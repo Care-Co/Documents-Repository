@@ -378,7 +378,7 @@
 
 | Method | URL                         |
 |--------|-----------------------------|
-| POST   | `/v1/users/{userId}/exists` |
+| GET    | `/v1/users/{userId}/exists` |
 
 ### Authorization
 
@@ -424,7 +424,7 @@
 ### cURL 명령어
 
 ```bash
-    curl --location --globoff 'https://carencoinc.com/kr/dev-auth/v1/users/{userId}/exists?version=null'
+    curl GET 'https://carencoinc.com/kr/dev-auth/v1/users/{userId}/exists?version=null'
 ```
 
 ## Response
