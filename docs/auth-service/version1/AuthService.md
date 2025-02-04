@@ -5,7 +5,7 @@
 
 <!-- api-1-start -->
 <details markdown="1">
-<summary><strong>&nbsp;API: Renewing access tokens with refresh tokens</strong></summary>
+<summary><strong>&nbsp;API: Reissue tokens</strong></summary>
 
 ## Basic Information
 
@@ -109,7 +109,7 @@
 
 <!-- api-2-start -->
 <details markdown="1">
-  <summary><strong>&nbsp;API: Changing your KeyClock account password(Version="2025-01-31")</strong></summary>
+  <summary><strong>&nbsp;API: changePassword(Version="2025-01-31")</strong></summary>
 
 ## Basic Information
 
@@ -231,34 +231,12 @@
 
 ### Request
 
-[//]: # (#### - Parameters&#40;@PathVariable&#41;)
-
-[//]: # ()
-
-[//]: # (| Name      | Type   | Description                                  | Required | Remarks                                                             |)
-
-[//]: # (|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|)
-
-[//]: # (| `userId`  | String | User Unique identifier                       | Yes      |                                                                     |)
-
 #### - Parameters(@RequestParam)
 
 | Name      | Type   | Description                                  | Required | Remarks                                                             |
 |-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
 | `version` | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
 | `email`   | String | Emails to check for duplicates (username)    | Yes      |                                                                     |
-
-[//]: # (#### - Parameters&#40;@ModelAttribute&#41;)
-
-[//]: # ()
-
-[//]: # (| Name                                    | Type   | Description  | Required | Remarks |)
-
-[//]: # (|-----------------------------------------|--------|--------------|----------|---------|)
-
-[//]: # (| `ChangePasswordRequest`                 | Object |              | Yes      |         |)
-
-[//]: # (| `ChangePasswordRequest.currentPassword` | Stirng | 기존 사용하던 비밀번호 | Yes      |         |)
 
 ### Response
 
@@ -296,8 +274,8 @@
 
 ```json
 {
-  "message": "Email is duplicated." or "Email is available.",
-  "data": true or false
+  "message": "Email is duplicated. or Email is available.",
+  "data": "true or false"
 }
 ```
 

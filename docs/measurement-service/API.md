@@ -1,6 +1,6 @@
 # Measurement-Service
 
-    - Basic Domain: https://carencoinc.com/kr/dev-measurement
+    - Basic Domain: https://carencoinc.com/kr/measurement-service
     - Basic IP: 15.165.125.100:8084
 
 ## API: CreateFootprintRecord
