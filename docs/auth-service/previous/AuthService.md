@@ -3,9 +3,11 @@
     - Basic Domain: https://carencoinc.com/kr/dev-auth
     - Basic IP: 15.165.125.100:8082
 
-## API: UserRegister
+<!-- api-1-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: User Register</strong></summary>
 
-### Basic Information
+## Basic Information
 
 | Method | URL         |
 |--------|-------------|
@@ -13,9 +15,9 @@
 
     - Email verification is required after registration to enable login.
 
-#### Request
+### Request
 
-###### Parameters(@RequestBody)
+#### Parameters(@RequestBody)
 
 **RegisterDto**
 
@@ -41,9 +43,17 @@
 | `data`        | Object | API result data                        |
 | `data.userId` | String | Unique identifier for the created user |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl --location 'https://carencoinc.com/kr/dev-auth/register' \
@@ -56,9 +66,11 @@ curl --location 'https://carencoinc.com/kr/dev-auth/register' \
 
 ```
 
-#### Response
+## Response
 
-##### 201 Created
+<details>
+<summary><strong>201 Created</strong></summary>
+
 
 ###### Header
 
@@ -73,7 +85,11 @@ curl --location 'https://carencoinc.com/kr/dev-auth/register' \
 }
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
 
 ###### Body
 
@@ -81,20 +97,27 @@ curl --location 'https://carencoinc.com/kr/dev-auth/register' \
 {
 }
 ```
+</details>
+</details>
 
 ---
+</details>
+<!-- api-1-end -->
 
-## API: Login
+<!-- api-2-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Login</strong></summary>
 
-### Basic Information
+
+## Basic Information
 
 | Method | URL      |
 |--------|----------|
 | POST   | `/login` |
 
-#### Request
+### Request
 
-###### Parameters(@RequestParam)
+#### Parameters(@RequestParam)
 
 | Name       | Type   | Description | Required | Remarks |
 |------------|--------|-------------|----------|---------|
@@ -115,17 +138,26 @@ curl --location 'https://carencoinc.com/kr/dev-auth/register' \
 | `token.refreshToken`     | String        | The refresh token used to obtain a new access token           |
 | `token.refreshExpiresAt` | LocalDateTime | The expiration date and time of the issued refresh token      |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+
 
 ```bash
 curl --location --request POST 'https://carencoinc.com/kr/dev-auth/login?username=&password=' \
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
 
 ###### Body
 
@@ -142,7 +174,11 @@ curl --location --request POST 'https://carencoinc.com/kr/dev-auth/login?usernam
 }
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
 
 ###### Body
 
@@ -151,7 +187,20 @@ curl --location --request POST 'https://carencoinc.com/kr/dev-auth/login?usernam
 }
 ```
 
+</details>
+
+</details>
+
 ---
+
+</details>
+<!-- api-2-end -->
+
+<!-- api-3-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Refresh Token</strong></summary>
+
+
 
 ## API: refreshToken
 
@@ -161,9 +210,9 @@ curl --location --request POST 'https://carencoinc.com/kr/dev-auth/login?usernam
 |--------|----------|
 | POST   | `/token` |
 
-#### Request
+### Request
 
-###### Parameters(@RequestParam)
+#### Parameters(@RequestParam)
 
 | Name           | Type   | Description | Required | Remarks |
 |----------------|--------|-------------|----------|---------|
@@ -183,17 +232,26 @@ curl --location --request POST 'https://carencoinc.com/kr/dev-auth/login?usernam
 | `token.refreshToken`     | String        | The refresh token used to obtain a new access token           |
 | `token.refreshExpiresAt` | LocalDateTime | The expiration date and time of the issued refresh token      |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl --location --request POST 'https://carencoinc.com/kr/dev-auth/token?refreshToken=' \
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
 
 ###### Body
 
@@ -209,8 +267,10 @@ curl --location --request POST 'https://carencoinc.com/kr/dev-auth/token?refresh
   }
 }
 ```
+</details>
 
-##### 400 BadRequest
+<details>
+<summary><strong>400 BadRequest</strong></summary>
 
 ###### Body
 
@@ -219,5 +279,11 @@ curl --location --request POST 'https://carencoinc.com/kr/dev-auth/token?refresh
   "message": "token refresh failed: + e.getMassage"
 }
 ```
+</details>
+
+</details>
 
 ---
+
+</details>
+<!-- api-3-end -->

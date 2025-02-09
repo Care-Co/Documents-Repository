@@ -3,6 +3,11 @@
     - Basic Domain: https://carencoinc.com/kr/dev-auth
     - Basic IP: 15.165.125.100:8082
 
+<!-- api-1-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: getUserinfo</strong></summary>
+
+
 ## API: getUserinfo
 
 ### Basic Information
@@ -11,9 +16,9 @@
 |--------|--------------|
 | GET    | `/user/{id}` |
 
-#### Request
+### Request
 
-###### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name | Type   | Description       | Required | Remarks |
 |------|--------|-------------------|----------|---------|
@@ -37,17 +42,27 @@
 | `data.height`      | Double    | The height of the user in centimeters                |
 | `data.weight`      | Double    | The weight of the user in kilograms                  |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl GET 'https://carencoinc.com/kr/dev-auth/users/{id}'
 ```
 
-#### Response
+## Response
 
-##### 200 Ok
+<details>
+<summary><strong>200 OK</strong></summary>
+
 
 ###### Body
 
@@ -69,7 +84,10 @@ curl GET 'https://carencoinc.com/kr/dev-auth/users/{id}'
 }
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
 
 ###### Body
 
@@ -77,9 +95,20 @@ curl GET 'https://carencoinc.com/kr/dev-auth/users/{id}'
 {
 }
 ```
+</details>
 
+</details>
 
 ---
+
+</details>
+<!-- api-1-end -->
+
+
+<!-- api-2-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: updateUserinfo</strong></summary>
+
 
 ## API: updateUserinfo
 
@@ -89,15 +118,15 @@ curl GET 'https://carencoinc.com/kr/dev-auth/users/{id}'
 |--------|--------------|
 | PUT    | `/user/{id}` |
 
-#### Request
+### Request
 
-###### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name | Type   | Description       | Required | Remarks |
 |------|--------|-------------------|----------|---------|
 | `id` | String | Unique identifier | Yes      |         |
 
-###### Parameters(@RequestBody)
+#### Parameters(@RequestBody)
 
 **UserDto**
 
@@ -132,9 +161,18 @@ curl GET 'https://carencoinc.com/kr/dev-auth/users/{id}'
 | `data.height`      | Double    | The height of the user in centimeters                |
 | `data.weight`      | Double    | The weight of the user in kilograms                  |
 
-### Example
 
-#### Request
+<details markdown=>
+  <summary><strong>Example</strong></summary>
+
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl PUT 'https://carencoinc.com/kr/dev-auth/users/{id}' \
@@ -150,9 +188,11 @@ curl PUT 'https://carencoinc.com/kr/dev-auth/users/{id}' \
 }'
 ```
 
-#### Response
+## Response
 
-##### 200 Ok
+<details>
+<summary><strong>200 OK</strong></summary>
+
 
 ###### Body
 
@@ -174,7 +214,11 @@ curl PUT 'https://carencoinc.com/kr/dev-auth/users/{id}' \
 }
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
 
 ###### Body
 
@@ -183,4 +227,11 @@ curl PUT 'https://carencoinc.com/kr/dev-auth/users/{id}' \
 }
 ```
 
+</details>
+
+</details>
+
 ---
+
+</details>
+<!-- api-2-end -->
