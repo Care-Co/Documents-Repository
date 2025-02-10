@@ -53,7 +53,7 @@
 
 아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
 
-[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/request/27911837-b07d5461-ecfa-4ffe-aa56-0f462f84ecbb?action=share&creator=32584424&ctx=documentation)
 
 ```bash
 curl --location 'https://carencoinc.com/kr/dev-auth/register' \
@@ -147,7 +147,7 @@ curl --location 'https://carencoinc.com/kr/dev-auth/register' \
 
 아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
 
-[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/request/27911837-eac83280-4ecc-47af-863b-910363399f76?action=share&creator=32584424&ctx=documentation)
 
 
 ```bash
@@ -242,7 +242,7 @@ curl --location --request POST 'https://carencoinc.com/kr/dev-auth/login?usernam
 
 아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
 
-[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/request/27911837-52765216-80ee-4286-befb-9407cb282d63?action=share&creator=32584424&ctx=documentation)
 
 ```bash
 curl --location --request POST 'https://carencoinc.com/kr/dev-auth/token?refreshToken=' \

@@ -45,7 +45,7 @@
 
 아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
 
-[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/request/27911837-3413a747-26c6-4b63-a406-5992e43ad072?action=share&creator=32584424&ctx=documentation)
 
 ```bash
 curl -X 'GET' \
@@ -130,7 +130,7 @@ curl -X 'GET' \
 
 아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
 
-[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/request/27911837-613ffcc6-eeb0-4308-9bc7-5c8f08214c60?action=share&creator=32584424&ctx=documentation)
 
 
 ```bash
@@ -212,7 +212,7 @@ curl -X 'GET' \
 
 아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
 
-[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/request/27911837-057af183-fbc0-4599-991b-20168d4eda9c?action=share&creator=32584424&ctx=documentation)
 
 ```bash
 curl -X 'POST' \

@@ -52,7 +52,7 @@
 
 아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
 
-[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/request/27911837-dfccbfa3-27ad-49b1-8528-e956646d3614?action=share&creator=32584424&ctx=documentation)
 
 ```bash
 curl GET 'https://carencoinc.com/kr/dev-auth/users/{id}'
@@ -172,7 +172,7 @@ curl GET 'https://carencoinc.com/kr/dev-auth/users/{id}'
 
 아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
 
-[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/request/27911837-b66132cf-28f1-499d-98b8-a290888238f4?action=share&creator=32584424&ctx=documentation)
 
 ```bash
 curl PUT 'https://carencoinc.com/kr/dev-auth/users/{id}' \
