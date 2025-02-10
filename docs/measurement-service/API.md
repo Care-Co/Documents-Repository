@@ -3,23 +3,28 @@
     - Basic Domain: https://carencoinc.com/kr/measurement-service
     - Basic IP: 15.165.125.100:8084
 
-## API: CreateFootprintRecord
 
-### Basic Information
+<!-- api-1-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: CreateFootprintRecord</strong></summary>
+
+
+
+## Basic Information
 
 | Method | URL                       |
 |--------|---------------------------|
 | POST   | `/v1/footprints/{userId}` |
 
-#### Request
+### Request
 
-###### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name     | Type   | Description            | Required | Remarks |
 |----------|--------|------------------------|----------|---------|
 | `userId` | String | User Unique identifier | Yes      |         |
 
-###### Parameters(@RequestParam)
+#### Parameters(@RequestParam)
 
 | Name        | Type          | Description                          | Required | Remarks |
 |-------------|---------------|--------------------------------------|----------|---------|
@@ -50,17 +55,25 @@
 | `data.footprintImageUrl`  | String        | URL of the saved plantar pressure image                                          |
 | `data.weight`             | Double        | The user's weight (in kilograms)                                                 |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
   curl POST 'https://carencoinc.com/kr/measurement-service/v1/footprints/{userId}?timestamp=&rawData='
 ```
 
-#### Response
+## Response
 
-##### 200 Ok
+<details>
+<summary><strong>200 OK</strong></summary>
 
 ###### Body
 
@@ -87,7 +100,10 @@
 }
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
 
 ###### Body
 
@@ -97,8 +113,10 @@
   "error": "Error detail message"
 }
 ```
+</details>
 
-##### 503 InternalServerError
+<details>
+<summary><strong>500 InternalServerError</strong></summary>
 
 ###### Body
 
@@ -109,25 +127,36 @@
 }
 ```
 
+</details>
+
+</details>
+
 ---
 
-## API: getFootprintRecords
+</details>
+<!-- api-1-end -->
 
-### Basic Information
+
+<!-- api-2-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: getFootprintRecords</strong></summary>
+
+
+## Basic Information
 
 | Method | URL                       |
 |--------|---------------------------|
 | GET    | `/v1/footprints/{userId}` |
 
-#### Request
+### Request
 
-###### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name     | Type   | Description            | Required | Remarks |
 |----------|--------|------------------------|----------|---------|
 | `userId` | String | User Unique identifier | Yes      |         |
 
-###### Parameters(@RequestParam)
+#### Parameters(@RequestParam)
 
 | Name   | Type          | Description                                  | Required | Remarks |
 |--------|---------------|----------------------------------------------|----------|---------|
@@ -194,9 +223,9 @@
 >     "error": "Detailed error message explaining the issue"
 >   }
 
-#### Response
+### Response
 
-##### Body
+#### Body
 
 | Name                      | Type          | Description                                                                      |
 |---------------------------|---------------|----------------------------------------------------------------------------------|
@@ -218,17 +247,27 @@
 | `data.footprintImageUrl`  | String        | URL of the saved plantar pressure image                                          |
 | `data.weight`             | Double        | The user's weight (in kilograms)                                                 |
 
-### Example
 
-#### Request
+<details markdown=>
+  <summary><strong>Example</strong></summary>
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+
 
 ```bash
   curl GET 'https://carencoinc.com/kr/measurement-service/v1/footprints/{userId}'
 ```
 
-#### Response
+## Response
 
-##### 200 Ok
+<details>
+<summary><strong>200 OK</strong></summary>
 
 ###### Body
 
@@ -274,8 +313,10 @@
 }
 ```
 
-##### 400 BadRequest
+</details>
 
+<details>
+<summary><strong>400 BadRequest</strong></summary>
 ###### Body
 
 ```json
@@ -285,7 +326,10 @@
 }
 ```
 
-##### 503 InternalServerError
+</details>
+
+<details>
+<summary><strong>500 InternalServerError</strong></summary>
 
 ###### Body
 
@@ -296,19 +340,29 @@
 }
 ```
 
+</details>
+
+</details>
+
 ---
 
-## API: DeleteFootprintRecord
+</details>
+<!-- api-2-end -->
 
-### Basic Information
+
+<!-- api-3-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: DeleteFootprintRecord</strong></summary>
+
+## Basic Information
 
 | Method | URL                   |
 |--------|-----------------------|
 | POST   | `/v1/footprints/{id}` |
 
-#### Request
+### Request
 
-###### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name | Type | Description                       | Required | Remarks |
 |------|------|-----------------------------------|----------|---------|
@@ -322,17 +376,25 @@
 |---------------------------|---------------|----------------------------------------------------------------------------|
 | `message`                 | String        | The result message of the API call (e.g., plantar pressure record deleted) |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
   curl DELETE 'https://carencoinc.com/kr/measurement-service/v1/footprints/{id}
 ```
 
-#### Response
+## Response
 
-##### 200 Ok
+<details>
+<summary><strong>200 OK</strong></summary>
 
 ###### Body
 
@@ -342,7 +404,10 @@
 }
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
 
 ###### Body
 
@@ -353,7 +418,10 @@
 }
 ```
 
-##### 503 InternalServerError
+</details>
+
+<details>
+<summary><strong>500 InternalServerError</strong></summary>
 
 ###### Body
 
@@ -363,3 +431,12 @@
   "error": "Error detail message"
 }
 ```
+
+</details>
+
+</details>
+
+---
+
+</details>
+<!-- api-1-end -->

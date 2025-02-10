@@ -1,16 +1,13 @@
-# API Reference
+# IoT Service
+    - Basic Domain: https://carencoinc.com/kr/iot-service/
+    - Version: 1.0.1
 
-- Ver: 1.0.1
+<!-- api-1-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Device Status Check</strong></summary>
 
-## Host
 
-| Domain Address                         |
-|----------------------------------------|
-| https://carencoinc.com/kr/iot-service/ |
-
-## Device Status Check
-
-### Basic Information
+## Basic Information
 
 - Checks the device's status, including sensor status, battery information.
 
@@ -38,9 +35,17 @@
 |-----------|--------|------------------------------------|
 | `message` | String | Device status check result message |
 
-#### Example
 
-##### Request
+<details markdown=>
+  <summary><strong>Example</strong></summary>
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'GET' \
@@ -55,17 +60,20 @@ curl -X 'GET' \
 }'
 ```
 
-##### Response
+## Response
 
-###### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
 
 ```json
 {
   "message": "Scale check passed"
 }
 ```
+</details>
 
-###### 400 BadRequest
+<details>
+<summary><strong>400 BadRequest</strong></summary>
 
 ```json
 {
@@ -74,11 +82,22 @@ curl -X 'GET' \
 }
 ```
 
+</details>
+
+</details>
+
 ---
 
-## Device OTA Update
+</details>
+<!-- api-1-end -->
 
-### Basic Information
+
+<!-- api-2-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Device OTA Update</strong></summary>
+
+
+## Basic Information
 
 - Performs an OTA update on the device.
 
@@ -102,18 +121,27 @@ curl -X 'GET' \
 |-----------|--------|-----------------------------|
 | `message` | String | Status check result message |
 
-#### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-##### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
+
 
 ```bash
 curl -X 'GET' \
 'https://carencoinc.com/kr/iot-service/scale/ota?version='
 ```
 
-##### Response
+## Response
 
-###### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
 
 ```json
 {
@@ -121,7 +149,10 @@ curl -X 'GET' \
 }
 ```
 
-###### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
 
 ```json
 {
@@ -130,11 +161,21 @@ curl -X 'GET' \
 }
 ```
 
+</details>
+
+</details>
+
 ---
 
-## Measurement Recording
+</details>
+<!-- api-2-end -->
 
-### Basic Information
+<!-- api-3-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Measurement Recording</strong></summary>
+
+
+## Basic Information
 
 - Records measurement data from the device.
 
@@ -162,9 +203,16 @@ curl -X 'GET' \
 |-----------|--------|----------------------------------------------------------------------|
 | `message` | String | Measurement data recorded with UID, Data, Time, MAC, and Region info |
 
-#### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-##### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'POST' \
@@ -188,9 +236,10 @@ curl -X 'POST' \
 ]'
 ```
 
-##### Response
+## Response
 
-###### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
 
 ```json
 {
@@ -198,7 +247,10 @@ curl -X 'POST' \
 }
 ```
 
-###### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
 
 ```json
 {
@@ -206,3 +258,11 @@ curl -X 'POST' \
   "message": "Invalid parameters"
 }
 ```
+</details>
+
+</details>
+
+---
+
+</details>
+<!-- api-3-end -->
