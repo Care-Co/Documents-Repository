@@ -1,7 +1,10 @@
-###
+# Demo User Service
+    - Basic Domain: https://carencoinc.com/kr/demo
+    - Basic IP: 15.165.125.100:8085
 
-
-# `btobController` - Create User Data
+<!-- api-1-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Create User Data</strong></summary>
 
 ## Basic Information
 
@@ -9,9 +12,9 @@
 |--------|----------|
 | POST   | `/users` |
 
-## Request
+### Request
 
-### Parameters(@RequestBody)
+#### Parameters(@RequestBody)
 
 | Name       | Type   | Description                               | Required |
 |------------|--------|-------------------------------------------|----------|
@@ -19,9 +22,9 @@
 | `birthday` | String | 생년 (4자리 년도, 예: `1990`)                    | Yes      |
 | `height`   | Double | 키 (소수점을 포함한 실수 값)                         | Yes      |
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name                   | Type              | Description                 |
 |------------------------|-------------------|-----------------------------|
@@ -40,9 +43,16 @@
 | `occupation`           | String (Nullable) | 사용자 직업                      |
 | `userRecords`          | List              | 사용자 기록 목록                   |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'POST' \
@@ -56,9 +66,12 @@ curl -X 'POST' \
 
 ```
 
-#### Response
+## Response
 
-##### 201 Created
+<details>
+<summary><strong>201 Created</strong></summary>
+
+###### Body
 
 ```json
   {
@@ -79,7 +92,12 @@ curl -X 'POST' \
 }
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
 
 ```json
 [
@@ -87,9 +105,18 @@ curl -X 'POST' \
 ]
 ```
 
+</details>
+
+</details>
+
 ---
 
-# `btobController` - Retrieve User Data
+</details>
+<!-- api-1-end -->
+
+<!-- api-2-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Retrieve User Data</strong></summary>
 
 ## Basic Information
 
@@ -97,17 +124,17 @@ curl -X 'POST' \
 |--------|-------------------|
 | GET    | `/users/{userId}` |
 
-## Request
+### Request
 
-### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name     | Type | Description | Required |
 |----------|------|-------------|----------|
 | `userId` | UUID | User 고유 식별자 | Yes      |
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name                   | Type              | Description                 |
 |------------------------|-------------------|-----------------------------|
@@ -126,18 +153,28 @@ curl -X 'POST' \
 | `occupation`           | String (Nullable) | 사용자 직업                      |
 | `userRecords`          | List<Object>      | 사용자 기록 목록                   |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'GET' \
 'http://15.165.125.100:8085/demo/v1/users/{userId}'
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 [
@@ -161,13 +198,29 @@ curl -X 'GET' \
 ]
 ```
 
-##### 404 NotFound
+</details>
+
+<details>
+<summary><strong>404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
+</details>
+
+</details>
+
 ---
+
+</details>
+<!-- api-2-end -->
+
+<!-- api-3-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Create Footprint Data</strong></summary>
 
 # `DemoController` - Create Footprint Data
 
@@ -211,9 +264,16 @@ curl -X 'GET' \
 | `accuracy`        | Integer       | 정확도 (데이터의 신뢰성이나 정확도를 나타내는 값) |
 | `imageUrl`        | String        | 측정 결과 이미지 URL                |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'POST' \
@@ -226,9 +286,12 @@ curl -X 'POST' \
 
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 [
@@ -249,21 +312,40 @@ curl -X 'POST' \
 ]
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
-##### 404 NotFound
+</details>
+
+<details>
+<summary><strong>404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
+
+</details>
+
+</details>
 
 ---
 
-# `DemoController` - Create Pose Data
+</details>
+<!-- api-3-end -->
+
+<!-- api-4-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Create Pose Data</strong></summary>
 
 ## Basic Information
 
@@ -271,23 +353,23 @@ curl -X 'POST' \
 |--------|------------------------|
 | POST   | `/users/{userId}/pose` |
 
-## Request
+### Request
 
-### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name     | Type | Description | Required |
 |----------|------|-------------|----------|
 | `userId` | UUID | User 고유 식별자 | Yes      |
 
-### Parameters(@RequestParam)
+#### Parameters(@RequestParam)
 
 | Name   | Type          | Description | Required |
 |--------|---------------|-------------|----------|
 | `file` | MultipartFile | 측정된 영상 데이터  | Yes      |
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name            | Type          | Description                              |
 |-----------------|---------------|------------------------------------------|
@@ -301,9 +383,16 @@ curl -X 'POST' \
 | `accuracy`      | Integer       | 정확도 (데이터의 신뢰성이나 정확도를 나타내는 값)             |
 | `imageUrl`      | String        | 측정 결과 이미지 URL                            |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'POST' \
@@ -313,9 +402,12 @@ curl -X 'POST' \
 
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 [
@@ -333,14 +425,33 @@ curl -X 'POST' \
 ]
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
-##### 404 NotFound
+</details>
+
+<details>
+<summary><strong>404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
+
+</details>
+
+</details>
+
+---
+
+</details>
+<!-- api-4-end -->

@@ -1,4 +1,10 @@
-# `btobController` - Retrieve Companies Data
+# Demo B2B Service
+    - Basic Domain: https://carencoinc.com/kr/demo
+    - Basic IP: 15.165.125.100:8085
+
+<!-- api-1-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Retrieve Companies Data</strong></summary>
 
 ## Basic Information
 
@@ -6,9 +12,9 @@
 |--------|-------------------|
 | GET    | `/btob/companies` |
 
-## Request
+### Request
 
-### Parameters(@RequestParam)
+#### Parameters(@RequestParam)
 
 | Name          | Type         | Description                           | Required |
 |---------------|--------------|---------------------------------------|----------|
@@ -22,9 +28,9 @@
     - `totalViewCountAsc`: 조회수 오름차순
     - `totalViewCountDesc`: 조회수 내림차순
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name                | Type    | Description    |
 |---------------------|---------|----------------|
@@ -37,18 +43,28 @@
 | `view`              | Object  | 조회수 관련 정보      |
 | `open`              | Boolean | 회사가 열려있는지 여부   |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'GET' \
 'http://15.165.125.100:8085/demo/v1/btob/companies?categories=GYM&companyName=First&sortBy=totalViewCountDesc'
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 [
@@ -81,21 +97,40 @@ curl -X 'GET' \
 ]
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
+
+```json
+[]
+```
+</details>
+
+<details>
+<summary><strong>404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
-##### 404 NotFound
+</details>
 
-```json
-[]
-```
+</details>
 
 ---
 
-# `btobController` - Retrieve Company Data
+</details>
+<!-- api-1-end -->
+
+
+<!-- api-2-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Retrieve Company Data</strong></summary>
 
 ## Basic Information
 
@@ -103,17 +138,17 @@ curl -X 'GET' \
 |--------|-------------------------------|
 | GET    | `/btob/companies/{comapnyId}` |
 
-## Request
+### Request
 
-### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name        | Type | Description    | Required |
 |-------------|------|----------------|----------|
 | `comapnyId` | UUID | Company 고유 식별자 | Yes      |
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name                                    | Type              | Description    |
 |-----------------------------------------|-------------------|----------------|
@@ -154,18 +189,28 @@ curl -X 'GET' \
 | `view.registrationPercentage`           | Float             | 등록된 비율 (%)     |
 | `open`                                  | Boolean           | 회사가 열려 있는지 여부  |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'GET' \
 'http://15.165.125.100:8085/demo/v1/btob/companies/{companyId}'
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 {
@@ -249,22 +294,39 @@ curl -X 'GET' \
   "open": true
 }
 ```
+</details>
 
-##### 400 BadRequest
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
+
+```json
+[]
+```
+</details>
+
+<details>
+<summary><strong>404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
-##### 404 NotFound
+</details>
 
-```json
-[]
-```
+</details>
 
 ---
 
-# `btobController` - Create Company Data
+</details>
+<!-- api-2-end -->
+
+<!-- api-3-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Create Company Data</strong></summary>
 
 ## Basic Information
 
@@ -272,9 +334,9 @@ curl -X 'GET' \
 |--------|-------------------|
 | POST   | `/btob/companies` |
 
-## Request
+### Request
 
-### Parameters(@RequestBody)
+#### Parameters(@RequestBody)
 
 | Name                 | Type         | Description                     | Required |
 |----------------------|--------------|---------------------------------|----------|
@@ -292,9 +354,9 @@ curl -X 'GET' \
 | `holidayClosingTime` | LocalTime    | 공휴일 영업 종료 시간                    | Yes      |
 | `closedDays`         | String       | 휴일 정보 (ex: 일요일, 공휴일)            | Yes      |
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name                | Type    | Description    |
 |---------------------|---------|----------------|
@@ -307,9 +369,12 @@ curl -X 'GET' \
 | `view`              | Object  | 조회수 관련 정보      |
 | `open`              | Boolean | 회사가 열려있는지 여부   |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+###### Body
 
 ```bash
 curl -X 'POST' \
@@ -331,9 +396,12 @@ curl -X 'POST' \
 
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 [
@@ -370,21 +438,41 @@ curl -X 'POST' \
 ]
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
-##### 404 NotFound
+</details>
+
+<details>
+<summary><strong>404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
+
+</details>
+
+</details>
 
 ---
 
-# `btobController` - Delete Company Data
+</details>
+<!-- api-3-end -->
+
+
+<!-- api-4-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Delete Company Data</strong></summary>
 
 ## Basic Information
 
@@ -392,34 +480,45 @@ curl -X 'POST' \
 |--------|-------------------------------|
 | DELETE | `/btob/companies/{companyId}` |
 
-## Request
+### Request
 
-### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name        | Type | Description    | Required |
 |-------------|------|----------------|----------|
 | `comapnyId` | UUID | Company 고유 식별자 | Yes      |
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name          | Type   | Description |
 |---------------|--------|-------------|
 | `Description` | String | 결과안내        |
 
-### Example
 
-#### Request
+<details markdown=>
+  <summary><strong>Example</strong></summary>
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'DELETE' \
 'http://15.165.125.100:8085/demo/v1/btob/companies/{companyId}'
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 [
@@ -427,19 +526,39 @@ curl -X 'DELETE' \
 ]
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
+```json
+[]
+```
+
+</details>
+
+<details>
+<summary><strong>##### 404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
-##### 404 NotFound
+</details>
 
-```json
-[]
-```
+</details>
 
 ---
+
+</details>
+<!-- api-4-end -->
+
+<!-- api-5-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Retrieve Employee Data</strong></summary>
 
 # `btobController` - Retrieve Employee Data
 
@@ -449,17 +568,17 @@ curl -X 'DELETE' \
 |--------|--------------------------------|
 | GET    | `/btob/employees/{employeeId}` |
 
-## Request
+### Request
 
-### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name         | Type | Description     | Required |
 |--------------|------|-----------------|----------|
 | `employeeId` | UUID | Employee 고유 식별자 | Yes      |
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name                                       | Type              | Description         |
 |--------------------------------------------|-------------------|---------------------|
@@ -508,18 +627,28 @@ curl -X 'DELETE' \
 | `company.view.registrationPercentage`      | Float             | 등록된 비율 (%)          |
 | `company.open`                             | Boolean           | 회사가 열려 있는지 여부       |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'GET' \
 'http://15.165.125.100:8085/demo/v1/btob/employees/{employeeId}'
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 {
@@ -602,21 +731,40 @@ curl -X 'GET' \
 }
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
-##### 404 NotFound
+</details>
+
+<details>
+<summary><strong>404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
+
+</details>
+
+</details>
 
 ---
 
-# `btobController` - Create Employee Data
+</details>
+<!-- api-5-end -->
+
+<!-- api-6-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Create Employee Data</strong></summary>
 
 ## Basic Information
 
@@ -624,15 +772,15 @@ curl -X 'GET' \
 |--------|-----------------------------------------|
 | POST   | `/btob/companies/{companyId}/employees` |
 
-## Request
+### Request
 
-### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name        | Type | Description    | Required |
 |-------------|------|----------------|----------|
 | `companyId` | UUID | Company 고유 식별자 | Yes      |
 
-### Parameters(@RequestBody)
+#### Parameters(@RequestBody)
 
 | Name                        | Type         | Description | Required |
 |-----------------------------|--------------|-------------|----------|
@@ -644,9 +792,9 @@ curl -X 'GET' \
 | `careerList[].careerOrder`  | Integer      | 경력 순서       | Yes      |
 | `careerList[].careerDetail` | String       | 경력 상세 정보    | Yes      |
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name                                       | Type              | Description         |
 |--------------------------------------------|-------------------|---------------------|
@@ -695,9 +843,16 @@ curl -X 'GET' \
 | `company.view.registrationPercentage`      | Float             | 등록된 비율 (%)          |
 | `company.open`                             | Boolean           | 회사가 열려 있는지 여부       |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'POST' \
@@ -717,9 +872,12 @@ curl -X 'POST' \
 }'
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 [
@@ -800,21 +958,40 @@ curl -X 'POST' \
 ]
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
-##### 404 NotFound
+</details>
+
+<details>
+<summary><strong>404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
+
+</details>
+
+</details>
 
 ---
 
-# `btobController` - Delete Employee Data
+</details>
+<!-- api-6-end -->
+
+<!-- api-7-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: Delete Employee Data</strong></summary>
 
 ## Basic Information
 
@@ -822,34 +999,44 @@ curl -X 'POST' \
 |--------|--------------------------------|
 | DELETE | `/btob/employees/{employeeId}` |
 
-## Request
+### Request
 
-### Parameters(@PathVariable)
+#### Parameters(@PathVariable)
 
 | Name         | Type | Description     | Required |
 |--------------|------|-----------------|----------|
 | `employeeId` | UUID | Employee 고유 식별자 | Yes      |
 
-## Response
+### Response
 
-### Body
+#### Body
 
 | Name          | Type   | Description |
 |---------------|--------|-------------|
 | `Description` | String | 결과안내        |
 
-### Example
+<details markdown=>
+  <summary><strong>Example</strong></summary>
 
-#### Request
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](http://naver.com)
 
 ```bash
 curl -X 'DELETE' \
 'http://15.165.125.100:8085/demo/v1/btob/employees/{employeeId}'
 ```
 
-#### Response
+## Response
 
-##### 200 OK
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
 
 ```json
 [
@@ -857,16 +1044,33 @@ curl -X 'DELETE' \
 ]
 ```
 
-##### 400 BadRequest
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
 
-##### 404 NotFound
+</details>
+
+<details>
+<summary><strong>404 NotFound</strong></summary>
+
+###### Body
 
 ```json
 []
 ```
+
+</details>
+
+</details>
 
 ---
+
+</details>
+<!-- api-7-end -->
