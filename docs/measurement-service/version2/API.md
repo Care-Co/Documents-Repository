@@ -6,9 +6,9 @@
 
 ### Endpoint
 
-| Method | URL                         |
-|--------|-----------------------------|
-| POST   | `users/{userId}/footprints` |
+| Method | URL                          |
+|--------|------------------------------|
+| POST   | `/users/{userId}/footprints` |
 
 ### Request
 
