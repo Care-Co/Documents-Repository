@@ -1,169 +1,103 @@
-# Measurement-Service
+# Version2 Measurement API Documents
 
-    - Basic Domain: https://carencoinc.com/kr/measurement-service
-    - Basic IP: 15.165.125.100:8084
+- BaseUrl: https://carencoinc.com/api/v2/measurement
 
+## GetFootprints
 
-<!-- api-1-start -->
-<details markdown="1">
-<summary><strong>&nbsp;API: CreateFootprintRecord</strong></summary>
+### Endpoint
 
-
-
-## Basic Information
-
-| Method | URL              |
-|--------|------------------|
-| POST   | `/v2/footprints` |
+| Method | URL                         |
+|--------|-----------------------------|
+| POST   | `users/{userId}/footprints` |
 
 ### Request
 
 #### Parameters(@RequestParam)
 
-| Name        | Type     | Description                                  | Required | Remarks                                                               |
-|-------------|----------|----------------------------------------------|----------|-----------------------------------------------------------------------|
-| `version`   | String   | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically.   |
+| Name      | Type          | Description                                   | Required | Remarks                                                             |
+|-----------|---------------|-----------------------------------------------|----------|---------------------------------------------------------------------|
+| `version` | String        | API version information (format: YYYY-MM-DD)  | No       | If not provided, the latest API version will be used automatically. |
+| `from`    | LocalDateTime | Query start date and time                     | No       |                                                                     |
+| `to`      | LocalDateTime | Query end date and time                       | No       |                                                                     |
+| `size`    | int           | Number of records to retrieve                 | No       |                                                                     |
+| `page`    | int           | Page number of the queried data               | No       |                                                                     |
+| `sort`    | String        | Sorting method (e.g., measuredDateTime, desc) | No       |                                                                     |
 
-#### Parameters(@RequestBody)
-| Name                 | Type          | Description                                               | Required | Remarks |
-|----------------------|---------------|-----------------------------------------------------------|----------|---------|
-| `userId`             | String        | User Unique identifier                                    | Yes      |         |
-| `measuredDateTime`   | LocalDateTime | Measurement date and time                                 | Yes      |         |
-| `rawData`            | String        | Measured raw data                                         | Yes      |         |
-| `firstClassType`     | Double        | The first-ranked plantar pressure class type              | Yes      |         |
-| `firstAccuracy`      | Double        | The accuracy (similarity) of the first-ranked class type  | Yes      |         |
-| `secondaryClassType` | Double        | The second-ranked plantar pressure class type             | Yes      |         |
-| `secondaryAccuracy`  | Double        | The accuracy (similarity) of the second-ranked class type | Yes      |         |
-| `thirdClassType`     | Double        | The third-ranked plantar pressure class type              | Yes      |         |
-| `thirdAccuracy`      | Double        | The accuracy (similarity) of the third-ranked class type  | Yes      |         |
-| `leftFootLength`     | Double        | Length of the left foot (in millimeters)                  | Yes      |         |
-| `leftFootWidth`      | Double        | Width of the left foot (in millimeters)                   | Yes      |         |
-| `rightFootLength`    | Double        | Length of the right foot (in millimeters)                 | Yes      |         |
-| `rightFootWidth`     | Double        | Width of the right foot (in millimeters)                  | Yes      |         |
-| `userId`             | String        | URL of the saved plantar pressure image                   | Yes      |         |
-| `weight`             | Double        | The user's weight (in kilograms)                          | Yes      |         |
-
+> ### Additional Query Logic for `GetFootprintRecords`
+> The `findByUserIdAndDateTimeRange` method includes logic to filter records based on various conditions. Below are the
+> details:
+>
+> #### Query Conditions
+>
+> 1. **Both `from` and `to` parameters are provided:**
+     >     - Filters records where the measurement timestamp (`measuredDateTime`) is between `fromDateTime` and
+     `toDateTime` (inclusive).
+     >     - Repository method: `findByUserIdAndMeasuredDateTimeBetween`.
+>
+> 2. **Only `from` parameter is provided:**
+     >     - Filters records where the measurement timestamp (`measuredDateTime`) is after `fromDateTime`.
+     >     - Repository method: `findByUserIdAndMeasuredDateTimeAfter`.
+>
+> 3. **Only `to` parameter is provided:**
+     >     - Filters records where the measurement timestamp (`measuredDateTime`) is before `toDateTime`.
+     >     - Repository method: `findByUserIdAndMeasuredDateTimeBefore`.
+>
+> 4. **Neither `from` nor `to` parameters are provided:**
+     >     - Returns all records for the given user, without date filtering.
+     >     - Repository method: `findByUserId`.
+>
+> #### Pagination and Sorting
+>
+> - **Pagination:**
+    >     - The `page` and `size` parameters determine the pagination behavior.
+    >     - These are passed into the `PageRequest` object to fetch the corresponding page of records.
+>
+> - **Sorting:**
+    >     - The `sort` parameter defines the sorting behavior. It should follow the format: `field,direction`.
+    >         - `field`: The name of the field to sort by (e.g., `measuredDateTime`).
+    >         - `direction`: Sorting direction (`asc` for ascending, `desc` for descending). Defaults to ascending if
+    omitted.
+    >     - Example values:
+    >         - `measuredDateTime,desc`: Sort by `measuredDateTime` in descending order.
+    >         - `weight,asc`: Sort by `weight` in ascending order.
+    >
+- **Error Handling:**
+  >         - If the `sort` parameter is invalid, an `IllegalArgumentException` is thrown with a message explaining the
+  expected format.
+>
+> #### Example Query Scenarios
+>
+> 1. **Retrieve all records for a user within a specific date range, sorted by timestamp in descending order:**
+     >     - Parameters: `from=2025-01-01T00:00:00`, `to=2025-01-31T23:59:59`, `sort=measuredDateTime,desc`.
+>
+> 2. **Retrieve all records after a specific date:**
+     >     - Parameters: `from=2025-01-01T00:00:00`, `sort=measuredDateTime,asc`.
+>
+> 3. **Retrieve paginated records without any date filters:**
+     >     - Parameters: `page=1`, `size=10`.
 
 ### Response
 
 #### Body
 
-| Name                      | Type          | Description                                                                      |
-|---------------------------|---------------|----------------------------------------------------------------------------------|
-| `message`                 | String        | The result message of the API call (e.g., plantar pressure measurement complete) |
-| `data`                    | Object        | Contains data related to the user's plantar pressure                             |
-| `data.id`                 | UUID          | Unique identifier (ID) for the plantar pressure record                           |
-| `data.userId`             | String        | ID of the user who requested the measurement                                     |
-| `data.measuredDateTime`   | LocalDateTime | The date and time when the plantar pressure measurement was taken                |
-| `data.firstClassType`     | Double        | The first-ranked plantar pressure class type                                     |
-| `data.firstAccuracy`      | Double        | The accuracy (similarity) of the first-ranked class type                         |
-| `data.secondaryClassType` | Double        | The second-ranked plantar pressure class type                                    |
-| `data.secondaryAccuracy`  | Double        | The accuracy (similarity) of the second-ranked class type                        |
-| `data.thirdClassType`     | Double        | The third-ranked plantar pressure class type                                     |
-| `data.thirdAccuracy`      | Double        | The accuracy (similarity) of the third-ranked class type                         |
-| `data.leftFootLength`     | Double        | Length of the left foot (in millimeters)                                         |
-| `data.leftFootWidth`      | Double        | Width of the left foot (in millimeters)                                          |
-| `data.rightFootLength`    | Double        | Length of the right foot (in millimeters)                                        |
-| `data.rightFootWidth`     | Double        | Width of the right foot (in millimeters)                                         |
-| `data.footprintImageUrl`  | String        | URL of the saved plantar pressure image                                          |
-| `data.weight`             | Double        | The user's weight (in kilograms)                                                 |
-
-<details markdown=>
-  <summary><strong>Example</strong></summary>
-
-## Request
-
-### Postman 요청
-
-아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
-
-[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/request/27911837-83f0189c-4197-4fa5-85d6-fc0ee4003610?action=share&creator=32584424&ctx=documentation)
-
-```bash
-  curl POST 'https://carencoinc.com/kr/measurement-service/v2/footprints/?version='\
---header 'Content-Type: application/json' \
---data '{
-    "userId": "469a4b9a-986d-429f-82ba-0795ab91c2d3",
-    "measuredDateTime": "2025-02-18T10:15:30",
-    "rawData": "<rawData sample>",
-    "firstClassType": 1.0,
-    "firstAccuracy": 98.5,
-    "secondaryClassType": 2.0,
-    "secondaryAccuracy": 97.0,
-    "thirdClassType": 3.0,
-    "thirdAccuracy": 96.5,
-    "leftFootLength": 250.0,
-    "leftFootWidth": 100.0,
-    "rightFootLength": 255.0,
-    "rightFootWidth": 105.0,
-    "footprintImageUrl": "http://example.com/footprint.jpg",
-    "weight": 70.0
-}'
-```
-
-
-## Response
-
-<details>
-<summary><strong>200 OK</strong></summary>
-
-###### Body
-
-```json
-{
-  "message": "Plantar pressure measurement complete",
-  "data": {
-    "id": "",
-    "userId": "469a4b9a-986d-429f-82ba-0795ab91c2d3",
-    "measuredDateTime": "2025-02-18T10:15:30",
-    "firstClassType": 1.0,
-    "firstAccuracy": 98.5,
-    "secondaryClassType": 2.0,
-    "secondaryAccuracy": 97.0,
-    "thirdClassType": 3.0,
-    "thirdAccuracy": 96.5,
-    "leftFootLength": 250.0,
-    "leftFootWidth": 100.0,
-    "rightFootLength": 255.0,
-    "rightFootWidth": 105.0,
-    "footprintImageUrl": "http://example.com/footprint.jpg",
-    "weight": 70.0
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>400 BadRequest</strong></summary>
-
-###### Body
-
-```json
-{
-  "message": "Invalid request parameters",
-  "error": "Error detail message"
-}
-```
-</details>
-
-<details>
-<summary><strong>500 InternalServerError</strong></summary>
-
-###### Body
-
-```json
-{
-  "message": "Error creating footprint record",
-  "error": "Error detail message"
-}
-```
-
-</details>
-
-</details>
+| Name                      | Type          | Description                                                       |
+|---------------------------|---------------|-------------------------------------------------------------------|
+| `success`                 | boolean       | Indicates whether the API call was successful (true/false)        |
+| `data`                    | Object        | Contains data related to the user's plantar pressure              |
+| `data.id`                 | UUID          | Unique identifier (ID) for the plantar pressure record            |
+| `data.userId`             | String        | ID of the user who requested the measurement                      |
+| `data.measuredDateTime`   | LocalDateTime | The date and time when the plantar pressure measurement was taken |
+| `data.firstClassType`     | Double        | The first-ranked plantar pressure class type                      |
+| `data.firstAccuracy`      | Double        | The accuracy (similarity) of the first-ranked class type          |
+| `data.secondaryClassType` | Double        | The second-ranked plantar pressure class type                     |
+| `data.secondaryAccuracy`  | Double        | The accuracy (similarity) of the second-ranked class type         |
+| `data.thirdClassType`     | Double        | The third-ranked plantar pressure class type                      |
+| `data.thirdAccuracy`      | Double        | The accuracy (similarity) of the third-ranked class type          |
+| `data.leftFootLength`     | Double        | Length of the left foot (in millimeters)                          |
+| `data.leftFootWidth`      | Double        | Width of the left foot (in millimeters)                           |
+| `data.rightFootLength`    | Double        | Length of the right foot (in millimeters)                         |
+| `data.rightFootWidth`     | Double        | Width of the right foot (in millimeters)                          |
+| `data.footprintImageUrl`  | String        | URL of the saved plantar pressure image                           |
+| `data.weight`             | Double        | The user's weight (in kilograms)                                  |
 
 ---
-
-</details>
-<!-- api-1-end -->
