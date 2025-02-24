@@ -28,7 +28,7 @@
 
 | Name       | Type   | Description          | Required | Remarks |
 |------------|--------|----------------------|----------|---------|
-| `username` | String | username으로 사용할 email | Yes      |         |
+| `username` | String | username으로 사용할 email | Yes |         |
 | `password` | String | password             | Yes      |         |
 
 ### Response
@@ -46,6 +46,55 @@
 | `success` | boolean | Indicates whether the API call was successful (true/false) |
 | `data`    | Object  | Contains the data for the user                             |
 | `data.id` | String  | Unique identifier (ID) for the user                        |
+
+
+
+## Example
+### Request
+
+```bash
+  curl POST 'https://carencoinc.com/api/v2/auth/register'
+    --header 'Content-Type: application/json' \
+    --data '{
+        "username": "",
+        "password": ""
+    }'
+```
+
+### Response
+
+#### 201 Created
+###### Body
+
+```json
+{
+  "success": true,
+  "data": "71ce665d-10c9-4fed-bd70-d53f547bf917"
+}
+```
+#### 400 Bad Request(Duplicated User)
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "A username or email that already exists.",
+  "error": "CHECK_PARAMETER"
+}
+```
+
+#### 400 Bad Request(Invalid Parameter)
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid parameter entry.",
+  "error": "CHECK_PARAMETER"
+}
+```
+
+
 
 ---
 
@@ -89,6 +138,60 @@
 | `token.userId`       | String  | Unique identifier for the user.                                               |
 | `token.accessToken`  | String  | Access token used for authenticating API requests.                            |
 | `token.refreshToken` | String  | Refresh token used to obtain a new access token when the current one expires. |
+
+
+
+## Example
+### Request
+
+```bash
+  curl POST 'https://carencoinc.com/api/v2/auth/login'
+    --header 'Content-Type: application/json' \
+    --data '{
+        "username": "",
+        "password": ""
+    }'
+```
+
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true,
+  "token": {
+    "userId": "71ce665d-10c9-4fed-bd70-d53f547bf917",
+    "accessToken": "",
+    "refreshToken": ""
+  }
+}
+```
+#### 400 Bad Request(Invalid Parameter)
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid parameter entry.",
+  "error": "CHECK_PARAMETER"
+}
+```
+
+#### 400 Bad Request(Invalid Login Credentials)
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid username or password",
+  "error": "CHECK_PARAMETER"
+}
+```
+
+
+
 
 ---
 
@@ -139,6 +242,73 @@
 | `data.birthday`    | LocalDate | User's date of birth.                                       |
 | `data.height`      | double    | User's height (e.g., in centimeters).                       |
 | `data.weight`      | double    | User's weight (e.g., in kilograms).                         |
+
+
+
+
+## Example
+### Request
+
+```bash
+  curl GET 'https://carencoinc.com/api/v2/auth/users/{id}/info'
+  --header 'Authorization: Bearer <access_token>
+```
+
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "71ce665d-10c9-4fed-bd70-d53f547bf917",
+    "firstName": "Doe",
+    "lastName": "Jhon",
+    "email": "sample@test.com",
+    "phoneNumber": "010-1234-5678",
+    "photoUrl": null,
+    "gender": "male",
+    "birthday": "2000-01-01",
+    "height": 180,
+    "weight": 60
+  }
+}
+```
+#### 403 Forbidden
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid access handling.",
+  "error": "ACCESS_DENIED"
+}
+```
+
+#### 401 Unauthorized(Invalid Token)
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "An error occurred while attempting to decode the Jwt: Malformed token",
+  "error": "INTERNAL_SERVER_ERROR"
+}
+```
+#### 401 Unauthorized(Expired Token)
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Your token is invalid or expired",
+  "error": "TOKEN_EXPIRED"
+}
+```
+
+
 
 ---
 
@@ -202,6 +372,73 @@
 | `data.height`      | double    | User's height (e.g., in centimeters).                       |
 | `data.weight`      | double    | User's weight (e.g., in kilograms).                         |
 
+
+
+
+## Example
+### Request
+
+```bash
+  curl PUT 'https://carencoinc.com/api/v2/auth/users/{id}/info'
+    --header 'Content-Type: application/json' \
+    --header 'Authorization: Bearer auth_key' \
+    --data '{
+        "firstName": "",
+        "lastName": "",
+        "phoneNumber": "",
+        "gender": "",
+        "birthday": "",
+        "height": 0,
+        "weight": 0
+    }'
+```
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "71ce665d-10c9-4fed-bd70-d53f547bf917",
+    "firstName": "Doe",
+    "lastName": "Jhon",
+    "email": "sample@test.com",
+    "phoneNumber": "010-1234-5678",
+    "photoUrl": null,
+    "gender": "male",
+    "birthday": "2000-01-01",
+    "height": 180,
+    "weight": 60
+  }
+}
+```
+#### 401 Unauthorized
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Your token is invalid or expired",
+  "error": "TOKEN_EXPIRED"
+}
+```
+
+#### 403 Forbidden
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid access handling.",
+  "error": "ACCESS_DENIED"
+}
+```
+
+
+
+
 --- 
 
 ## Withdrawal
@@ -240,3 +477,39 @@
 | Name               | Type      | Description                                                 |
 |--------------------|-----------|-------------------------------------------------------------|
 | `success`          | boolean   | Indicates whether the API call was successful (true/false). |
+
+
+
+
+## Example
+### Request
+
+```bash
+  curl DELETE 'https://carencoinc.com/api/v2/auth/users/{id}'
+    --header 'Authorization: Bearer auth_key' 
+```
+
+### Response
+
+
+#### 401 Unauthorized
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Your token is invalid or expired",
+  "error": "TOKEN_EXPIRED"
+}
+```
+
+#### 403 Forbidden
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid access handling.",
+  "error": "ACCESS_DENIED"
+}
+```
