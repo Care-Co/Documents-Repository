@@ -491,7 +491,14 @@
 
 ### Response
 
+#### 200 OK
+###### Body
 
+```json
+{
+  "success": true,
+}
+```
 #### 401 Unauthorized
 ###### Body
 
