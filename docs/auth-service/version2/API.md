@@ -292,9 +292,9 @@
 
 ```json
 {
-  "success": false,
-  "message": "An error occurred while attempting to decode the Jwt: Malformed token",
-  "error": "INTERNAL_SERVER_ERROR"
+  "success":false,
+  "message":"Your token is invalid or expired", 
+  "error":"TOKEN_INVALID"
 }
 ```
 #### 401 Unauthorized(Expired Token)
