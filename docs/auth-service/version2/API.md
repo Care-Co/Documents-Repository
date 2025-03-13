@@ -26,10 +26,11 @@
 
 #### - Parameters(@RequestBody)
 
-| Name       | Type   | Description          | Required | Remarks |
-|------------|--------|----------------------|----------|---------|
-| `username` | String | username으로 사용할 email | Yes |         |
-| `password` | String | password             | Yes      |         |
+| Name       | Type    | Description                | Required | Remarks |
+|------------|---------|----------------------------|----------|---------|
+| `username` | String  | Email to use as a username | Yes      |         |
+| `password` | String  | password                   | Yes      |         |
+| `role`     | String  | user's role                | No       |         | 
 
 ### Response
 
@@ -44,8 +45,7 @@
 | Name      | Type    | Description                                                |
 |-----------|---------|------------------------------------------------------------|
 | `success` | boolean | Indicates whether the API call was successful (true/false) |
-| `data`    | Object  | Contains the data for the user                             |
-| `data.id` | String  | Unique identifier (ID) for the user                        |
+| `data`    | String  | Unique identifier (ID) for the user                        |
 
 
 
@@ -79,7 +79,7 @@
 {
   "success": false,
   "message": "A username or email that already exists.",
-  "error": "CHECK_PARAMETER"
+  "error": "Please check input parameters"
 }
 ```
 
@@ -90,7 +90,7 @@
 {
   "success": false,
   "message": "Invalid parameter entry.",
-  "error": "CHECK_PARAMETER"
+  "error": "Please check input parameters"
 }
 ```
 
@@ -174,23 +174,132 @@
 ```json
 {
   "success": false,
-  "message": "Invalid parameter entry.",
-  "error": "CHECK_PARAMETER"
+  "message": "Invalid username or password",
+  "error": "Please check input parameters"
 }
 ```
 
-#### 400 Bad Request(Invalid Login Credentials)
+
+
+
+---
+
+## Logout
+
+### Endpoint
+
+| Method | URL       |
+|--------|-----------|
+| POST   | `/logout` |
+
+### Authorization
+
+| Security Type   | Roles Allowed |
+|-----------------|---------------|
+| `@PreAuthorize` | `permitAll()` |
+
+### Request
+
+#### - Parameters(@RequestParam)
+
+| Name           | Type   | Description                                  | Required | Remarks                                                             |
+|----------------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `version`      | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
+| `refreshToken` | String | User's refresh token                         | Yes      |                                                                     |
+
+
+### Response
+
+#### - Body
+
+| Name                 | Type    | Description                                                                   |
+|----------------------|---------|-------------------------------------------------------------------------------|
+| `success`            | boolean | Indicates whether the API call was successful (true/false).                   |
+
+
+## Example
+### Request
+
+```bash
+  curl POST 'https://carencoinc.com/api/v2/auth/logout?refreshToken'
+```
+
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true
+}
+```
+#### 400 Bad Request
 ###### Body
 
 ```json
 {
   "success": false,
-  "message": "Invalid username or password",
+  "message": "Please check input parameters",
   "error": "CHECK_PARAMETER"
 }
 ```
 
 
+
+
+---
+
+## Refresh Token
+
+### Endpoint
+
+| Method | URL     |
+|--------|---------|
+| POST   | `/token` |
+
+### Authorization
+
+| Security Type   | Roles Allowed |
+|-----------------|---------------|
+| `@PreAuthorize` | `permitAll()` |
+
+### Request
+
+#### - Parameters(@RequestParam)
+
+| Name           | Type   | Description                                  | Required | Remarks                                                             |
+|----------------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `version`      | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
+| `refreshToken` | String | User's refresh token                         | Yes      |                                                                     |
+
+
+### Response
+
+#### - Body
+
+| Name                 | Type    | Description                                                                   |
+|----------------------|---------|-------------------------------------------------------------------------------|
+| `success`            | boolean | Indicates whether the API call was successful (true/false).                   |
+
+
+## Example
+### Request
+
+```bash
+  curl POST 'https://carencoinc.com/api/v2/auth/logout?refreshToken'
+```
+
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true
+}
+```
 
 
 ---
@@ -217,11 +326,16 @@
 |-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
 | `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
 
-#### - Parameters(@RequestParam)
+#### - Parameters(@PathVariable)
 
 | Name      | Type   | Description                                  | Required | Remarks                                                             |
 |-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
 | `id`      | String | Unique identifier for the user.              | Yes      |                                                                     |
+
+#### - Parameters(@RequestParam)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
 | `version` | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
 
 ### Response
@@ -292,9 +406,9 @@
 
 ```json
 {
-  "success":false,
-  "message":"Your token is invalid or expired", 
-  "error":"TOKEN_INVALID"
+  "success": false,
+  "message": "Authentication details are insufficient",
+  "error": "Invalid token"
 }
 ```
 #### 401 Unauthorized(Expired Token)
@@ -334,11 +448,16 @@
 |-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
 | `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
 
-#### - Parameters(@RequestParam)
+#### - Parameters(@PathVariable)
 
 | Name      | Type   | Description                                  | Required | Remarks                                                             |
 |-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
 | `id`      | String | Unique identifier for the user.              | Yes      |                                                                     |
+
+#### - Parameters(@RequestParam)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
 | `version` | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
 
 #### - Parameters(@RequestBody)
@@ -420,8 +539,8 @@
 ```json
 {
   "success": false,
-  "message": "Your token is invalid or expired",
-  "error": "TOKEN_EXPIRED"
+  "message": "Authentication details are insufficient",
+  "error": "Invalid token"
 }
 ```
 
@@ -432,22 +551,19 @@
 {
   "success": false,
   "message": "Invalid access handling.",
-  "error": "ACCESS_DENIED"
+  "error": "Access denied"
 }
 ```
 
+---
 
-
-
---- 
-
-## Withdrawal
+## ChangePassword
 
 ### Endpoint
 
-| Method | URL               |
-|--------|-------------------|
-| Delete | `/users/{id}` |
+| Method | URL                           |
+|--------|-------------------------------|
+| PUT    | `/users/{id}/change-password` |
 
 ### Authorization
 
@@ -463,11 +579,112 @@
 |-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
 | `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
 
-#### - Parameters(@RequestParam)
+#### - Parameters(@PathVariable)
 
 | Name      | Type   | Description                                  | Required | Remarks                                                             |
 |-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
 | `id`      | String | Unique identifier for the user.              | Yes      |                                                                     |
+
+#### - Parameters(@RequestParam)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `version` | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
+
+#### - Parameters(@RequestBody)
+
+| Name          | Type    | Description                         | Required | Remarks                                                 |
+|---------------|---------|-------------------------------------|----------|---------------------------------------------------------|
+| `newPassword` | String  | The new password the user will use. | Yes      | The password must be between 8 and 24 characters long.  |
+
+### Response
+
+#### - Body
+
+| Name               | Type      | Description                                                 |
+|--------------------|-----------|-------------------------------------------------------------|
+| `success`          | boolean   | Indicates whether the API call was successful (true/false). |
+
+
+## Example
+### Request
+
+```bash
+  curl PUT 'https://carencoinc.com/api/v2/auth/users/{id}/change-password'
+    --header 'Content-Type: application/json' \
+    --header 'Authorization: Bearer auth_key' \
+    --data '{
+        "newPassword": ""
+    }'
+```
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true
+}
+```
+#### 401 Unauthorized
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Authentication details are insufficient",
+  "error": "Invalid token"
+}
+```
+
+#### 403 Forbidden
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid access handling.",
+  "error": "Access denied"
+}
+```
+
+
+
+--- 
+
+## Withdrawal
+
+### Endpoint
+
+| Method | URL               |
+|--------|-------------------|
+| DELETE | `/users/{id}` |
+
+### Authorization
+
+| Security Type   | Roles Allowed     |
+|-----------------|-------------------|
+| `@PreAuthorize` | `hasRole('USER')` |
+
+### Request
+
+#### - Parameters(@Header)
+
+| Name            | Type   | Description                               | Required | Remarks                                           |
+|-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
+| `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
+
+#### - Parameters(@PathVariable)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `id`      | String | Unique identifier for the user.              | Yes      |                                                                     |
+
+#### - Parameters(@RequestParam)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
 | `version` | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
 
 ### Response
@@ -505,8 +722,8 @@
 ```json
 {
   "success": false,
-  "message": "Your token is invalid or expired",
-  "error": "TOKEN_EXPIRED"
+  "message": "Authentication details are insufficient",
+  "error": "Invalid token"
 }
 ```
 
@@ -517,6 +734,159 @@
 {
   "success": false,
   "message": "Invalid access handling.",
-  "error": "ACCESS_DENIED"
+  "error": "Access denied"
+}
+```
+
+--- 
+
+## Check Existence
+
+### Endpoint
+
+| Method | URL                  |
+|--------|----------------------|
+| GET    | `/users/{id}/exists` |
+
+### Authorization
+
+| Security Type   | Roles Allowed     |
+|-----------------|-------------------|
+| `@PreAuthorize` | `hasRole('USER')` |
+
+### Request
+
+#### - Parameters(@Header)
+
+| Name            | Type   | Description                               | Required | Remarks                                           |
+|-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
+| `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
+
+#### - Parameters(@PathVariable)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `id`      | String | Unique identifier for the user.              | Yes      |                                                                     |
+
+#### - Parameters(@RequestParam)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `version` | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
+
+### Response
+
+#### - Body
+
+| Name               | Type      | Description                                                 |
+|--------------------|-----------|-------------------------------------------------------------|
+| `success`          | boolean   | Indicates whether the API call was successful (true/false). |
+
+
+
+
+## Example
+### Request
+
+```bash
+  curl GET 'https://carencoinc.com/api/v2/auth/users/{id}/exists'
+    --header 'Authorization: Bearer auth_key' 
+```
+
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true,
+  "message": "User existence check successful.",
+  "data": true
+}
+```
+#### 401 Unauthorized
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Authentication details are insufficient",
+  "error": "Invalid token"
+}
+```
+
+
+
+#### 403 Forbidden
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid access handling.",
+  "error": "Access denied"
+}
+```
+
+--- 
+
+## Email Email Duplication
+
+### Endpoint
+
+| Method | URL                  |
+|--------|----------------------|
+| GET    | `/duplication-check` |
+
+### Authorization
+
+| Security Type   | Roles Allowed     |
+|-----------------|-------------------|
+| `@PreAuthorize` | `hasRole('USER')` |
+
+### Request
+
+#### - Parameters(@Header)
+
+| Name            | Type   | Description                               | Required | Remarks                                           |
+|-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
+| `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
+
+#### - Parameters(@RequestParam)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `version` | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
+| `email`   | String | User's email address.                        | Yes      |                                                                     |
+
+### Response
+
+#### - Body
+
+| Name               | Type      | Description                                                 |
+|--------------------|-----------|-------------------------------------------------------------|
+| `success`          | boolean   | Indicates whether the API call was successful (true/false). |
+
+
+
+
+## Example
+### Request
+
+```bash
+  curl GET 'https://carencoinc.com/api/v2/auth/duplication-check'
+    --header 'Authorization: Bearer auth_key' 
+```
+
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true,
+  "data": true
 }
 ```
