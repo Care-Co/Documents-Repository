@@ -179,6 +179,17 @@
 }
 ```
 
+#### 502 Bad Gateway
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "External gateway issue.",
+  "error": "Bad response from external service"
+}
+```
+
 
 
 
@@ -278,10 +289,13 @@
 
 #### - Body
 
-| Name                 | Type    | Description                                                                   |
-|----------------------|---------|-------------------------------------------------------------------------------|
-| `success`            | boolean | Indicates whether the API call was successful (true/false).                   |
-
+| Name                 | Type    | Description                                                                    |
+|----------------------|---------|--------------------------------------------------------------------------------|
+| `success`            | boolean | Indicates whether the API call was successful (true/false).                    |
+| `token`              | Object  | Contains authentication tokens and related user data.                          |
+| `token.userId`       | String  | Unique identifier for the user.                                                |
+| `token.accessToken`  | String  | Access token used for authenticating API requests.                             |
+| `token.refreshToken` | String  | Refresh token used to obtain a new access token when the current one expires.  |
 
 ## Example
 ### Request
@@ -297,7 +311,12 @@
 
 ```json
 {
-  "success": true
+  "success": true,
+  "token": {
+    "userId": "71ce665d-10c9-4fed-bd70-d53f547bf917",
+    "accessToken": "",
+    "refreshToken": ""
+  }
 }
 ```
 
@@ -365,6 +384,126 @@
 
 ```bash
   curl GET 'https://carencoinc.com/api/v2/auth/users/{id}/info'
+  --header 'Authorization: Bearer <access_token>
+```
+
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "71ce665d-10c9-4fed-bd70-d53f547bf917",
+    "firstName": "Doe",
+    "lastName": "Jhon",
+    "email": "sample@test.com",
+    "phoneNumber": "010-1234-5678",
+    "photoUrl": null,
+    "gender": "male",
+    "birthday": "2000-01-01",
+    "height": 180,
+    "weight": 60
+  }
+}
+```
+#### 403 Forbidden
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid access handling.",
+  "error": "ACCESS_DENIED"
+}
+```
+
+#### 401 Unauthorized(Invalid Token)
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Authentication details are insufficient",
+  "error": "Invalid token"
+}
+```
+#### 401 Unauthorized(Expired Token)
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Your token is invalid or expired",
+  "error": "TOKEN_EXPIRED"
+}
+```
+
+---
+
+## GetAllUsersInfo
+
+### Endpoint
+
+| Method | URL                |
+|--------|--------------------|
+| GET    | `/users/{id}/list` |
+
+### Authorization
+
+| Security Type   | Roles Allowed     |
+|-----------------|-------------------|
+| `@PreAuthorize` | `hasRole('USER')` |
+
+### Request
+
+#### - Parameters(@Header)
+
+| Name            | Type   | Description                               | Required | Remarks                                           |
+|-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
+| `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
+
+#### - Parameters(@PathVariable)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `id`      | String | Unique identifier for the user.              | Yes      |                                                                     |
+
+#### - Parameters(@RequestParam)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `version` | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
+
+### Response
+
+#### - Body
+
+| Name               | Type      | Description                                                 |
+|--------------------|-----------|-------------------------------------------------------------|
+| `success`          | boolean   | Indicates whether the API call was successful (true/false). |
+| `data`             | Object    | Contains user profile information.                          |
+| `data.id`          | UUID      | Unique identifier for the user.                             |
+| `data.firstName`   | String    | User's first name.                                          |
+| `data.lastName`    | String    | User's last name.                                           |
+| `data.email`       | String    | User's email address.                                       |
+| `data.phoneNumber` | String    | User's phone number.                                        |
+| `data.photoUrl`    | String    | URL to the user's profile photo.                            |
+| `data.gender`      | String    | User's gender.                                              |
+| `data.birthday`    | LocalDate | User's date of birth.                                       |
+| `data.height`      | double    | User's height (e.g., in centimeters).                       |
+| `data.weight`      | double    | User's weight (e.g., in kilograms).                         |
+
+
+
+
+## Example
+### Request
+
+```bash
+  curl GET 'https://carencoinc.com/api/v2/auth/users/{id}/list'
   --header 'Authorization: Bearer <access_token>
 ```
 
@@ -557,6 +696,123 @@
 
 ---
 
+## UpdateUserProfileImage
+
+### Endpoint
+
+| Method | URL                         |
+|--------|-----------------------------|
+| POST   | `/users/{id}/profile-image` |
+
+### Authorization
+
+| Security Type   | Roles Allowed     |
+|-----------------|-------------------|
+| `@PreAuthorize` | `hasRole('USER')` |
+
+### Request
+
+#### - Parameters(@Header)
+
+| Name            | Type   | Description                               | Required | Remarks                                           |
+|-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
+| `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
+
+#### - Parameters(@PathVariable)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `id`      | String | Unique identifier for the user.              | Yes      |                                                                     |
+
+#### - Parameters(@RequestParam)
+
+| Name      | Type   | Description                                  | Required | Remarks                                                             |
+|-----------|--------|----------------------------------------------|----------|---------------------------------------------------------------------|
+| `version` | String | API version information (format: YYYY-MM-DD) | No       | If not provided, the latest API version will be used automatically. |
+
+#### - Parameters(@ModelAttribute)
+
+| Name          | Type           | Description                                        | Required | Remarks                    |
+|---------------|----------------|----------------------------------------------------|----------|----------------------------|
+| `file`        | MultipartFile  | Image file to update the user’s profile image      | No       | Typically 2-50 characters. |
+
+
+### Response
+
+#### - Body
+
+| Name               | Type      | Description                                                 |
+|--------------------|-----------|-------------------------------------------------------------|
+| `success`          | boolean   | Indicates whether the API call was successful (true/false). |
+| `data`             | Object    | Contains user profile information.                          |
+| `data.id`          | UUID      | Unique identifier for the user.                             |
+| `data.firstName`   | String    | User's first name.                                          |
+| `data.lastName`    | String    | User's last name.                                           |
+| `data.email`       | String    | User's email address.                                       |
+| `data.phoneNumber` | String    | User's phone number.                                        |
+| `data.photoUrl`    | String    | URL to the user's profile photo.                            |
+| `data.gender`      | String    | User's gender.                                              |
+| `data.birthday`    | LocalDate | User's date of birth.                                       |
+| `data.height`      | double    | User's height (e.g., in centimeters).                       |
+| `data.weight`      | double    | User's weight (e.g., in kilograms).                         |
+
+
+
+## Example
+### Request
+
+```bash
+  curl POST 'https://carencoinc.com/api/v2/auth/users/{id}/profile-image'
+    --header 'Content-Type: application/json' \
+    --header 'Authorization: Bearer auth_key' \
+    --form 'file="sample.jpg"'
+```
+
+### Response
+
+#### 200 OK
+###### Body
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "71ce665d-10c9-4fed-bd70-d53f547bf917",
+    "firstName": "Doe",
+    "lastName": "Jhon",
+    "email": "sample@test.com",
+    "phoneNumber": "010-1234-5678",
+    "photoUrl": null,
+    "gender": "male",
+    "birthday": "2000-01-01",
+    "height": 180,
+    "weight": 60
+  }
+}
+```
+#### 401 Unauthorized
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Authentication details are insufficient",
+  "error": "Invalid token"
+}
+```
+
+#### 403 Forbidden
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Invalid access handling.",
+  "error": "Access denied"
+}
+```
+---
+
 ## ChangePassword
 
 ### Endpoint
@@ -627,6 +883,19 @@
   "success": true
 }
 ```
+
+#### 400 Bad Request
+###### Body
+
+```json
+{
+  "success": false,
+  "message": "Please check input parameters",
+  "error": "CHECK_PARAMETER"
+}
+```
+
+
 #### 401 Unauthorized
 ###### Body
 
@@ -657,8 +926,8 @@
 
 ### Endpoint
 
-| Method | URL               |
-|--------|-------------------|
+| Method | URL           |
+|--------|---------------|
 | DELETE | `/users/{id}` |
 
 ### Authorization
@@ -713,7 +982,7 @@
 
 ```json
 {
-  "success": true,
+  "success": true
 }
 ```
 #### 401 Unauthorized
@@ -747,21 +1016,21 @@
 | Method | URL                  |
 |--------|----------------------|
 | GET    | `/users/{id}/exists` |
-
+<!--
 ### Authorization
 
 | Security Type   | Roles Allowed     |
 |-----------------|-------------------|
 | `@PreAuthorize` | `hasRole('USER')` |
-
+-->
 ### Request
-
+<!--
 #### - Parameters(@Header)
 
 | Name            | Type   | Description                               | Required | Remarks                                           |
 |-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
 | `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
-
+-->
 #### - Parameters(@PathVariable)
 
 | Name      | Type   | Description                                  | Required | Remarks                                                             |
@@ -778,21 +1047,24 @@
 
 #### - Body
 
-| Name               | Type      | Description                                                 |
-|--------------------|-----------|-------------------------------------------------------------|
-| `success`          | boolean   | Indicates whether the API call was successful (true/false). |
-
+| Name      | Type    | Description                                                 |
+|-----------|---------|-------------------------------------------------------------|
+| `success` | boolean | Indicates whether the API call was successful (true/false). |
+| `data`    | boolean | Indicates whether relevant data exists(true/false).         |
 
 
 
 ## Example
 ### Request
-
+```bash
+  curl GET 'https://carencoinc.com/api/v2/auth/users/{id}/exists'
+```
+<!--
 ```bash
   curl GET 'https://carencoinc.com/api/v2/auth/users/{id}/exists'
     --header 'Authorization: Bearer auth_key' 
 ```
-
+-->
 ### Response
 
 #### 200 OK
@@ -801,10 +1073,11 @@
 ```json
 {
   "success": true,
-  "message": "User existence check successful.",
   "data": true
 }
 ```
+
+<!--
 #### 401 Unauthorized
 ###### Body
 
@@ -828,7 +1101,7 @@
   "error": "Access denied"
 }
 ```
-
+-->
 --- 
 
 ## Email Email Duplication
@@ -838,21 +1111,21 @@
 | Method | URL                  |
 |--------|----------------------|
 | GET    | `/duplication-check` |
-
+<!--
 ### Authorization
 
 | Security Type   | Roles Allowed     |
 |-----------------|-------------------|
 | `@PreAuthorize` | `hasRole('USER')` |
-
+-->
 ### Request
-
+<!--
 #### - Parameters(@Header)
 
 | Name            | Type   | Description                               | Required | Remarks                                           |
 |-----------------|--------|-------------------------------------------|----------|---------------------------------------------------|
 | `Authorization` | String | `Bearer <token>` Access token in the form | Yes      | `--header 'Authorization: Bearer <access_token>'` |
-
+-->
 #### - Parameters(@RequestParam)
 
 | Name      | Type   | Description                                  | Required | Remarks                                                             |
@@ -864,9 +1137,10 @@
 
 #### - Body
 
-| Name               | Type      | Description                                                 |
-|--------------------|-----------|-------------------------------------------------------------|
-| `success`          | boolean   | Indicates whether the API call was successful (true/false). |
+| Name      | Type    | Description                                                 |
+|-----------|---------|-------------------------------------------------------------|
+| `success` | boolean | Indicates whether the API call was successful (true/false). |
+| `data`    | boolean | Indicates whether relevant data exists(true/false).         |
 
 
 

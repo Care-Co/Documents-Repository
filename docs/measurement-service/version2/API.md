@@ -454,8 +454,8 @@
 | `measuredDateTime` | LocalDateTime | The date and time when the plantar measurement was taken |          |         |
 | `rawData`          | String        | Measured raw data                                        |          |         |
 | `gender`           | String        | The gender of the user                                   |          |         |
-| `height`           |  Double       | The height of the user                                   |
-| `age`              | Int           | The age of the user                                      |
+| `height`           | Double        | The height of the user                                   |          |         | 
+| `age`              | Int           | The age of the user                                      |          |         |
 | `front`            | MultipartFile | The file for measuring pose                              |          |         |
 | `side`             | MultipartFile | The file for measuring pose                              |          |         |
 
@@ -535,7 +535,12 @@
 ## Request
 
 ```bash
-  curl POST 'https://carencoinc.com/kr/api/v2/measurement/users/{uid}/records'
+  curl POST 'https://carencoinc.com/kr/api/v2/measurement/users/{uid}/records' \
+    --form 'measuredDateTime=""' \
+    --form 'rawData=""' \
+    --form 'gender=""' \
+    --form 'front="sample_front.jpg"' \
+    --form 'side="sample_side.jpg"'
 ```
 
 ## Response
