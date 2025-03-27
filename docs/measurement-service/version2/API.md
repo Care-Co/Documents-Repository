@@ -127,6 +127,9 @@
 | `side.angleShoulder`           | Double        | The degree of tilt of the shoulder relative to the horizontal line        |
 | `side.anglePelvis`             | Double        | The degree of tilt of the pelvis relative to the horizontal line          |
 | `side.imageUrl`                | Double        | URL of the saved user's posture image                                     |
+| `data.score`                   | Object        | Contains data related to the user's predicted age and body score          |
+| `score.bodyScore`              | Double        | The body score value predicted by the system.                             |
+| `score.predictedAge`           | Double        | The age estimated predicted by the system.                                |
 
 #### Keypoints
 
@@ -381,6 +384,10 @@
             "accuracy": 79.65
           }
         }
+      },
+      "score": {
+        "body_score": 87,
+        "predicted_age": 32
       }
     }
   ]
@@ -442,13 +449,15 @@
 
 #### Body(@RequestPart)
 
-| Name               | Type           | Description                                              | Required | Remarks |
-|--------------------|----------------|----------------------------------------------------------|----------|---------|
-| `measuredDateTime` | LocalDateTime  | The date and time when the plantar measurement was taken |          |         |
-| `rawData`          | String         | Measured raw data                                        |          |         |
-| `gender`           | String         | The gender of the user                                   |          |         |
-| `front`            | MultipartFile  | The file for measuring pose                              |          |         |
-| `side`             | MultipartFile  | The file for measuring pose                              |          |         |
+| Name               | Type          | Description                                              | Required | Remarks |
+|--------------------|---------------|----------------------------------------------------------|----------|---------|
+| `measuredDateTime` | LocalDateTime | The date and time when the plantar measurement was taken |          |         |
+| `rawData`          | String        | Measured raw data                                        |          |         |
+| `gender`           | String        | The gender of the user                                   |          |         |
+| `height`           |  Double       | The height of the user                                   |
+| `age`              | Int           | The age of the user                                      |
+| `front`            | MultipartFile | The file for measuring pose                              |          |         |
+| `side`             | MultipartFile | The file for measuring pose                              |          |         |
 
 
 
@@ -485,6 +494,9 @@
 | `side.angleShoulder`           | Double        | The degree of tilt of the shoulder relative to the horizontal line        |
 | `side.anglePelvis`             | Double        | The degree of tilt of the pelvis relative to the horizontal line          |
 | `side.imageUrl`                | Double        | URL of the saved user's posture image                                     |
+| `data.score`                   | Object        | Contains data related to the user's predicted age and body score          |
+| `score.bodyScore`              | Double        | The body score value predicted by the system.                             |
+| `score.predictedAge`           | Double        | The age estimated predicted by the system.                                |
 
 #### Keypoints
 
@@ -739,6 +751,10 @@
             "accuracy": 79.65
           }
         }
+      },
+      "score": {
+        "body_score": 87,
+        "predicted_age": 32
       }
     }
   ]
