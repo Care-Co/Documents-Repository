@@ -1,6 +1,6 @@
 # Measurement-Service
 
-    - Basic Domain: https://carencoinc.com/kr/measurement-service
+    - Basic Domain: https://carencoinc.com
     - Basic IP: 15.165.125.100:8084
 
 
@@ -12,9 +12,9 @@
 
 ## Basic Information
 
-| Method | URL                       |
-|--------|---------------------------|
-| POST   | `/v1/footprints/{userId}` |
+| Method | URL                                              |
+|--------|--------------------------------------------------|
+| POST   | `/kr/measurement-service/v1/footprints/{userId}` |
 
 ### Request
 
@@ -144,9 +144,9 @@
 
 ## Basic Information
 
-| Method | URL                       |
-|--------|---------------------------|
-| GET    | `/v1/footprints/{userId}` |
+| Method | URL                                              |
+|--------|--------------------------------------------------|
+| GET    | `/kr/measurement-service/v1/footprints/{userId}` |
 
 ### Request
 
@@ -158,12 +158,12 @@
 
 #### Parameters(@RequestParam)
 
-| Name   | Type          | Description                                  | Required | Remarks |
-|--------|---------------|----------------------------------------------|----------|---------|
-| `from` | LocalDateTime | Query start date and time                    | No       |         |
-| `to`   | LocalDateTime | Query end date and time                      | No       |         |
-| `size` | int           | Number of records to retrieve                | No       |         |
-| `page` | int           | Page number of the queried data              | No       |         |
+| Name   | Type          | Description                                   | Required | Remarks |
+|--------|---------------|-----------------------------------------------|----------|---------|
+| `from` | LocalDateTime | Query start date and time                     | No       |         |
+| `to`   | LocalDateTime | Query end date and time                       | No       |         |
+| `size` | int           | Number of records to retrieve                 | No       |         |
+| `page` | int           | Page number of the queried data               | No       |         |
 | `sort` | String        | Sorting method (e.g., measuredDateTime, desc) | No       |         |
 
 > ### Additional Query Logic for `GetFootprintRecords`
@@ -356,9 +356,9 @@
 
 ## Basic Information
 
-| Method | URL                   |
-|--------|-----------------------|
-| POST   | `/v1/footprints/{id}` |
+| Method | URL                                          |
+|--------|----------------------------------------------|
+| POST   | `/kr/measurement-service/v1/footprints/{id}` |
 
 ### Request
 
@@ -449,9 +449,9 @@
 
 ## Basic Information
 
-| Method | URL                    |
-|--------|------------------------|
-| GET    | `/v1/weights/{userId}` |
+| Method | URL                                           |
+|--------|-----------------------------------------------|
+| GET    | `/kr/measurement-service/v1/weights/{userId}` |
 
 ### Request
 
@@ -630,9 +630,9 @@
 
 ## Basic Information
 
-| Method | URL                |
-|--------|--------------------|
-| POST   | `/v1/weights/{id}` |
+| Method | URL                                       |
+|--------|-------------------------------------------|
+| POST   | `/kr/measurement-service/v1/weights/{id}` |
 
 ### Request
 
@@ -723,9 +723,9 @@
 
 ## Basic Information
 
-| Method | URL                 |
-|--------|---------------------|
-| POST   | `/v1/pose/{userId}` |
+| Method | URL                                        |
+|--------|--------------------------------------------|
+| POST   | `/kr/measurement-service/v1/pose/{userId}` |
 
 ### Request
 
@@ -846,9 +846,9 @@
 
 ## Basic Information
 
-| Method | URL                          |
-|--------|------------------------------|
-| POST   | `/v1/users/{uid}/activities` |
+| Method | URL                                          |
+|--------|----------------------------------------------|
+| POST   | `/api/v1/measurement/users/{uid}/activities` |
 
 ### Request
 
@@ -997,9 +997,9 @@
 
 ## Basic Information
 
-| Method | URL                          |
-|--------|------------------------------|
-| GET    | `/v1/users/{uid}/activities` |
+| Method | URL                                          |
+|--------|----------------------------------------------|
+| GET    | `/api/v1/measurement/users/{uid}/activities` |
 
 ### Request
 
@@ -1203,9 +1203,9 @@
 
 ## Basic Information
 
-| Method | URL                               |
-|--------|-----------------------------------|
-| DELETE | `/v1/users/{uid}/activities/{id}` |
+| Method | URL                                               |
+|--------|---------------------------------------------------|
+| DELETE | `/api/v1/measurement/users/{uid}/activities/{id}` |
 
 ### Request
 
