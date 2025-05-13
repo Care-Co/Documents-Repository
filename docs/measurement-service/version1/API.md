@@ -835,3 +835,455 @@
 
 </details>
 <!-- api-6-end -->
+
+
+
+<!-- api-7-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: CreateActivityRecord</strong></summary>
+
+
+
+## Basic Information
+
+| Method | URL                          |
+|--------|------------------------------|
+| POST   | `/v1/users/{uid}/activities` |
+
+### Request
+
+#### Parameters(@PathVariable)
+
+| Name  | Type | Description            | Required | Remarks |
+|-------|------|------------------------|----------|---------|
+| `uid` | UUID | User Unique identifier | Yes      |         |
+
+#### Parameters(@RequestBody)
+
+| Name             | Type      | Description                                     | Required | Remarks |
+|------------------|-----------|-------------------------------------------------|----------|---------|
+| `category`       | String    | Type of activity record                         |          |         |
+| `activity_date`  | LocalDate | Date of the activity                            |          |         |
+| `start_time`     | LocalTime | Start time of the activity                      |          |         |
+| `end_time`       | LocalTime | End time of the activity                        |          |         |
+| `pain_decreased` | boolean   | Whether the pain was reduced after the activity | No       |         |
+| `same_pain`      | boolean   | Whether the pain remained unchanged             | No       |         |
+| `mild_pain`      | boolean   | Whether the pain was mild                       | No       |         |
+| `moderate_pain`  | boolean   | Whether the pain was moderate                   | No       |         |
+| `severe_pain`    | boolean   | Whether the pain was severe                     | No       |         |
+
+
+### Response
+
+#### Body
+
+| Name                    | Type      | Description                                                |
+|-------------------------|-----------|------------------------------------------------------------|
+| `success`               | boolean   | Indicates whether the API call was successful (true/false) |
+| `data`                  | Object    | Contains data related to the user's activity record        |
+| `data.id`               | UUID      | Unique identifier (ID) for the activity record             |
+| `data.uid`              | UUID      | ID of the user who requested                               |
+| `data.type`             | String    | Type of activity record                                    |
+| `data.activityDate`     | LocalDate | Date of the activity                                       |
+| `data.startTime`        | LocalTime | Start time of the activity                                 |
+| `data.endTime`          | LocalTime | End time of the activity                                   |
+| `data.painLog`          | Object    | Contains data related to the user's activity pain record   |
+| `painLog.id`            | UUID      | Unique identifier (ID) for the pain record                 |
+| `painLog.painDecreased` | boolean   | Whether the pain was reduced after the activity            | 
+| `painLog.samePain`      | boolean   | Whether the pain remained unchanged                        | 
+| `painLog.mildPain`      | boolean   | Whether the pain was mild                                  | 
+| `painLog.moderatePain`  | boolean   | Whether the pain was moderate                              | 
+| `painLog.severePain`    | boolean   | Whether the pain was severe                                | 
+
+
+<details markdown=>
+  <summary><strong>Example</strong></summary>
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/example/27911837-f3383c46-0500-401a-b925-3c1dbe08e935?action=share&creator=32584424&ctx=documentation)
+
+```bash
+  curl POST 'https://carencoinc.com/api/v1/measurement/users/{uid}/activities'
+    --header 'Content-Type: application/json' \
+    --data '{
+        "category": "",
+        "activity_date": "",
+        "start_time": "",
+        "end_time": "",
+        "pain_decreased": "",
+        "same_pain": "",
+        "mild_pain": "",
+        "moderate_pain": "",
+        "severe_pain": ""
+    }'
+```
+
+## Response
+
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "dcad5dfa-8b36-4736-84f7-04e68b40a0ac",
+    "uid": "469a4b9a-986d-429f-82ba-0795ab91c2d3",
+    "type": "ORIENTAL_TREATMENT",
+    "activityDate": "2025-05-13",
+    "startTime": "13:00:00",
+    "endTime": "14:00:00",
+    "painLog": {
+      "id": "2884133d-bfe1-4dff-a668-a4f475833cde",
+      "painDecreased": true,
+      "samePain": false,
+      "mildPain": false,
+      "moderatePain": false,
+      "severePain": false
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
+
+```json
+{
+    "code": "CHECK_PARAMETER"
+}
+```
+</details>
+
+<details>
+<summary><strong>500 InternalServerError</strong></summary>
+
+###### Body
+
+```json
+{
+  "message": "Error creating activity record",
+  "error": "Error detail message"
+}
+```
+
+</details>
+
+</details>
+
+---
+
+</details>
+<!-- api-7-end -->
+
+
+
+<!-- api-8-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: RetrieveActivityRecords</strong></summary>
+
+
+
+## Basic Information
+
+| Method | URL                          |
+|--------|------------------------------|
+| GET    | `/v1/users/{uid}/activities` |
+
+### Request
+
+#### Parameters(@PathVariable)
+
+| Name  | Type | Description            | Required | Remarks |
+|-------|------|------------------------|----------|---------|
+| `uid` | UUID | User Unique identifier | Yes      |         |
+
+
+#### Parameters(@RequestParam)
+
+| Name      | Type      | Description                            | Required | Remarks |
+|-----------|-----------|----------------------------------------|----------|---------|
+| `from`    | LocalDate | Query start date                       | No       |         |
+| `to`      | LocalDate | Query end date                         | No       |         |
+| `size`    | int       | Number of records to retrieve          | No       |         |
+| `page`    | int       | Page number of the queried data        | No       |         |
+| `sort`    | String    | Sorting method (e.g., startTime, desc) | No       |         |
+
+> ### Additional Query Logic for `GetActivityRecords`
+> The `findByUidAndDateRange` method includes logic to filter records based on various conditions. Below are the
+> details:
+>
+> #### Query Conditions
+>
+> 1. **Both `from` and `to` parameters are provided:**
+     >     - Filters records where the measurement timestamp (`activityDate`) is between `fromDate` and
+     `toDate` (inclusive).
+     >     - Repository method: `findByUidAndActivityDateBetween`.
+>
+> 2. **Only `from` parameter is provided:**
+     >     - Filters records where the measurement timestamp (`activityDate`) is after `fromDate`.
+     >     - Repository method: `findByUidAndActivityDateAfter`.
+>
+> 3. **Only `to` parameter is provided:**
+     >     - Filters records where the measurement timestamp (`activityDate`) is before `toDate`.
+     >     - Repository method: `findByUidAndActivityDateBefore`.
+>
+> 4. **Neither `from` nor `to` parameters are provided:**
+     >     - Returns all records for the given user, without date filtering.
+     >     - Repository method: `findByUid`.
+>
+> #### Pagination and Sorting
+>
+> - **Pagination:**
+    >     - The `page` and `size` parameters determine the pagination behavior.
+    >     - These are passed into the `PageRequest` object to fetch the corresponding page of records.
+>
+> - **Sorting:**
+    >     - The `sort` parameter defines the sorting behavior. It should follow the format: `field,direction`.
+    >         - `field`: The name of the field to sort by (e.g., `startTime`).
+    >         - `direction`: Sorting direction (`asc` for ascending, `desc` for descending). Defaults to ascending if
+    omitted.
+    >     - Example values:
+    >         - `startTime,desc`: Sort by `startTime` in descending order.
+    >         - `weight,asc`: Sort by `weight` in ascending order.
+    >
+- **Error Handling:**
+  >         - If the `sort` parameter is invalid, an `IllegalArgumentException` is thrown with a message explaining the
+  expected format.
+>
+> #### Example Query Scenarios
+>
+> 1. **Retrieve all records for a user within a specific date range, sorted by timestamp in descending order:**
+     >     - Parameters: `from=2025-01-01`, `to=2025-01-31`, `sort=startTime,desc`.
+>
+> 2. **Retrieve all records after a specific date:**
+     >     - Parameters: `from=2025-01-01`, `sort=startTime,asc`.
+>
+> 3. **Retrieve paginated records without any date filters:**
+     >     - Parameters: `page=1`, `size=10`.
+
+
+### Response
+
+#### Body
+
+| Name                    | Type      | Description                                                |
+|-------------------------|-----------|------------------------------------------------------------|
+| `success`               | boolean   | Indicates whether the API call was successful (true/false) |
+| `data`                  | Object    | Contains data related to the user's activity record        |
+| `data.id`               | UUID      | Unique identifier (ID) for the activity record             |
+| `data.uid`              | UUID      | ID of the user who requested                               |
+| `data.type`             | String    | Type of activity record                                    |
+| `data.activityDate`     | LocalDate | Date of the activity                                       |
+| `data.startTime`        | LocalTime | Start time of the activity                                 |
+| `data.endTime`          | LocalTime | End time of the activity                                   |
+| `data.painLog`          | Object    | Contains data related to the user's activity pain record   |
+| `painLog.id`            | UUID      | Unique identifier (ID) for the pain record                 |
+| `painLog.painDecreased` | boolean   | Whether the pain was reduced after the activity            | 
+| `painLog.samePain`      | boolean   | Whether the pain remained unchanged                        | 
+| `painLog.mildPain`      | boolean   | Whether the pain was mild                                  | 
+| `painLog.moderatePain`  | boolean   | Whether the pain was moderate                              | 
+| `painLog.severePain`    | boolean   | Whether the pain was severe                                | 
+
+<details markdown=>
+  <summary><strong>Example</strong></summary>
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/example/27911837-a11ce1a8-27df-4591-bf9b-decfc4bddd13?action=share&creator=32584424&ctx=documentation)
+
+```bash
+  curl GET 'https://carencoinc.com/api/v1/measurement/users/{uid}/activities?from=2025-05-13&to=2025-05-13&size=1&page=0&sort=startTime,asc'
+```
+
+## Response
+
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "dcad5dfa-8b36-4736-84f7-04e68b40a0ac",
+      "uid": "469a4b9a-986d-429f-82ba-0795ab91c2d3",
+      "type": "ORIENTAL_TREATMENT",
+      "activityDate": "2025-05-13",
+      "startTime": "13:00:00",
+      "endTime": "14:00:00",
+      "painLog": {
+        "id": "2884133d-bfe1-4dff-a668-a4f475833cde",
+        "painDecreased": true,
+        "samePain": false,
+        "mildPain": false,
+        "moderatePain": false,
+        "severePain": false
+      }
+    },
+    {
+      "id": "a48ec36c-9caf-4227-b4c0-05118696b4ba",
+      "uid": "469a4b9a-986d-429f-82ba-0795ab91c2d3",
+      "type": "ORIENTAL_TREATMENT",
+      "activityDate": "2025-05-13",
+      "startTime": "12:00:00",
+      "endTime": "13:00:00",
+      "painLog": {
+        "id": "f87e05b6-666a-4e4f-8881-1921c7923c42",
+        "painDecreased": true,
+        "samePain": false,
+        "mildPain": false,
+        "moderatePain": false,
+        "severePain": false
+      }
+    }
+  ]
+}
+```
+
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
+
+```json
+{
+    "code": "CHECK_PARAMETER"
+}
+```
+</details>
+
+<details>
+<summary><strong>500 InternalServerError</strong></summary>
+
+###### Body
+
+```json
+{
+  "message": "Error retrieving activity record",
+  "error": "Error detail message"
+}
+```
+
+</details>
+
+</details>
+
+---
+
+</details>
+<!-- api-8-end -->
+
+
+
+<!-- api-9-start -->
+<details markdown="1">
+<summary><strong>&nbsp;API: DeleteActivityRecord</strong></summary>
+
+
+
+## Basic Information
+
+| Method | URL                               |
+|--------|-----------------------------------|
+| DELETE | `/v1/users/{uid}/activities/{id}` |
+
+### Request
+
+#### Parameters(@PathVariable)
+
+| Name  | Type | Description                                    | Required | Remarks |
+|-------|------|------------------------------------------------|----------|---------|
+| `uid` | UUID | User Unique identifier                         | Yes      |         |
+| `id`  | UUID | Unique identifier (ID) for the activity record | Yes      |         |
+
+### Response
+
+#### Body
+
+| Name                    | Type      | Description                                                |
+|-------------------------|-----------|------------------------------------------------------------|
+| `success`               | boolean   | Indicates whether the API call was successful (true/false) |
+
+<details markdown=>
+  <summary><strong>Example</strong></summary>
+
+## Request
+
+### Postman 요청
+
+아래 버튼을 클릭하면 `Postman`에서 API 요청을 실행할 수 있습니다.
+
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://carenco.postman.co/workspace/Care%26CO~7c4d2551-cc9d-413f-b156-4c350b99eb32/example/27911837-0f34102c-173b-4a7a-a534-b95b88f86bca?action=share&creator=32584424&ctx=documentation)
+
+```bash
+  curl POST 'https://carencoinc.com/api/v1/measurement/users/{uid}/activities/{id}'
+```
+
+## Response
+
+<details>
+<summary><strong>200 OK</strong></summary>
+
+###### Body
+
+```json
+{
+  "success": true
+}
+
+```
+
+</details>
+
+<details>
+<summary><strong>400 BadRequest</strong></summary>
+
+###### Body
+
+```json
+{
+  "code": "CHECK_PARAMETER"
+}
+```
+</details>
+
+<details>
+<summary><strong>500 InternalServerError</strong></summary>
+
+###### Body
+
+```json
+{
+  "message": "Error deleting activity record",
+  "error": "Error detail message"
+}
+```
+
+</details>
+
+</details>
+
+---
+
+</details>
+<!-- api-9-end -->
