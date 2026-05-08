@@ -19,6 +19,7 @@ Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 | Doc | Routes | Versioning | Notes |
 |---|---|---|---|
 | [user-service](./user-service.md) | 48 endpoints (auth + user + admin + public + audit) | header `api-version: 1.0.0` | OAuth2 controller deprecated |
+| [b2b-service](./b2b-service.md) | ~40 endpoints (auth + user + organization + membership + invite + device + measurement + feedback + license + billing) | unversioned | 별도 user pool (b2b_users), 다이어그램 + cross-MSA 흐름 + 코드 매핑 포함 |
 | [measure-service](./measure-service.md) | 7 endpoints (record + activity + internal sync) | `api-version: 1.0.0` | record DTO `2026-01-13`, activity DTO `2026-02-02` |
 | [noti-service](./noti-service.md) | 12 endpoints (FCM + device + topic + history) | `api-version: 1.0.0` | async job pattern |
 | [storage-service](./storage-service.md) | 9 endpoints (v1 deprecated + v2 current) | `api-version: 1.0.0` | v1 sunset 2026-12-31 |
