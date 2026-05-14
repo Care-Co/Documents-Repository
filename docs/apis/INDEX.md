@@ -1,6 +1,6 @@
 # Care&Co Workspace API Index
 
-Updated: 2026-04-27
+Updated: 2026-05-14
 Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 
 ## Documentation Standard
@@ -28,7 +28,7 @@ Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 | [graph-service](./graph-service.md) | 1 endpoint (Neo4j shoe recommendation) | `api-version: 0.0.1` | random fallback |
 | [payment-service](./payment-service.md) | 17 REST + 1 webhook | unversioned | Paddle Billing v2 |
 | [ML-service](./ml-service.md) | 6 routes (footprint + pose + measurement) | `api-version: 1.0.0` (reserved, not branched) | Flask blueprints |
-| [device-service](./device-service.md) | 0 endpoints | — | bootstrap-only skeleton |
+| [device-service](./device-service.md) | 11 REST + 1 gRPC | `api-version: 1.0.0` | device registry, owner validation, OTA firmware |
 
 ## Repositories Without API Controllers
 
@@ -38,7 +38,6 @@ Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 - `common-libs` — shared library
 - `B2B_WEB` — Next.js frontend (no public REST surface)
 - `Documents-Repository` — this repo
-- `device-service` — currently no controllers (see doc)
 
 ## Samples
 
