@@ -1,9 +1,10 @@
 # B2B Service API
 
-> Updated: 2026-05-13
+> Updated: 2026-05-18
 > Style: OpenAPI 3.1 + diagrams + code chain mapping + full request/response samples
 > Base path: `/api/v2/b2b/...`
 > 응답 envelope: [`CncResponse`](#71-cncresponse-envelope) (Pattern B)
+> 권한 매트릭스 (서비스 측): [`b2b-service/docs/authorization.md`](../../../b2b-service/docs/authorization.md)
 
 ---
 
@@ -194,50 +195,52 @@ sequenceDiagram
 |---|---|---|---|---|
 | 1 | POST | `/api/v2/b2b/auth/login` | 🔓 | [§4.1](#41-post-apiv2b2bauthlogin) |
 | 2 | POST | `/api/v2/b2b/auth/token` | 🔓 | [§4.2](#42-post-apiv2b2bauthtoken) |
-| 3 | POST | `/api/v2/b2b/auth/logout` | 🔓 | [§4.3](#43-post-apiv2b2bauthlogout) |
-| 4 | GET | `/api/v2/b2b/auth/me` | 🔒 | [§4.4](#44-get-apiv2b2bauthme) |
-| 5 | POST | `/api/v2/b2b/auth/oauth2/google` | 🔓 | [§4.5](#45-post-apiv2b2bauthoauth2google) |
-| 6 | POST | `/api/v2/b2b/auth/oauth2/apple` | 🔓 | [§4.6](#46-post-apiv2b2bauthoauth2apple) |
-| 7 | POST | `/api/v2/b2b/users` | 🔓 | [§4.7](#47-post-apiv2b2busers) |
-| 8 | GET | `/api/v2/b2b/users/{b2bUserId}` | 🧍 | [§4.8](#48-get-apiv2b2busersb2buserid) |
-| 9 | PATCH | `/api/v2/b2b/users/{b2bUserId}` | 🧍 | [§4.9](#49-patch-apiv2b2busersb2buserid) |
-| 10 | POST | `/api/v2/b2b/users/{b2bUserId}/password` | 🧍 | [§4.10](#410-post-apiv2b2busersb2buseridpassword) |
-| 11 | DELETE | `/api/v2/b2b/users/{b2bUserId}` | 🧍 | [§4.11](#411-delete-apiv2b2busersb2buserid) |
-| 12 | POST | `/api/v2/b2b/organizations` | 🔒 | [§4.12](#412-post-apiv2b2borganizations) |
-| 13 | GET | `/api/v2/b2b/organizations/{id}` | 🔓 | [§4.13](#413-get-apiv2b2borganizationsid) |
-| 14 | PATCH | `/api/v2/b2b/organizations/{id}` | 👑 | [§4.14](#414-patch-apiv2b2borganizationsid) |
-| 15 | DELETE | `/api/v2/b2b/organizations/{id}` | 👑 | [§4.15](#415-delete-apiv2b2borganizationsid) |
-| 16 | GET | `/api/v2/b2b/organizations/search` | 🔓 | [§4.16](#416-get-apiv2b2borganizationssearch) |
-| 17 | GET | `/api/v2/b2b/organizations/mine` | 🔒 | [§4.17](#417-get-apiv2b2borganizationsmine) |
-| 18 | POST | `/api/v2/b2b/organizations/{orgId}/join-requests` | 🔓 | [§4.18](#418-post-apiv2b2borganizationsorgidjoin-requests) |
-| 19 | POST | `/api/v2/b2b/memberships/{id}/approve` | 👑 | [§4.19](#419-post-apiv2b2bmembershipsidapprove) |
-| 20 | POST | `/api/v2/b2b/memberships/{id}/reject` | 👑 | [§4.20](#420-post-apiv2b2bmembershipsidreject) |
-| 21 | POST | `/api/v2/b2b/memberships/{id}/suspend` | 👑 | [§4.21](#421-post-apiv2b2bmembershipsidsuspend) |
-| 22 | POST | `/api/v2/b2b/memberships/{id}/leave` | 🔓 | [§4.22](#422-post-apiv2b2bmembershipsidleave) |
-| 23 | POST | `/api/v2/b2b/organizations/{orgId}/staff` | 👑 | [§4.23](#423-post-apiv2b2borganizationsorgidstaff) |
-| 24 | GET | `/api/v2/b2b/organizations/{orgId}/members` | 👥 | [§4.24](#424-get-apiv2b2borganizationsorgidmembers) |
-| 25 | POST | `/api/v2/b2b/organizations/{orgId}/invite-codes` | 👑 | [§4.25](#425-post-apiv2b2borganizationsorgidinvite-codes) |
-| 26 | GET | `/api/v2/b2b/organizations/{orgId}/invite-codes` | 🔒 | [§4.26](#426-get-apiv2b2borganizationsorgidinvite-codes) |
-| 27 | POST | `/api/v2/b2b/invite-codes/{id}/revoke` | 👑 | [§4.27](#427-post-apiv2b2binvite-codesidrevoke) |
-| 28 | POST | `/api/v2/b2b/invite-codes/redeem` | 🔓 | [§4.28](#428-post-apiv2b2binvite-codesredeem) |
-| 29 | POST | `/api/v2/b2b/organizations/{orgId}/devices` | 👑 | [§4.29](#429-post-apiv2b2borganizationsorgiddevices) |
-| 30 | GET | `/api/v2/b2b/organizations/{orgId}/devices` | 🔒 | [§4.30](#430-get-apiv2b2borganizationsorgiddevices) |
-| 31 | GET | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}` | 🔒 | [§4.31](#431-get-apiv2b2borganizationsorgiddevicesdeviceid) |
-| 32 | PATCH | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}` | 👑 | [§4.32](#432-patch-apiv2b2borganizationsorgiddevicesdeviceid) |
-| 33 | POST | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}/deactivate` | 👑 | [§4.33](#433-post-apiv2b2borganizationsorgiddevicesdeviceiddeactivate) |
-| 34 | GET | `…/members/{memberId}/measurements` | 👥 | [§4.34](#434-get-apiv2b2borganizationsorgidmembersmemberidmeasurements) |
-| 35 | GET | `…/measurements/{recordId}` | 👥 | [§4.35](#435-get-apiv2b2borganizationsorgidmembersmemberidmeasurementsrecordid) |
-| 36 | GET | `…/measurements/summary` | 👥 | [§4.36](#436-get-apiv2b2borganizationsorgidmembersmemberidmeasurementssummary) |
-| 37 | POST | `/api/v2/b2b/feedbacks/memberships/{id}` | 👥 | [§4.37](#437-post-apiv2b2bfeedbacksmembershipsid) |
-| 38 | PATCH | `/api/v2/b2b/feedbacks/{id}` | 작성자 | [§4.38](#438-patch-apiv2b2bfeedbacksid) |
-| 39 | DELETE | `/api/v2/b2b/feedbacks/{id}` | 작성자 | [§4.39](#439-delete-apiv2b2bfeedbacksid) |
-| 40 | GET | `/api/v2/b2b/feedbacks/memberships/{id}` | 🔒 | [§4.40](#440-get-apiv2b2bfeedbacksmembershipsid) |
-| 41 | GET | `/api/v2/b2b/feedbacks/measurements/{recordId}` | 🔒 | [§4.41](#441-get-apiv2b2bfeedbacksmeasurementsrecordid) |
-| 42 | GET | `/api/v2/b2b/license-summary` | 🔒 | [§4.42](#442-get-apiv2b2blicense-summary) |
-| 43 | GET | `/api/v2/b2b/license-summary/{orgId}` | 🔒 | [§4.43](#443-get-apiv2b2blicense-summaryorgid) |
-| 44 | POST | `/api/v2/b2b/billing/checkout-init` | 👑 | [§4.44](#444-post-apiv2b2bbillingcheckout-init) |
+| 3 | POST | `/api/v2/b2b/auth/logout` | 🔒 | [§4.3](#43-post-apiv2b2bauthlogout) |
+| 4 | POST | `/api/v2/b2b/auth/oauth2/google` | 🔓 | [§4.5](#45-post-apiv2b2bauthoauth2google) |
+| 5 | POST | `/api/v2/b2b/auth/oauth2/apple` | 🔓 | [§4.6](#46-post-apiv2b2bauthoauth2apple) |
+| 6 | POST | `/api/v2/b2b/users` | 🔓 | [§4.7](#47-post-apiv2b2busers) |
+| 7 | GET | `/api/v2/b2b/users/{b2bUserId}` | 🧍 | [§4.8](#48-get-apiv2b2busersb2buserid) |
+| 8 | PATCH | `/api/v2/b2b/users/{b2bUserId}` | 🧍 | [§4.9](#49-patch-apiv2b2busersb2buserid) |
+| 9 | POST | `/api/v2/b2b/users/{b2bUserId}/password` | 🧍 | [§4.10](#410-post-apiv2b2busersb2buseridpassword) |
+| 10 | DELETE | `/api/v2/b2b/users/{b2bUserId}` | 🧍 | [§4.11](#411-delete-apiv2b2busersb2buserid) |
+| 11 | POST | `/api/v2/b2b/organizations` | 🔒 | [§4.12](#412-post-apiv2b2borganizations) |
+| 12 | GET | `/api/v2/b2b/organizations/{id}` | 🔓 | [§4.13](#413-get-apiv2b2borganizationsid) |
+| 13 | PATCH | `/api/v2/b2b/organizations/{id}` | 👑 | [§4.14](#414-patch-apiv2b2borganizationsid) |
+| 14 | DELETE | `/api/v2/b2b/organizations/{id}` | 👑 | [§4.15](#415-delete-apiv2b2borganizationsid) |
+| 15 | GET | `/api/v2/b2b/organizations/search` | 🔓 | [§4.16](#416-get-apiv2b2borganizationssearch) |
+| 16 | POST | `/api/v2/b2b/organizations/{orgId}/join-requests` | 🔓 | [§4.18](#418-post-apiv2b2borganizationsorgidjoin-requests) |
+| 17 | POST | `/api/v2/b2b/memberships/{id}/approve` | 👑 | [§4.19](#419-post-apiv2b2bmembershipsidapprove) |
+| 18 | POST | `/api/v2/b2b/memberships/{id}/reject` | 👑 | [§4.20](#420-post-apiv2b2bmembershipsidreject) |
+| 19 | POST | `/api/v2/b2b/memberships/{id}/suspend` | 👑 | [§4.21](#421-post-apiv2b2bmembershipsidsuspend) |
+| 20 | POST | `/api/v2/b2b/memberships/{id}/leave` | 🔓 | [§4.22](#422-post-apiv2b2bmembershipsidleave) |
+| 21 | POST | `/api/v2/b2b/organizations/{orgId}/staff` | 👑 | [§4.23](#423-post-apiv2b2borganizationsorgidstaff) |
+| 22 | GET | `/api/v2/b2b/organizations/{orgId}/members` | 👥 | [§4.24](#424-get-apiv2b2borganizationsorgidmembers) |
+| 23 | POST | `/api/v2/b2b/organizations/{orgId}/invite-codes` | 👑 | [§4.25](#425-post-apiv2b2borganizationsorgidinvite-codes) |
+| 24 | GET | `/api/v2/b2b/organizations/{orgId}/invite-codes` | 🔒 | [§4.26](#426-get-apiv2b2borganizationsorgidinvite-codes) |
+| 25 | POST | `/api/v2/b2b/invite-codes/{id}/revoke` | 👑 | [§4.27](#427-post-apiv2b2binvite-codesidrevoke) |
+| 26 | POST | `/api/v2/b2b/invite-codes/redeem` | 🔓 | [§4.28](#428-post-apiv2b2binvite-codesredeem) |
+| 27 | POST | `/api/v2/b2b/organizations/{orgId}/devices` | 👑 | [§4.29](#429-post-apiv2b2borganizationsorgiddevices) |
+| 28 | GET | `/api/v2/b2b/organizations/{orgId}/devices` | 🔒 | [§4.30](#430-get-apiv2b2borganizationsorgiddevices) |
+| 29 | GET | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}` | 🔒 | [§4.31](#431-get-apiv2b2borganizationsorgiddevicesdeviceid) |
+| 30 | PATCH | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}` | 👑 | [§4.32](#432-patch-apiv2b2borganizationsorgiddevicesdeviceid) |
+| 31 | POST | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}/deactivate` | 👑 | [§4.33](#433-post-apiv2b2borganizationsorgiddevicesdeviceiddeactivate) |
+| 32 | GET | `…/members/{memberId}/measurements` | 👥 | [§4.34](#434-get-apiv2b2borganizationsorgidmembersmemberidmeasurements) |
+| 33 | GET | `…/measurements/{recordId}` | 👥 | [§4.35](#435-get-apiv2b2borganizationsorgidmembersmemberidmeasurementsrecordid) |
+| 34 | GET | `…/measurements/summary` | 👥 | [§4.36](#436-get-apiv2b2borganizationsorgidmembersmemberidmeasurementssummary) |
+| 35 | POST | `/api/v2/b2b/feedbacks/memberships/{id}` | 👥 | [§4.37](#437-post-apiv2b2bfeedbacksmembershipsid) |
+| 36 | PATCH | `/api/v2/b2b/feedbacks/{id}` | 작성자 | [§4.38](#438-patch-apiv2b2bfeedbacksid) |
+| 37 | DELETE | `/api/v2/b2b/feedbacks/{id}` | 작성자 | [§4.39](#439-delete-apiv2b2bfeedbacksid) |
+| 38 | GET | `/api/v2/b2b/feedbacks/memberships/{id}` | 🔒 | [§4.40](#440-get-apiv2b2bfeedbacksmembershipsid) |
+| 39 | GET | `/api/v2/b2b/feedbacks/measurements/{recordId}` | 🔒 | [§4.41](#441-get-apiv2b2bfeedbacksmeasurementsrecordid) |
+| 40 | GET | `/api/v2/b2b/license-summary` | 🔒 | [§4.42](#442-get-apiv2b2blicense-summary) |
+| 41 | GET | `/api/v2/b2b/license-summary/{orgId}` | 🔒 | [§4.43](#443-get-apiv2b2blicense-summaryorgid) |
+| 42 | POST | `/api/v2/b2b/billing/checkout-init` | 👑 | [§4.44](#444-post-apiv2b2bbillingcheckout-init) |
+| 43 | POST | `/api/v2/b2b/billing/plan-change` | 👑 | [§4.45](#445-post-apiv2b2bbillingplan-change) |
+| 44 | GET | `/api/v2/b2b/billing/organizations/{orgId}/transactions` | 👑 | [§4.46](#446-get-apiv2b2bbillingorganizationsorgidtransactions) |
 
 전 응답은 [`CncResponse`](#71-cncresponse-envelope) envelope 으로 감싸진다. 본 문서의 응답 샘플은 envelope 전체를 보여 준다.
+
+> § 4.4 (`GET /auth/me`), § 4.17 (`GET /organizations/mine`) 은 코드에서 제거됨 — 표 번호는 코드 기준 44개. § 번호는 결번 (변경 추적 용이).
 
 ---
 
@@ -361,33 +364,6 @@ JTI revocation + (web 흐름) Session invalidate.
 ```json
 { "success": true, "code": "200", "message": "OK", "data": null }
 ```
-
----
-
-### 4.4 `GET /api/v2/b2b/auth/me`
-
-세션 sanity check. 인증 컨텍스트 노출.
-
-**Auth** 🔒.
-
-**Response — 200**
-
-```json
-{
-  "success": true, "code": "200", "message": "OK",
-  "data": {
-    "authenticated": true,
-    "userId": "u-9f3e",
-    "email": "owner@example.com",
-    "roles": ["ROLE_USER"]
-  }
-}
-```
-
-**Errors**
-| HTTP | 코드 | 케이스 |
-|---|---|---|
-| 401 | `CMN-401-001` | anonymous principal |
 
 ---
 
@@ -787,27 +763,6 @@ soft 삭제 (owner 만). `status=DELETED` + 모든 멤버십 LEFT + 모든 invit
     "totalElements": 1,
     "totalPages": 1,
     "hasNext": false
-  }
-}
-```
-
----
-
-### 4.17 `GET /api/v2/b2b/organizations/mine`
-
-본인 소유 시설 목록.
-
-**Auth** 🔒.
-
-**Response — 200**
-
-```json
-{
-  "success": true, "code": "200", "message": "OK",
-  "data": {
-    "items": [
-      { "id": "org-A", "name": "강남점", "type": "PILATES", "... (OrganizationResponse 동일)": "" }
-    ]
   }
 }
 ```
@@ -1692,6 +1647,150 @@ BillingController.checkoutInit → BillingService.initCheckout
 
 ---
 
+### 4.45 `POST /api/v2/b2b/billing/plan-change`
+
+기존 구독의 plan 변경 (price 변경). b2b 가 OWNER 검증 후 payment-service REST 위임. Paddle PATCH 즉시 반영 + 후속 webhook 으로 DB 정합 확정.
+
+**Auth** 👑 (OWNER).
+
+**Request body** — `ChangePlanRequest`
+
+```json
+{
+  "organizationId": "org-A",
+  "newPriceId": "pri_01h6_pro"
+}
+```
+
+검증. `organizationId` ValidUuid, `newPriceId` NotBlank.
+
+**Response — 200** — `PaymentPlanChangeResponse`
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "paddleSubscriptionId": "sub_xxx",
+    "newPriceId": "pri_01h6_pro",
+    "newPlanCode": "PILATES_PRO",
+    "newPlanSeats": 100,
+    "newBillingInterval": "month",
+    "prorationMode": "prorated_immediately",
+    "status": "active"
+  }
+}
+```
+
+**Errors** (`BillingError`)
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 404 | `CMN-404-001` | OrganizationNotFound |
+| 404 | `CMN-404-001` | PlanNotFound — 새 priceId 가 subscription_plans 에 없음 |
+| 404 | `CMN-404-001` | NoActiveSubscription — 변경할 구독이 없음 |
+| 403 | `AUTH-403-002` | NotOwner |
+| 409 | `CMN-409-001` | SamePlanAsCurrent — 현재와 동일한 priceId |
+| 4xx | `CMN-400-001`/`CMN-404-001`/`CMN-409-001` | PaymentRejected — payment-service 4xx (statusCode 별 매핑) |
+| 502 | `CMN-502-001` | PaymentServiceUnavailable |
+
+**연쇄 호출**
+
+```
+BillingController.planChange → BillingService.changePlan
+  ├─ OrganizationRepository.findById
+  ├─ owner 검증 (organization.ownerUserId == principal)
+  └─ PaymentClient.changePlan (HTTP → payment-service)
+       └─ payment-service: Paddle PATCH /subscriptions/{id} + subscription_plan_history 기록
+```
+
+---
+
+### 4.46 `GET /api/v2/b2b/billing/organizations/{organizationId}/transactions`
+
+organization 의 결제 transaction 이력. payment-service REST 응답을 그대로 echo.
+
+**Auth** 👑 (OWNER).
+
+**Response — 200** — `List<PaymentTransactionView>`
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": [
+    {
+      "id": "txn-9c2a",
+      "paddleTransactionId": "txn_01h_xxx",
+      "customerId": "ctm_xxx",
+      "subscriptionId": "sub_xxx",
+      "status": "completed",
+      "currencyCode": "KRW",
+      "subtotal": 99000,
+      "discountTotal": 0,
+      "taxTotal": 9900,
+      "totalAmount": 108900,
+      "billingPeriodStartsAt": "2026-05-01T00:00:00Z",
+      "billingPeriodEndsAt": "2026-06-01T00:00:00Z",
+      "billingCountryCode": "KR",
+      "billingPostalCode": "06000",
+      "billingRegion": "서울",
+      "billingCity": "강남구",
+      "billingAddressLine": "테헤란로 123",
+      "items": [
+        {
+          "id": "ti-1",
+          "paddleItemId": "txnitm_xxx",
+          "priceId": "pri_01h5xxx",
+          "productId": "pro_xxx",
+          "productName": "PILATES_BASIC (50석)",
+          "productDescription": "월 99,000원 / 50명 수용",
+          "quantity": 1,
+          "unitPrice": 99000,
+          "subtotal": 99000,
+          "discountAmount": 0,
+          "taxAmount": 9900,
+          "total": 108900,
+          "taxRate": "0.10"
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-1",
+          "amount": 108900,
+          "status": "captured",
+          "paymentType": "card",
+          "cardType": "visa",
+          "cardLast4": "4242",
+          "cardExpiryMonth": 12,
+          "cardExpiryYear": 2028,
+          "cardholderName": "OWNER PARK",
+          "capturedAt": "2026-05-01T00:05:00Z"
+        }
+      ],
+      "createdAt": "2026-05-01T00:05:00Z"
+    }
+  ]
+}
+```
+
+이력이 없으면 `data: []`.
+
+**Errors** (`BillingError`)
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 404 | `CMN-404-001` | OrganizationNotFound |
+| 403 | `AUTH-403-002` | NotOwner |
+| 502 | `CMN-502-001` | PaymentServiceUnavailable |
+
+**연쇄 호출**
+
+```
+BillingController.listTransactions → BillingService.listTransactions
+  ├─ OrganizationRepository.findById
+  ├─ owner 검증
+  └─ PaymentClient.listTransactions(organizationId) (HTTP → payment-service)
+```
+
+---
+
 ## 5. License Guard 매트릭스
 
 `external/license/LicenseGuard.java` — 4종 결정.
@@ -1948,6 +2047,70 @@ user-service / measure-service 다운 시 user/measurement 필드 모두 null.
 }
 ```
 
+### 7.14 PaymentPlanChangeResponse
+
+```json
+{
+  "paddleSubscriptionId": "sub_xxx",
+  "newPriceId": "pri_...",
+  "newPlanCode": "PILATES_PRO",
+  "newPlanSeats": 100,
+  "newBillingInterval": "month|year",
+  "prorationMode": "prorated_immediately|do_not_prorate|...",
+  "status": "active|trialing|past_due|..."
+}
+```
+
+### 7.15 PaymentTransactionView
+
+payment-service 의 transaction 응답을 b2b 가 그대로 echo. 필드 의미는 Paddle Transaction 객체와 동일.
+
+```json
+{
+  "id": "...",
+  "paddleTransactionId": "txn_xxx",
+  "customerId": "ctm_xxx",
+  "subscriptionId": "sub_xxx?",
+  "status": "completed|paid|past_due|...",
+  "currencyCode": "KRW|USD|...",
+  "subtotal": 99000,
+  "discountTotal": 0,
+  "taxTotal": 9900,
+  "totalAmount": 108900,
+  "billingPeriodStartsAt": "...?",
+  "billingPeriodEndsAt": "...?",
+  "billingCountryCode": "KR?",
+  "billingPostalCode": "...?",
+  "billingRegion": "...?",
+  "billingCity": "...?",
+  "billingAddressLine": "...?",
+  "items": [
+    {
+      "id": "...", "paddleItemId": "...",
+      "priceId": "...", "productId": "...",
+      "productName": "...", "productDescription": "...?",
+      "quantity": 1, "unitPrice": 99000,
+      "subtotal": 99000, "discountAmount": 0,
+      "taxAmount": 9900, "total": 108900,
+      "taxRate": "0.10"
+    }
+  ],
+  "payments": [
+    {
+      "id": "...", "amount": 108900,
+      "status": "captured|failed|...",
+      "paymentType": "card|...",
+      "cardType": "visa|master|...?",
+      "cardLast4": "4242?",
+      "cardExpiryMonth": 12, "cardExpiryYear": 2028,
+      "cardholderName": "...?",
+      "capturedAt": "...?"
+    }
+  ],
+  "createdAt": "..."
+}
+```
+
 ---
 
 ## 8. Error Code (`ErrorCode` enum, common-core 기반)
@@ -1956,7 +2119,7 @@ user-service / measure-service 다운 시 user/measurement 필드 모두 null.
 |---|---|---|
 | `CMN-400-001` | 400 | CHECK_PARAMETER (validation, role assignment 등) |
 | `CMN-400-002` | 400 | VALIDATION_FAILED |
-| `CMN-401-001` | 401 | Unauthorized (auth/me 의 anonymous principal) |
+| `CMN-401-001` | 401 | Unauthorized (SecurityConfig 의 anonymous principal — Authorization/Session 누락) |
 | `AUTH-401-001` | 401 | TOKEN_INVALID (refresh / oauth id_token / audience) |
 | `AUTH-401-003` | 401 | AUTHENTICATION_FAILED (login 실패, InvalidCurrentPassword) |
 | `AUTH-403-001` | 403 | ACCESS_DENIED (license/seat / NotSearchable) |
@@ -2123,9 +2286,9 @@ erDiagram
 |---|---|
 | Java | 25 |
 | Spring Boot | 4.0.6 |
-| common-libs | `carencoPlatformVersion=0.0.46` |
+| common-libs | `carencoPlatformVersion=0.0.50` |
 | DB | PostgreSQL (TIMESTAMP(6) / VARCHAR / payment-service 와 같은 인스턴스, DB 분리) |
-| Flyway | V1 init / V2 jwt / V3 feedback / V4 user country |
+| Flyway | V1 init / V2 jwt / V3 feedback / V4 user country / V5 refresh_token_hash VARCHAR / V6 soft-delete on invite-codes/memberships / V7 password_changed_at / V8 archive_outbox |
 | Build | `./gradlew compileJava` (config-server 필요 시 dev profile + CONFIG_URI) |
 | Postman | `b2b-service/postman/B2B-Service-API.postman_collection.json` |
 
