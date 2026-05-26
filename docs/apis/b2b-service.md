@@ -1,6 +1,6 @@
 # B2B Service API
 
-> Updated: 2026-05-18
+> Updated: 2026-05-26
 > Style: OpenAPI 3.1 + diagrams + code chain mapping + full request/response samples
 > Base path: `/api/v2/b2b/...`
 > 응답 envelope: [`CncResponse`](#71-cncresponse-envelope) (Pattern B)
@@ -987,11 +987,14 @@ OWNER/ADMIN 이 기존 b2b_user 를 staff 로 지정. role 은 ADMIN 또는 TRAI
 **Query**
 | 이름 | 타입 | 기본 |
 |---|---|---|
-| `query` | string | 이름/전화번호 부분일치 |
+| `query` | string | 이름 부분일치 (user-service `SearchUsers` 4가지 결합 매칭 — firstName+lastName / lastName+firstName / firstName / lastName, 공백 무시) |
+| `include_nickname` | boolean | `false` (true 시 `query` 매칭에 nickname 포함) |
 | `sort_by` | `NAME` / `REGISTERED_AT` / `LATEST_MEASUREMENT` | `REGISTERED_AT` |
 | `status` | `MembershipStatus` | `ACTIVE` |
 | `page` | int | 0 |
 | `size` | int | 20 (max 100) |
+
+> 0.0.52 에서 phone_number 매칭은 user-service 측에서 제거됨 — 이름/nickname 만 검색 가능.
 
 **Response — 200** — `MemberListResponse`
 
@@ -1550,6 +1553,7 @@ soft 삭제 (deletedAt 채움).
         "startedAt": "2026-01-01T00:00:00Z",
         "expiresAt": "2027-01-01T00:00:00Z",
         "graceRemainingDays": 0,
+        "graceRemainingSeconds": 0,
         "subscriptionId": "sub_xxx"
       },
       {
@@ -1563,6 +1567,7 @@ soft 삭제 (deletedAt 채움).
         "startedAt": "2025-12-01T00:00:00Z",
         "expiresAt": "2026-05-10T00:00:00Z",
         "graceRemainingDays": 4,
+        "graceRemainingSeconds": 345600,
         "subscriptionId": "sub_yyy"
       }
     ]
@@ -2026,11 +2031,13 @@ user-service / measure-service 다운 시 user/measurement 필드 모두 null.
   "startedAt": "...?",
   "expiresAt": "...?",
   "graceRemainingDays": 0,
+  "graceRemainingSeconds": 0,
   "subscriptionId": "...?"
 }
 ```
 
 `state=NONE` 시 `planCode`, `planSeats`, `seatsRemaining`, `subscriptionId` 모두 null. seatsUsed 는 organization master.
+`graceRemainingDays` 는 일 단위 (0~7), `graceRemainingSeconds` 는 동일 잔여 시간의 초 단위 정밀값 (UI 가 시간/분 단위 카운트다운 표시용). `GRACE` 외 상태에서는 둘 다 0.
 
 ### 7.13 PaymentCheckoutLinkResponse
 
@@ -2286,9 +2293,9 @@ erDiagram
 |---|---|
 | Java | 25 |
 | Spring Boot | 4.0.6 |
-| common-libs | `carencoPlatformVersion=0.0.50` |
+| common-libs | `carencoPlatformVersion=0.0.53` |
 | DB | PostgreSQL (TIMESTAMP(6) / VARCHAR / payment-service 와 같은 인스턴스, DB 분리) |
-| Flyway | V1 init / V2 jwt / V3 feedback / V4 user country / V5 refresh_token_hash VARCHAR / V6 soft-delete on invite-codes/memberships / V7 password_changed_at / V8 archive_outbox |
+| Flyway | V1 init / V2 jwt / V3 feedback / V4 user country / V5 refresh_token_hash VARCHAR / V6 soft-delete on invite-codes/memberships / V7 password_changed_at / V8 archive_outbox / V9 archive_outbox restore 컬럼 5종 / V10 archive_outbox.entity_id VARCHAR(36) / V11 partial unique index on memberships (soft-delete 재가입 허용) |
 | Build | `./gradlew compileJava` (config-server 필요 시 dev profile + CONFIG_URI) |
 | Postman | `b2b-service/postman/B2B-Service-API.postman_collection.json` |
 
