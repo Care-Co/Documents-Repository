@@ -25,7 +25,7 @@ Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 | [storage-service](./storage-service.md) | 9 endpoints (v1 deprecated + v2 current) | `api-version: 1.0.0` | v1 sunset 2026-12-31 |
 | [admin-service](./admin-service.md) | 4 endpoints (Spring Boot Admin instance view) | `api-version` `1.0.0`, `2025-06-24`, `0.0.1` | wraps SBA |
 | [agent-service](./agent-service.md) | 2 endpoints (LLM chat + greeting) | `api-version: 1.0.0` | proxies Física Agent |
-| [graph-service](./graph-service.md) | 1 endpoint (Neo4j shoe recommendation) | `api-version: 0.0.1` | random fallback |
+| [graph-service](./graph-service.md) | 7 endpoints (shoe recommendation + catalog) | `api-version: 1.0.0` | in-memory `shoes.json` |
 | [payment-service](./payment-service.md) | 17 REST + 1 webhook | unversioned | Paddle Billing v2 |
 | [ML-service](./ml-service.md) | 6 routes (footprint + pose + measurement) | `api-version: 1.0.0` (reserved, not branched) | Flask blueprints |
 | [device-service](./device-service.md) | 11 REST + 1 gRPC | `api-version: 1.0.0` | device registry, owner validation, OTA firmware |
