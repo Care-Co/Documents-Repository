@@ -3,7 +3,7 @@
 > OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
 
 Source: `/Users/jonghak/GitHub/Care&Co/measure-service`
-Updated: 2026-04-27
+Updated: 2026-05-29
 
 **Servers**
 - `https://api.example.com`
@@ -12,13 +12,13 @@ Updated: 2026-04-27
 
 | Header | Value |
 |---|---|
-| `api-version` | `1.0.0` |
+| `api-version` | `1.0.0` (records · activities) / `1.0.1` (POST records only) |
 | `Authorization` | `Bearer <jwt>` (gateway-enforced) |
 | `Content-Type` | `application/json` or `multipart/form-data` |
 
 **Security** &nbsp;Auth context resolved internally via `AuthService.userGetData(userId)`. No `@PreAuthorize` annotations.
 
-DTO calendar versions: `2026-01-13` (record DTO), `2026-02-02` (activity DTO).
+DTO calendar versions: `2026-01-13` (record DTO — V9 부터 `deviceId` / `deviceSerial` / `source` / `appVersion` 포함), `2026-02-02` (activity DTO).
 
 ---
 
@@ -44,12 +44,12 @@ One-shot sync of records/activities `user_id` against Auth Service; backfills UT
 
 ---
 
-## `POST` /api/v2/users/{userId}/records
+## `POST` /api/v2/users/{userId}/records — `api-version: 1.0.0`
 
 **Operation ID** &nbsp;`createRecord`
 **Tags** &nbsp;`record`
 
-Create record (vision/footprint).
+Create record (vision/footprint). v1.0.0 는 B2C 모바일 앱 자가 측정 코호트 — 서버에서 `source` 를 `SELF` 로 강제 매핑.
 
 ### Parameters
 
@@ -63,7 +63,7 @@ Create record (vision/footprint).
 
 `multipart/form-data` &nbsp;**Required**
 
-**Schema** — [`CreateRecordRequest`](#createrecordrequest)
+**Schema** — [`CreateRecordRequestV1_0_0`](#createrecordrequestv1_0_0)
 
 | Part | Type | Required |
 |---|---|---|
@@ -92,7 +92,11 @@ Create record (vision/footprint).
     "footprint": { "weight": 70.5, "height": 175.0, "age": 34 },
     "front": { "type": "POSE", "imageUrl": "..." },
     "side": { "type": "POSE", "imageUrl": "..." },
-    "score": { "bodyScore": 80.0, "predictedAge": 30.0 }
+    "score": { "bodyScore": 80.0, "predictedAge": 30.0 },
+    "deviceId": null,
+    "deviceSerial": null,
+    "source": "SELF",
+    "appVersion": null
   }
 }
 ```
@@ -102,6 +106,81 @@ curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=VIS
   -H "api-version: 1.0.0" -H "Authorization: Bearer ..." \
   -F "measuredDataTime=2026-04-27T01:23:45Z" \
   -F "front=@front.jpg" -F "side=@side.jpg"
+```
+
+---
+
+## `POST` /api/v2/users/{userId}/records — `api-version: 1.0.1`
+
+**Operation ID** &nbsp;`createRecordV1_0_1`
+**Tags** &nbsp;`record`
+
+v1.0.0 + 측정 컨텍스트 추적 (`macAddress` / `source` / `appVersion`). 같은 path 에 `api-version` 헤더로 분기.
+
+`macAddress` 전송 시 controller 가 device-service `DeviceLookup.LookupByMac` gRPC 호출 → 응답의 `deviceId` / `hardwareSerial` 을 record 에 함께 저장. owner / status 검증·풀 자동 추적은 device-service 가 처리. lookup 실패 시 device-service 의 `ErrorCode` 가 `CncResponse` 로 propagate.
+
+`source` 미전송 시 [`RecordSource.UNSPECIFIED`](#recordsource) (의도적 "모름"). 유효하지 않은 값은 400.
+
+### Parameters
+
+| In | Name | Type | Required | Validation |
+|---|---|---|---|---|
+| header | `api-version` | string (enum: `1.0.1`) | yes | — |
+| path | `userId` | string (uuid) | yes | `@ValidUuid` |
+| query | `recordType` | string (enum: `VISION` `FOOTPRINT`) | yes | `@ValidEnum(RecordType)` |
+
+### Request body
+
+`multipart/form-data` &nbsp;**Required**
+
+**Schema** — [`CreateRecordRequestV1_0_1`](#createrecordrequestv1_0_1)
+
+| Part | Type | Required | Description |
+|---|---|---|---|
+| `measuredDataTime` | string (date-time, UTC) | yes | — |
+| `rawData` | string | no | — |
+| `front` | binary | no | — |
+| `side` | binary | no | — |
+| `macAddress` | string | no | 측정 device 의 MAC. 전송 시 device-service lookup 수행 |
+| `source` | string (enum: `UNSPECIFIED` `SELF` `TRAINER_GUIDED` `IMPORT`) | no | 미전송 시 `UNSPECIFIED` |
+| `appVersion` | string | no | 예: `ios-2.3.1` (회귀 추적용) |
+
+### Responses
+
+| Status | Content-Type | Schema |
+|---|---|---|
+| **201** | `application/json` | `Envelope` with `data:` [`Record`](#record) |
+| **400** | `application/json` | [`ErrorResponse`](#errorresponse) — `source` enum 위반 / device lookup 실패 (owner mismatch, device inactive 등) |
+
+#### 201 — example
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "userId": "uuid",
+    "measuredDateTime": "2026-05-29T01:23:45Z",
+    "timezone": "Asia/Seoul",
+    "footprint": { "weight": 70.5, "height": 175.0, "age": 34 },
+    "front": { "type": "POSE", "imageUrl": "..." },
+    "side": { "type": "POSE", "imageUrl": "..." },
+    "score": { "bodyScore": 80.0, "predictedAge": 30.0 },
+    "deviceId": "dev-uuid-from-device-service",
+    "deviceSerial": "HW-SN-001234",
+    "source": "TRAINER_GUIDED",
+    "appVersion": "ios-2.3.1"
+  }
+}
+```
+
+```bash
+curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=FOOTPRINT" \
+  -H "api-version: 1.0.1" -H "Authorization: Bearer ..." \
+  -F "measuredDataTime=2026-05-29T01:23:45Z" \
+  -F "macAddress=AA:BB:CC:DD:EE:FF" \
+  -F "source=TRAINER_GUIDED" \
+  -F "appVersion=ios-2.3.1"
 ```
 
 ---
@@ -294,18 +373,22 @@ Bulk delete by ids and/or time range.
 
 ### `Record`
 
-(`RecordDtoV20260113`)
+(`RecordDtoV20260113` — V9)
 
 | Field | Type | Description |
 |---|---|---|
 | `id` | string (uuid) | — |
 | `userId` | string (uuid) | — |
 | `measuredDateTime` | string (date-time, UTC) | — |
-| `timezone` | string (IANA zone id) | — |
+| `timezone` | string (IANA zone id) | 측정 시점 사용자 zone snapshot |
 | `footprint` | [`Footprint`](#footprint) | — |
 | `front` | [`Vision`](#vision) | — |
 | `side` | [`Vision`](#vision) | — |
 | `score` | object — `{ bodyScore: number, predictedAge: number }` | — |
+| `deviceId` | string (uuid) \| null | device-service `DeviceLookup.LookupByMac` 응답. v1.0.0 record 는 항상 null |
+| `deviceSerial` | string \| null | device-service 응답의 `hardwareSerial`. v1.0.0 record 는 항상 null |
+| `source` | [`RecordSource`](#recordsource) | v1.0.0 record 는 `SELF`, v1.0.1 미전송 시 `UNSPECIFIED` |
+| `appVersion` | string \| null | v1.0.1 에서 전송된 앱 버전. v1.0.0 record 는 항상 null |
 
 ### `Footprint`
 
@@ -330,9 +413,24 @@ Bulk delete by ids and/or time range.
 | `imageUrl` | string (uri) |
 | `keypoints` | object — 17 named keypoints, each `{ x: number, y: number, accuracy: number }` |
 
-### `CreateRecordRequest`
+### `CreateRecordRequestV1_0_0`
 
-See request-body table above.
+See `POST /records — v1.0.0` request-body table.
+
+### `CreateRecordRequestV1_0_1`
+
+See `POST /records — v1.0.1` request-body table. v1.0.0 의 4개 part + `macAddress` / `source` / `appVersion`.
+
+### `RecordSource`
+
+| Value | Meaning |
+|---|---|
+| `UNSPECIFIED` | v1.0.1 호출자가 의도적으로 미전송. "정말 모름". NULL 회피용 명시 분류 |
+| `SELF` | B2C 사용자가 본인 device 로 자가 측정 (B2B 시설 무관). v1.0.0 호출은 모두 이 case |
+| `TRAINER_GUIDED` | B2B 시설의 device 로 측정 (트레이너 입회 가능) |
+| `IMPORT` | 데이터 마이그레이션 / 일괄 인입 (수동 또는 batch) |
+
+DB 에는 `EnumType.STRING` 으로 저장 — 새 case 추가 시 schema 변경 없음.
 
 ### `RecordDeleteRequest`
 
