@@ -150,11 +150,11 @@ Flow:
 
 ```json
 {
-  "hardwareSerial": "CN1G00226KR1700001JP",
-  "model": "Scale2 Pro",
-  "firmwareVersion": "1.0.0"
+  "hardwareSerial": "CN1G00226KR1700001JP"
 }
 ```
+
+`model` / `firmwareVersion` 은 optional. 생략 시 `model` 은 null, `firmwareVersion` 은 출고 풀의 값이 자동 채워진다 (풀이 권위). client 가 굳이 보낼 이유 없음.
 
 #### Responses
 
