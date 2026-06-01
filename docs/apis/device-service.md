@@ -1,6 +1,6 @@
 # device-service
 
-> Updated: 2026-05-29
+> Updated: 2026-06-01 (proto v0.0.61)
 > Style: OpenAPI 3.1 + code-backed endpoint catalog + schema tables
 > Base path: `/api/v1/devices`, `/api/v1/admin/allowed-devices`
 > Response envelope: `CncResponse` (common-core / Pattern B)
@@ -20,7 +20,7 @@ Source: `/Users/jonghak/GitHub/Care&Co/device-service`
 | `allowed_device` | Shipped-device pool. Admin adds rows (single or xlsx bulk); register flow consumes them; `claim` / `unclaim` toggle is the binding to a real `device` row |
 | `device` | Register physical devices to an owner using a pool serial, validate active ownership, change status, unregister (REVOKED + pool unclaim) |
 | `firmware` | Store firmware by `deviceType + version`, mark one latest firmware per device type, serve upgrade checks |
-| `grpc` | Three internal gRPC services — `DeviceLookup` (mac → serial for measure-service), `DeviceManagement` (B2B organization device asset lifecycle), `DeviceLifecycle` (owner-scoped bulk unregister for user-service deletion worker) |
+| `grpc` | Four internal gRPC services — `DeviceLookup` (mac → serial for measure-service), `DeviceManagement` (B2B organization device asset lifecycle + serial preview), `DeviceLifecycle` (owner-scoped bulk unregister for user-service deletion worker), `DeviceMetrics` (battery report from measure-service after each record save) |
 
 ### 1.2 Runtime
 
@@ -536,10 +536,13 @@ Used by `b2b-service` to manage device assets attached to organizations. Distinc
 |---|---|
 | `RegisterDevice` | Pool-backed register (organizationId, serialNumber, alias, registeredBy) |
 | `GetDevice` | By device id |
-| `ListDevices` | Paged by organization, with status filter + sort |
+| `ListDevices` | Paged by organization, with status filter + sort (`NAME`/`REGISTERED_AT`/`LAST_USED`/**`BATTERY`** new in 0.0.61) |
 | `UpdateDevice` | Update alias |
 | `DeactivateDevice` | Soft-deactivate (DEACTIVATED). Reversible |
 | `UnregisterDevice` | **New in 0.0.59.** Permanent revoke (REVOKED + pool unclaim). Distinct from `DeactivateDevice` — REVOKED rows are terminal |
+| `PreviewBySerial` | **New in 0.0.61.** Lookup pool row by `hardware_serial` only — no claim, no write. b2b UI registration preview step. Returns `{found, already_claimed, hardware_serial, device_type, firmware_version}` |
+
+`Device` proto fields added in 0.0.61: `battery_level` (int32, `-1` = unknown), `battery_reported_at` (ISO-8601, `""` = none).
 
 `OrganizationDeviceError` cases map to gRPC `Status`:
 
@@ -572,7 +575,31 @@ Called by `user-service` deletion outbox worker (`UserOutboxDeletionRetryExecuto
 | `unregistered_count` | int | devices newly transitioned to REVOKED in this call |
 | `active_before` | int | active devices observed before transition |
 
-### 7.4 Removed gRPC
+### 7.4 `DeviceMetrics.ReportBattery` (new in 0.0.61)
+
+Java: `DeviceMetricsGrpcService extends DeviceMetricsGrpc.DeviceMetricsImplBase`.
+
+Called by `measure-service` fire-and-forget after every footprint / vision record save (`RecordServiceImpl.createFootprint` / `createByVision`). Updates `device.battery_level` + `battery_reported_at`. Failures (NOT_FOUND, INVALID_ARGUMENT, deadline exceeded) are swallowed at the caller so they cannot delay measurement responses.
+
+#### Request
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `device_id` | string | yes | NOT_FOUND if missing |
+| `battery_level` | int32 | yes | 0-100; INVALID_ARGUMENT if out of range |
+| `reported_at` | string | no | ISO-8601 (UTC). Empty → server now |
+| `reported_by` | string | no | Audit (e.g. `measure-service:record`) |
+
+#### Response
+
+| Field | Type | Notes |
+|---|---|---|
+| `battery_level` | int32 | Echo of stored value |
+| `battery_reported_at` | string | ISO-8601 of stored timestamp |
+
+Dev verification (2026-06-01): one footprint upload via newman `device-mac-lookup-flow` → `DeviceApplicationService.reportBattery args=[deviceId, 99, ...]` succeeded in 12ms.
+
+### 7.5 Removed gRPC
 
 - `DeviceValidator.Validate` — removed in `common-libs` `0.0.58`. Its functionality is split: measurement uses `DeviceLookup.LookupByMac`; B2B uses `DeviceManagement.GetDevice` + status check.
 
@@ -640,6 +667,8 @@ Seed data: V5 Flyway migration seeds 35 rows from the legacy `mac_database.xlsx`
 | `revocation_reason` | `VARCHAR(255)` | no | audit |
 | `last_used_at` | `TIMESTAMP` | no | set on successful validation/lookup |
 | `last_used_ip` | `VARCHAR(45)` | no | IPv4/IPv6 |
+| `battery_level` | `INTEGER` | no | 0-100; updated by `DeviceMetrics.ReportBattery` (V10) |
+| `battery_reported_at` | `TIMESTAMP` | no | timestamp of last battery report (V10) |
 | `created_at`, `updated_at`, `deleted_at` | `TIMESTAMP` | no | `BaseTimeEntity` |
 
 Indexes / constraints:
@@ -652,6 +681,7 @@ Indexes / constraints:
 | `idx_devices_mac` | `mac_address` | — |
 | `idx_devices_type` | `device_type` | — |
 | `idx_devices_organization` | `organization_id` | B2B lookups |
+| `idx_devices_battery_level` | `battery_level` | sort by battery (V10) |
 
 ### 8.3 `device_firmwares`
 

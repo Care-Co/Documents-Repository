@@ -224,6 +224,8 @@ sequenceDiagram
 | 29 | GET | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}` | 🔒 | [§4.31](#431-get-apiv2b2borganizationsorgiddevicesdeviceid) |
 | 30 | PATCH | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}` | 👑 | [§4.32](#432-patch-apiv2b2borganizationsorgiddevicesdeviceid) |
 | 31 | POST | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}/deactivate` | 👑 | [§4.33](#433-post-apiv2b2borganizationsorgiddevicesdeviceiddeactivate) |
+| 31a | GET | `/api/v2/b2b/organizations/{orgId}/devices/preview?serial=...` | 👑 | [§4.33.1](#4331-get-devicespreview-new-in-0061) |
+| 31b | DELETE | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}?reason=...` | 👑 | [§4.33.2](#4332-delete-devicesdeviceid-new-in-0061) |
 | 32 | GET | `…/members/{memberId}/measurements` | 👥 | [§4.34](#434-get-apiv2b2borganizationsorgidmembersmemberidmeasurements) |
 | 33 | GET | `…/measurements/{recordId}` | 👥 | [§4.35](#435-get-apiv2b2borganizationsorgidmembersmemberidmeasurementsrecordid) |
 | 34 | GET | `…/measurements/summary` | 👥 | [§4.36](#436-get-apiv2b2borganizationsorgidmembersmemberidmeasurementssummary) |
@@ -1241,7 +1243,7 @@ device 목록.
 |---|---|---|
 | `keyword` | string | serialNumber / alias 부분일치 |
 | `status` | `DeviceStatus` (`ACTIVE` / `INACTIVE`) | 필터 |
-| `sortBy` | string | device-service 위임 (REGISTERED_AT DESC / ALIAS ASC 등) |
+| `sortBy` | string | `name` / `registered_at` (default DESC) / `last_used` / **`battery`** (0.0.61, NULLS LAST) |
 
 **Response — 200**
 
@@ -1261,12 +1263,16 @@ device 목록.
         "deactivatedAt": null,
         "deactivatedBy": null,
         "deactivationReason": null,
-        "lastUsedAt": "2026-05-13T11:20:00Z"
+        "lastUsedAt": "2026-05-13T11:20:00Z",
+        "batteryLevel": 87,
+        "batteryReportedAt": "2026-05-13T11:20:00Z"
       }
     ]
   }
 }
 ```
+
+`batteryLevel` / `batteryReportedAt` 는 0.0.61 추가. 측정 record 가 저장될 때마다 ML 응답의 battery 가 fire-and-forget 으로 갱신됨. 측정 이력 없는 device 는 둘 다 `null`.
 
 **Errors**
 | HTTP | 코드 | 케이스 |
@@ -1319,6 +1325,55 @@ device 비활성화 (status=INACTIVE).
 ```
 
 **Response — 200** — `DeviceResponse` (status=INACTIVE, deactivatedAt/deactivatedBy 채워짐).
+
+---
+
+### 4.33.1 `GET .../devices/preview` (new in 0.0.61)
+
+시리얼만으로 풀 조회 — 등록 전 미리보기. claim 안 함, write 없음. UI 의 "기기 등록" 흐름에서 serial 입력 후 alias 입력 전 호출.
+
+**Auth** 👑 (OWNER / ADMIN).
+
+**Query parameters**
+
+| Name | Required | Notes |
+|---|---|---|
+| `serial` | yes | 풀에서 찾을 `hardware_serial` |
+
+**Response — 200** — `PreviewDeviceResponse`
+
+| Field | Type | Notes |
+|---|---|---|
+| `found` | boolean | 풀에 있고 provisional 아닌 경우 true |
+| `alreadyClaimed` | boolean | 이미 다른 owner 가 등록함 |
+| `hardwareSerial` | string | found=true 일 때만 |
+| `deviceType` | string | `DeviceType` 문자열 (e.g. `SCALE2`) |
+| `firmwareVersion` | string | 풀 시점 펌웨어, nullable |
+
+**Error**
+- 403 `OrgRoleRequired` — caller 가 OWNER/ADMIN 아님.
+
+---
+
+### 4.33.2 `DELETE .../devices/{deviceId}` (new in 0.0.61)
+
+영구 삭제 — `status=REVOKED` + 풀 row unclaim. 일시 정지 ([§4.33](#433-post-apiv2b2borganizationsorgiddevicesdeviceiddeactivate)) 와 다름. 같은 `(mac, serial)` 가 다른 organization 에 재등록 가능해짐.
+
+**Auth** 👑 (OWNER / ADMIN).
+
+**Query parameters**
+
+| Name | Required | Notes |
+|---|---|---|
+| `reason` | no | audit (예. `lost` / `discarded` / `replaced`) |
+
+**Response — 200** — `DeviceResponse` (status=INACTIVE, deactivatedAt/deactivatedBy/deactivationReason 채워짐, batteryLevel 마지막 값 유지).
+
+**Idempotent**. 이미 REVOKED 인 device 에 다시 호출해도 200 + 같은 row 반환.
+
+**Error**
+- 403 `OrgRoleRequired`.
+- 404 `DeviceNotInOrg` — device 가 해당 organization 소유가 아님.
 
 ---
 
