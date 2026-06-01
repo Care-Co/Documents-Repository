@@ -1,56 +1,63 @@
 # device-service
 
-> Updated: 2026-06-01 (proto v0.0.61)
-> Style: OpenAPI 3.1 + code-backed endpoint catalog + schema tables
-> Base path: `/api/v1/devices`, `/api/v1/admin/allowed-devices`
-> Response envelope: `CncResponse` (common-core / Pattern B)
+> 갱신. 2026-06-01 (proto v0.0.62)
+> 스타일. OpenAPI 3.1 + 코드 기반 endpoint 카탈로그 + 스키마 테이블
+> Base path. `/api/v1/devices`, `/api/v1/admin/allowed-devices`
+> 응답 envelope. `CncResponse` (common-core / Pattern B)
 
-Source: `/Users/jonghak/GitHub/Care&Co/device-service`
+소스. `/Users/jonghak/GitHub/Care&Co/device-service`
 
 ---
 
-## 1. Overview
+## 1. 개요
 
-`device-service` owns the shipped-device pool, user/B2B device registration scoped to that pool, owner-scoped device validation, lifecycle status changes, OTA firmware metadata, and cluster-internal MAC lookup for the measurement pipeline.
+`device-service` 는 다음을 소유한다.
 
-### 1.1 Domain responsibilities
+- 출고된 기기 풀 (`allowed_devices`)
+- 풀에 등록된 시리얼만 사용할 수 있는 owner 별 device 등록 (USER / B2B_CENTER)
+- owner 검증 + lifecycle 상태 변경
+- OTA 펌웨어 메타데이터
+- 측정 파이프라인을 위한 cluster 내부 MAC lookup
+- 측정 직후 battery / firmware 자동 보고
 
-| Domain | Responsibility |
+### 1.1 도메인 책임
+
+| 도메인 | 책임 |
 |---|---|
-| `allowed_device` | Shipped-device pool. Admin adds rows (single or xlsx bulk); register flow consumes them; `claim` / `unclaim` toggle is the binding to a real `device` row |
-| `device` | Register physical devices to an owner using a pool serial, validate active ownership, change status, unregister (REVOKED + pool unclaim) |
-| `firmware` | Store firmware by `deviceType + version`, mark one latest firmware per device type, serve upgrade checks |
-| `grpc` | Four internal gRPC services — `DeviceLookup` (mac → serial for measure-service), `DeviceManagement` (B2B organization device asset lifecycle + serial preview), `DeviceLifecycle` (owner-scoped bulk unregister for user-service deletion worker), `DeviceMetrics` (battery report from measure-service after each record save) |
+| `allowed_device` | 출고 기기 풀. 어드민이 단건 또는 xlsx 일괄 추가. register 흐름이 소비. `claim` / `unclaim` 으로 device row 와 단방향 binding |
+| `device` | 풀의 시리얼로 owner 에 등록. owner 검증, 상태 변경, unregister (REVOKED + 풀 unclaim) |
+| `firmware` | `deviceType + version` 단위 OTA 펌웨어 메타. type 당 최신 1개. device 측 polling endpoint 제공 |
+| `grpc` | 4개 internal gRPC service. `DeviceLookup` (mac → serial, measure-service 용), `DeviceManagement` (B2B 자산 lifecycle + 등록 preview), `DeviceLifecycle` (탈퇴 worker 의 일괄 unregister), `DeviceMetrics` (측정 직후 battery + firmware 보고) |
 
-### 1.2 Runtime
+### 1.2 런타임
 
-| Item | Value |
+| 항목 | 값 |
 |---|---|
 | Java / Spring | Java 25, Spring Boot 4.0.5 |
 | Persistence | PostgreSQL 17 + Flyway (`spring-boot-starter-flyway`) |
-| HTTP port | `8080` |
-| gRPC port | `9090` |
-| Discovery/config | Spring Cloud Config via `CONFIG_URI`, profile `dev-k3s` / `prod-k3s` |
-| Kubernetes service | `device.carenco.svc.cluster.local` (`http:8080`, `grpc:9090`) |
+| HTTP 포트 | `8080` |
+| gRPC 포트 | `9090` |
+| Discovery/config | Spring Cloud Config (`CONFIG_URI`), 프로필 `dev-k3s` / `prod-k3s` |
+| Kubernetes 서비스 | `device.carenco.svc.cluster.local` (`http:8080`, `grpc:9090`) |
 | Prometheus | `/actuator/prometheus` |
 
 ---
 
-## 2. API Conventions
+## 2. API 컨벤션
 
-### 2.1 Common headers
+### 2.1 공통 헤더
 
-| Header | Value | Required | Notes |
+| 헤더 | 값 | 필수 | 비고 |
 |---|---|---|---|
-| `api-version` | `1.0.0` | yes | Spring header version selector |
-| `Content-Type` | `application/json` | request body only | REST JSON endpoints |
-| `X-Caller-Type` | `USER` \| `B2B_CENTER` | device owner endpoints | Injected by gateway/auth layer |
-| `X-Caller-Id` | UUID string | device owner endpoints | `user.id` or B2B center id |
-| `X-Caller-Role` | `ADMIN` (optional) | admin endpoints | Gateway-injected; non-`ADMIN` → `AllowedDeviceError.Forbidden` |
+| `api-version` | `1.0.0` | yes | Spring 의 header version selector |
+| `Content-Type` | `application/json` | request body 시만 | REST JSON endpoint |
+| `X-Caller-Type` | `USER` \| `B2B_CENTER` | device owner endpoint | gateway / auth layer 가 주입 |
+| `X-Caller-Id` | UUID 문자열 | device owner endpoint | `user.id` 또는 B2B center id |
+| `X-Caller-Role` | `ADMIN` (선택) | admin endpoint | gateway 가 JWT role 에서 주입. 없거나 `ADMIN` 이 아니면 `AllowedDeviceError.Forbidden` |
 
-### 2.2 Response envelope
+### 2.2 응답 envelope
 
-Success responses use common-core `CncResponse`.
+성공 응답은 common-core 의 `CncResponse` 사용.
 
 ```json
 {
@@ -58,11 +65,11 @@ Success responses use common-core `CncResponse`.
   "data": {},
   "token": null,
   "error": null,
-  "timestamp": "2026-05-29T01:00:00Z"
+  "timestamp": "2026-06-01T01:00:00Z"
 }
 ```
 
-Binding errors that would otherwise fall through are mapped to `400`:
+binding 단계에서 빠지는 에러는 400 으로 매핑.
 
 ```json
 {
@@ -74,49 +81,49 @@ Binding errors that would otherwise fall through are mapped to `400`:
 }
 ```
 
-### 2.3 Security notes
+### 2.3 보안 메모
 
-- Controllers currently do not declare `@PreAuthorize`; caller identity is passed through headers for owner-scoped device endpoints.
-- Admin endpoints check `X-Caller-Role == "ADMIN"` inside the service (`AllowedDeviceService.requireAdmin`). Production gateways must populate this header from JWT roles.
-- Firmware management endpoints are marked as operating endpoints in code; fine-grained auth is noted as follow-up work.
-- Internal MSAs should call the gRPC adapters (`DeviceLookup`, `DeviceManagement`, `DeviceLifecycle`) instead of REST.
+- 컨트롤러는 현재 `@PreAuthorize` 사용하지 않음. owner 식별은 헤더로 통과.
+- 어드민 endpoint 는 service 내부에서 `X-Caller-Role == "ADMIN"` 확인 (`AllowedDeviceService.requireAdmin`). 운영 gateway 가 JWT role 을 이 헤더로 변환해야 함.
+- 펌웨어 운영 endpoint 는 코드에서 operations 표시만. fine-grained auth 는 follow-up.
+- 다른 MSA 는 REST 가 아니라 gRPC adapter (`DeviceLookup` / `DeviceManagement` / `DeviceLifecycle` / `DeviceMetrics`) 사용.
 
 ---
 
-## 3. Endpoint Catalog
+## 3. Endpoint 카탈로그
 
-### 3.1 Device (user / B2C owner)
+### 3.1 Device (사용자 / B2C owner)
 
-| # | Method | Path | Purpose | Caller headers |
+| # | Method | Path | 용도 | Caller 헤더 |
 |---|---|---|---|---|
-| 1 | `POST` | `/api/v1/devices` | Register caller-owned device using a pool serial | required |
-| 2 | `GET` | `/api/v1/devices/{id}` | Get device by id | no |
-| 3 | `GET` | `/api/v1/devices` | List caller-owned devices | required |
-| 4 | `DELETE` | `/api/v1/devices/{id}?reason=...` | Unregister caller-owned device (REVOKED + pool unclaim, idempotent) | required |
-| 5 | `PATCH` | `/api/v1/devices/{id}/status` | Change device status | required |
-| 6 | `POST` | `/api/v1/devices/validate` | Validate caller can use device | required |
+| 1 | `POST` | `/api/v1/devices` | 풀 시리얼로 caller 본인 device 등록 | 필수 |
+| 2 | `GET` | `/api/v1/devices/{id}` | 단건 조회 | no |
+| 3 | `GET` | `/api/v1/devices` | caller 본인 device 목록 | 필수 |
+| 4 | `DELETE` | `/api/v1/devices/{id}?reason=...` | caller 본인 device unregister (REVOKED + 풀 unclaim, idempotent) | 필수 |
+| 5 | `PATCH` | `/api/v1/devices/{id}/status` | 상태 변경 | 필수 |
+| 6 | `POST` | `/api/v1/devices/validate` | caller 가 사용 가능한 device 인지 검증 | 필수 |
 
-### 3.2 Admin allowed-devices (shipped pool)
+### 3.2 어드민 — 출고 풀 (allowed-devices)
 
-| # | Method | Path | Purpose |
+| # | Method | Path | 용도 |
 |---|---|---|---|
-| 7 | `POST` | `/api/v1/admin/allowed-devices` | Add single pool row |
-| 8 | `GET` | `/api/v1/admin/allowed-devices/{id}` | Get pool row by id |
-| 9 | `GET` | `/api/v1/admin/allowed-devices?query&claimed&page&size` | List pool rows with filter |
-| 10 | `POST` | `/api/v1/admin/allowed-devices/{id}/unclaim` | Force-unclaim + revoke the bound device (loss/swap ops) |
-| 11 | `PATCH` | `/api/v1/admin/allowed-devices/{id}/serial` | Confirm real serial for a provisional (`TMP-...`) row |
-| 12 | `POST` | `/api/v1/admin/allowed-devices/bulk` | xlsx bulk upload (multipart/form-data) |
+| 7 | `POST` | `/api/v1/admin/allowed-devices` | 풀 단건 추가 |
+| 8 | `GET` | `/api/v1/admin/allowed-devices/{id}` | 풀 단건 조회 |
+| 9 | `GET` | `/api/v1/admin/allowed-devices?query&claimed&page&size` | 풀 목록 |
+| 10 | `POST` | `/api/v1/admin/allowed-devices/{id}/unclaim` | 강제 unclaim + 바인딩된 device REVOKED (분실/교체 운영) |
+| 11 | `PATCH` | `/api/v1/admin/allowed-devices/{id}/serial` | 임시 serial (`TMP-...`) 을 진짜 serial 로 확정 |
+| 12 | `POST` | `/api/v1/admin/allowed-devices/bulk` | xlsx 일괄 업로드 (multipart/form-data) |
 
-### 3.3 Firmware
+### 3.3 펌웨어
 
-| # | Method | Path | Purpose |
+| # | Method | Path | 용도 |
 |---|---|---|---|
-| 13 | `GET` | `/api/v1/devices/firmware/upgrade` | Check latest firmware for a device |
-| 14 | `POST` | `/api/v1/devices/firmware` | Register firmware |
-| 15 | `GET` | `/api/v1/devices/firmware` | List firmware by device type |
-| 16 | `GET` | `/api/v1/devices/firmware/{id}` | Get firmware by id |
-| 17 | `PATCH` | `/api/v1/devices/firmware/{id}/promote` | Mark firmware as latest |
-| 18 | `DELETE` | `/api/v1/devices/firmware/{id}` | Delete firmware |
+| 13 | `GET` | `/api/v1/devices/firmware/upgrade` | device 별 최신 펌웨어 확인 |
+| 14 | `POST` | `/api/v1/devices/firmware` | 펌웨어 등록 |
+| 15 | `GET` | `/api/v1/devices/firmware` | deviceType 별 펌웨어 목록 |
+| 16 | `GET` | `/api/v1/devices/firmware/{id}` | 단건 조회 |
+| 17 | `PATCH` | `/api/v1/devices/firmware/{id}/promote` | 최신으로 promote |
+| 18 | `DELETE` | `/api/v1/devices/firmware/{id}` | 삭제 |
 
 ---
 
@@ -128,20 +135,20 @@ Binding errors that would otherwise fall through are mapped to `400`:
 **Tags** `device`
 **Security** caller headers
 
-Register a device to the caller using a serial that exists in the shipped-device pool. The pool is authoritative for `mac`, `deviceType`, and `firmwareVersion` — the client does not send them. New devices start with status `REGISTERED`.
+caller 본인의 device 등록. 시리얼은 반드시 출고 풀에 존재해야 한다. 풀이 `mac`, `deviceType`, `firmwareVersion`, `model` 의 권위 — client 는 시리얼만 보내면 된다. 신규 device 는 `REGISTERED` 로 시작.
 
-Flow:
-1. Look up the pool row by `hardwareSerial`. Missing or provisional (`TMP-` prefix) → `DeviceError.NotAllowed`.
-2. If already claimed by another user → `DeviceError.AlreadyClaimed`.
-3. If a non-revoked `devices` row with the same `(mac, serial)` already exists → `DeviceError.DuplicateRegistration`.
-4. Persist the new device. The pool row gets `claim(deviceId)`.
+흐름.
+1. `hardwareSerial` 로 풀 row lookup. 없거나 provisional (`TMP-` prefix) 이면 `DeviceError.NotAllowed`.
+2. 이미 다른 사용자가 claim 했으면 `DeviceError.AlreadyClaimed`.
+3. 같은 `(mac, serial)` 의 non-revoked device row 가 있으면 `DeviceError.DuplicateRegistration`.
+4. 신규 device 저장 + 풀 row 에 `claim(deviceId)`.
 
-#### Headers
+#### 헤더
 
-| Name | Required | Description |
+| 이름 | 필수 | 설명 |
 |---|---|---|
 | `api-version` | yes | `1.0.0` |
-| `X-Caller-Type` | yes | `USER` or `B2B_CENTER` |
+| `X-Caller-Type` | yes | `USER` 또는 `B2B_CENTER` |
 | `X-Caller-Id` | yes | caller owner id |
 
 #### Request body
@@ -154,31 +161,31 @@ Flow:
 }
 ```
 
-`model` / `firmwareVersion` 은 optional. 생략 시 `model` 은 null, `firmwareVersion` 은 출고 풀의 값이 자동 채워진다 (풀이 권위). client 가 굳이 보낼 이유 없음.
+`model` / `firmwareVersion` 은 optional. 생략 시 `model` 은 풀의 `model` 값으로, `firmwareVersion` 은 풀의 `firmware_version` (출고 시 값) 으로 자동 채워진다. client 가 보낼 이유 거의 없음.
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
 | `201` | [`CncResponse_DeviceResponse`](#cncresponse_deviceresponse) | Created |
-| `400` | `CncResponse` error | validation / missing headers / enum mismatch |
-| `403` | `CncResponse` error | `NotAllowed` — serial not in pool / provisional |
-| `409` | `CncResponse` error | `AlreadyClaimed` (pool taken) or `DuplicateRegistration` (active device row exists) |
+| `400` | `CncResponse` error | validation / 헤더 누락 / enum 불일치 |
+| `403` | `CncResponse` error | `NotAllowed` — 시리얼이 풀에 없거나 provisional |
+| `409` | `CncResponse` error | `AlreadyClaimed` (풀이 점유됨) 또는 `DuplicateRegistration` (활성 device row 존재) |
 
 ### 4.2 `GET` /api/v1/devices/{id}
 
 **Operation ID** `getDeviceById`
 **Tags** `device`
 
-#### Parameters
+#### 파라미터
 
-| In | Name | Type | Required |
+| 위치 | 이름 | 타입 | 필수 |
 |---|---|---|---|
 | path | `id` | string | yes |
 
-#### Responses
+#### 응답
 
-| Status | Schema |
+| 상태 | 스키마 |
 |---|---|
 | `200` | [`CncResponse_DeviceResponse`](#cncresponse_deviceresponse) |
 | `404` | `CncResponse` error |
@@ -189,19 +196,19 @@ Flow:
 **Tags** `device`
 **Security** caller headers
 
-List devices owned by the caller (including `REVOKED` rows — they persist for audit).
+caller 가 소유한 device 목록 (REVOKED 포함 — 감사용 보존).
 
-#### Headers
+#### 헤더
 
-| Name | Required | Description |
+| 이름 | 필수 | 설명 |
 |---|---|---|
 | `api-version` | yes | `1.0.0` |
-| `X-Caller-Type` | yes | `USER` or `B2B_CENTER` |
+| `X-Caller-Type` | yes | `USER` 또는 `B2B_CENTER` |
 | `X-Caller-Id` | yes | caller owner id |
 
-#### Responses
+#### 응답
 
-| Status | Schema |
+| 상태 | 스키마 |
 |---|---|
 | `200` | [`CncResponse_DeviceResponseList`](#cncresponse_deviceresponselist) |
 | `400` | `CncResponse` error |
@@ -212,21 +219,21 @@ List devices owned by the caller (including `REVOKED` rows — they persist for 
 **Tags** `device`
 **Security** caller headers
 
-Unregister a caller-owned device. Sets `status=REVOKED` and calls `AllowedDevice.unclaim()` on the pool row, making the same serial re-registerable by another user. Idempotent — calling again on an already-revoked device returns 200 with the existing row.
+caller 본인 device unregister. `status=REVOKED` 로 전이 + `AllowedDevice.unclaim()` 호출 → 동일 시리얼이 다른 사용자에 의해 재등록 가능해짐. Idempotent — 이미 REVOKED 인 device 에 다시 호출해도 200 + 기존 row 반환.
 
-#### Parameters
+#### 파라미터
 
-| In | Name | Type | Required | Notes |
+| 위치 | 이름 | 타입 | 필수 | 비고 |
 |---|---|---|---|---|
 | path | `id` | string | yes | device id |
-| query | `reason` | string | no | Audit reason; stored on `device.revocation_reason` |
+| query | `reason` | string | no | 감사 사유. `device.revocation_reason` 저장 |
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
 | `200` | [`CncResponse_DeviceResponse`](#cncresponse_deviceresponse) | `status=REVOKED` |
-| `403` | `CncResponse` error | `NotOwner` — caller is not the device owner |
+| `403` | `CncResponse` error | `NotOwner` |
 | `404` | `CncResponse` error | `NotFound` |
 
 ### 4.5 `PATCH` /api/v1/devices/{id}/status
@@ -235,11 +242,11 @@ Unregister a caller-owned device. Sets `status=REVOKED` and calls `AllowedDevice
 **Tags** `device`
 **Security** caller headers
 
-Change a caller-owned device status. `REVOKED` devices cannot be changed again.
+caller 본인 device 의 상태 변경. `REVOKED` 는 더 이상 변경 불가.
 
-#### Parameters
+#### 파라미터
 
-| In | Name | Type | Required |
+| 위치 | 이름 | 타입 | 필수 |
 |---|---|---|---|
 | path | `id` | string | yes |
 
@@ -253,13 +260,13 @@ Change a caller-owned device status. `REVOKED` devices cannot be changed again.
 }
 ```
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
 | `200` | [`CncResponse_DeviceResponse`](#cncresponse_deviceresponse) | Updated |
-| `403` | `CncResponse` error | not owner, revoked, unusable status rule |
-| `404` | `CncResponse` error | device not found |
+| `403` | `CncResponse` error | 비-owner / revoked / unusable 상태 규칙 |
+| `404` | `CncResponse` error | device 없음 |
 
 ### 4.6 `POST` /api/v1/devices/validate
 
@@ -267,7 +274,7 @@ Change a caller-owned device status. `REVOKED` devices cannot be changed again.
 **Tags** `device`, `validation`
 **Security** caller headers
 
-Validate that `(macAddress, hardwareSerial)` belongs to the caller and has status `ACTIVE`. On success, the service updates `lastUsedAt` and `lastUsedIp`. The v1.0.1 measurement pipeline prefers `DeviceLookup.LookupByMac` gRPC (mac-only) over this endpoint.
+`(macAddress, hardwareSerial)` 가 caller 소유 + `ACTIVE` 인지 검증. 통과 시 `lastUsedAt` / `lastUsedIp` 갱신. v1.0.1 측정 파이프라인은 이 endpoint 대신 `DeviceLookup.LookupByMac` gRPC (mac-only) 를 사용.
 
 #### Request body
 
@@ -280,15 +287,15 @@ Validate that `(macAddress, hardwareSerial)` belongs to the caller and has statu
 }
 ```
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
 | `200` | [`CncResponse_DeviceValidateResponse`](#cncresponse_devicevalidateresponse) | `allowed=true` |
-| `403` | `CncResponse` error | caller is not owner or status is not `ACTIVE` |
-| `404` | `CncResponse` error | device not found |
+| `403` | `CncResponse` error | caller 가 owner 아니거나 `ACTIVE` 아님 |
+| `404` | `CncResponse` error | device 없음 |
 
-#### 200 example
+#### 200 예시
 
 ```json
 {
@@ -302,71 +309,71 @@ Validate that `(macAddress, hardwareSerial)` belongs to the caller and has statu
 
 ---
 
-## 5. Admin Allowed-Devices API
+## 5. 어드민 — Allowed-Devices API
 
-All endpoints require `X-Caller-Role: ADMIN`. Missing or non-`ADMIN` → `AllowedDeviceError.Forbidden` (403).
+모든 endpoint 가 `X-Caller-Role: ADMIN` 필요. 없거나 다른 값 → `AllowedDeviceError.Forbidden` (403).
 
 ### 5.1 `POST` /api/v1/admin/allowed-devices
 
 **Operation ID** `registerAllowedDevice`
 **Tags** `admin`, `allowed-device`
 
-Add a single row to the shipped pool. MAC is normalized to lowercase colon format. `hardwareSerial` must be unique; passing a `TMP-{MAC}` style serial intentionally marks the row provisional (admin confirms later via `/serial`).
+풀에 단건 추가. MAC 은 lowercase 콜론 형식으로 정규화. `hardwareSerial` unique. `TMP-{MAC}` 형식 시리얼을 일부러 보내면 provisional 으로 표시 (어드민이 나중에 `/serial` 로 확정).
 
 #### Request body
 
 `application/json` — [`AllowedDeviceRegisterRequest`](#alloweddeviceregisterrequest)
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
 | `201` | [`CncResponse_AllowedDeviceResponse`](#cncresponse_alloweddeviceresponse) | Created |
 | `400` | `CncResponse` error | `InvalidMacFormat` / validation |
 | `403` | `CncResponse` error | `Forbidden` |
-| `409` | `CncResponse` error | `Duplicate` (mac or serial collision) |
+| `409` | `CncResponse` error | `Duplicate` (mac 또는 serial 충돌) |
 
 ### 5.2 `GET` /api/v1/admin/allowed-devices/{id}
 
-Get pool row by id. `404` when missing.
+풀 단건 조회. 없으면 `404`.
 
 ### 5.3 `GET` /api/v1/admin/allowed-devices
 
-List pool rows.
+풀 목록.
 
-#### Parameters
+#### 파라미터
 
-| In | Name | Type | Required | Notes |
+| 위치 | 이름 | 타입 | 필수 | 비고 |
 |---|---|---|---|---|
-| query | `query` | string | no | substring match on `mac` / `serial` |
-| query | `claimed` | boolean | no | `true` = bound to a device, `false` = available, omit = all |
-| query | `page` | int | no | default `0` |
-| query | `size` | int | no | default `20` |
+| query | `query` | string | no | `mac` / `serial` 부분 일치 |
+| query | `claimed` | boolean | no | `true` = 바인딩된 것, `false` = 미바인딩, 생략 = 전체 |
+| query | `page` | int | no | 기본 `0` |
+| query | `size` | int | no | 기본 `20` |
 
-Returns [`CncResponse_AllowedDevicePageResponse`](#cncresponse_alloweddevicepageresponse).
+[`CncResponse_AllowedDevicePageResponse`](#cncresponse_alloweddevicepageresponse) 반환.
 
 ### 5.4 `POST` /api/v1/admin/allowed-devices/{id}/unclaim
 
-Force-unclaim a pool row and revoke the bound `device` if any. Used by ops for loss/swap. Idempotent.
+풀 row 강제 unclaim + 바인딩된 device 가 있으면 REVOKED. 분실 / 교체 운영용. Idempotent.
 
-#### Parameters
+#### 파라미터
 
-| In | Name | Type | Required | Notes |
+| 위치 | 이름 | 타입 | 필수 | 비고 |
 |---|---|---|---|---|
-| path | `id` | string | yes | pool row id |
-| query | `reason` | string | no | audit reason |
+| path | `id` | string | yes | 풀 row id |
+| query | `reason` | string | no | 감사 사유 |
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
-| `200` | [`CncResponse_AllowedDeviceResponse`](#cncresponse_alloweddeviceresponse) | row with `claimed=false` |
+| `200` | [`CncResponse_AllowedDeviceResponse`](#cncresponse_alloweddeviceresponse) | `claimed=false` |
 | `403` | `CncResponse` error | `Forbidden` |
 | `404` | `CncResponse` error | `NotFound` |
 
 ### 5.5 `PATCH` /api/v1/admin/allowed-devices/{id}/serial
 
-Confirm the real serial for a provisional row (`is_provisional=true`, typically `TMP-{MAC}` shape). If the row is already claimed by a device, that device's `hardware_serial` is synced as well.
+provisional row (`is_provisional=true`, 보통 `TMP-{MAC}` 형식) 의 진짜 시리얼 확정. 이미 device 가 claim 했으면 그 device 의 `hardware_serial` 도 같이 동기화.
 
 #### Request body
 
@@ -378,72 +385,72 @@ Confirm the real serial for a provisional row (`is_provisional=true`, typically 
 }
 ```
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
 | `200` | [`CncResponse_AllowedDeviceResponse`](#cncresponse_alloweddeviceresponse) | `is_provisional=false` |
-| `400` | `CncResponse` error | `NotProvisional` (row is already confirmed) |
+| `400` | `CncResponse` error | `NotProvisional` (이미 확정된 row) |
 | `403` | `CncResponse` error | `Forbidden` |
 | `404` | `CncResponse` error | `NotFound` |
-| `409` | `CncResponse` error | `Duplicate` — target serial already exists |
+| `409` | `CncResponse` error | `Duplicate` — 대상 시리얼이 이미 존재 |
 
 ### 5.6 `POST` /api/v1/admin/allowed-devices/bulk
 
-xlsx bulk upload. The first sheet is parsed; one `register` per data row. Header row at row 1, data from row 2. Expected columns (Korean): `고유번호`, `MAC주소`, `펌웨어버전`, `제품코드`, `년도`, `생산국가`, `생산주차`, `배송국가`, `일련번호`, `등록일시`.
+xlsx 일괄 업로드. 첫 sheet 파싱, row 당 `register` 1회 호출. header 가 row 1, 데이터는 row 2 부터. 예상 컬럼 (한글). `고유번호`, `MAC주소`, `펌웨어버전`, `제품코드`, `년도`, `생산국가`, `생산주차`, `배송국가`, `일련번호`, `등록일시`.
 
-`제품코드` is mapped to `DeviceType` inline (`CN1G002` → `SCALE2`). New product codes must be added to `AdminAllowedDeviceController.mapDeviceType`.
+`제품코드` → `DeviceType` 매핑은 `AdminAllowedDeviceController.mapDeviceType` 의 inline switch. 새 product code 는 거기 추가.
 
-Non-atomic by default — one row failing does not abort the rest. Duplicates are reported in `skipped`; other failures in `failed`. `Forbidden` from the first row aborts.
+비-atomic — 한 row 실패해도 나머지 진행. duplicate 는 `skipped`, 그 외 실패는 `failed`. 첫 row 부터 `Forbidden` 이면 즉시 중단.
 
 #### Request body
 
 `multipart/form-data`
 
-| Part | Required | Notes |
+| Part | 필수 | 비고 |
 |---|---|---|
-| `file` | yes | xlsx file |
+| `file` | yes | xlsx 파일 |
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
-| `200` | [`CncResponse_AllowedDeviceBulkResponse`](#cncresponse_alloweddevicebulkresponse) | per-row counters |
-| `400` | `CncResponse` error | xlsx parse failure |
+| `200` | [`CncResponse_AllowedDeviceBulkResponse`](#cncresponse_alloweddevicebulkresponse) | row 별 카운터 |
+| `400` | `CncResponse` error | xlsx 파싱 실패 |
 | `403` | `CncResponse` error | `Forbidden` |
 
 ---
 
-## 6. Firmware API
+## 6. 펌웨어 API
 
 ### 6.1 `GET` /api/v1/devices/firmware/upgrade
 
 **Operation ID** `checkFirmwareUpgrade`
 **Tags** `firmware`
 
-Device-side polling endpoint. Returns the current latest firmware for the device type when `currentVersion` differs from latest. Returns `204 No Content` when already latest or no latest firmware exists.
+device 측 polling endpoint. `currentVersion` 이 최신과 다르면 최신 펌웨어 반환. 이미 최신이거나 등록된 최신이 없으면 `204 No Content`.
 
-#### Parameters
+#### 파라미터
 
-| In | Name | Type | Required | Description |
+| 위치 | 이름 | 타입 | 필수 | 설명 |
 |---|---|---|---|---|
-| query | `deviceType` | [`DeviceType`](#devicetype) | yes | Device type |
-| query | `currentVersion` | string | yes | Firmware version reported by device |
+| query | `deviceType` | [`DeviceType`](#devicetype) | yes | device type |
+| query | `currentVersion` | string | yes | device 가 보고하는 펌웨어 버전 |
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
-| `200` | [`CncResponse_FirmwareUpgradeResponse`](#cncresponse_firmwareupgraderesponse) | Upgrade available |
-| `204` | no body | Latest or no registered latest firmware |
-| `400` | `CncResponse` error | invalid enum / missing parameter |
+| `200` | [`CncResponse_FirmwareUpgradeResponse`](#cncresponse_firmwareupgraderesponse) | 업그레이드 있음 |
+| `204` | body 없음 | 최신 또는 최신 등록 없음 |
+| `400` | `CncResponse` error | enum / 파라미터 오류 |
 
 ### 6.2 `POST` /api/v1/devices/firmware
 
 **Operation ID** `registerFirmware`
 **Tags** `firmware`, `operations`
 
-Register firmware metadata. If `makeLatest=true`, the previous latest firmware for the same `deviceType` is unmarked first.
+펌웨어 메타 등록. `makeLatest=true` 면 같은 `deviceType` 의 기존 latest 를 먼저 unmark.
 
 #### Request body
 
@@ -456,95 +463,95 @@ Register firmware metadata. If `makeLatest=true`, the previous latest firmware f
   "downloadUrl": "https://cdn.example.com/firmware/scale2/1.1.0.bin",
   "makeLatest": true,
   "notes": "Stability improvements",
-  "releasedAt": "2026-05-29T00:00:00Z"
+  "releasedAt": "2026-06-01T00:00:00Z"
 }
 ```
 
-#### Responses
+#### 응답
 
-| Status | Schema | Notes |
+| 상태 | 스키마 | 비고 |
 |---|---|---|
 | `201` | [`CncResponse_FirmwareResponse`](#cncresponse_firmwareresponse) | Created |
-| `400` | `CncResponse` error | validation / enum mismatch |
-| `409` | `CncResponse` error | duplicate `(deviceType, version)` |
+| `400` | `CncResponse` error | validation / enum 불일치 |
+| `409` | `CncResponse` error | `(deviceType, version)` 중복 |
 
 ### 6.3 `GET` /api/v1/devices/firmware
 
-List firmware records for a device type, sorted by `releasedAt` descending.
+deviceType 별 펌웨어 목록. `releasedAt` 내림차순.
 
-#### Parameters
+#### 파라미터
 
-| In | Name | Type | Required |
+| 위치 | 이름 | 타입 | 필수 |
 |---|---|---|---|
 | query | `deviceType` | [`DeviceType`](#devicetype) | yes |
 
-Returns [`CncResponse_FirmwareResponseList`](#cncresponse_firmwareresponselist).
+[`CncResponse_FirmwareResponseList`](#cncresponse_firmwareresponselist) 반환.
 
 ### 6.4 `GET` /api/v1/devices/firmware/{id}
 
-Get firmware by id. `404` when missing.
+단건 조회. 없으면 `404`.
 
 ### 6.5 `PATCH` /api/v1/devices/firmware/{id}/promote
 
-Promote a firmware row to latest for its `deviceType`. Existing latest for the same type is unmarked.
+선택한 펌웨어를 해당 `deviceType` 의 latest 로 promote. 기존 latest 는 unmark.
 
 ### 6.6 `DELETE` /api/v1/devices/firmware/{id}
 
-Delete a firmware row. `204` on success.
+펌웨어 row 삭제. 성공 시 `204`.
 
 ---
 
-## 7. Internal gRPC
+## 7. 내부 gRPC
 
-`device-service` exposes three gRPC services on port `9090`. Protos live in `common-libs/common-grpc` (`com.carenco.grpc.device.v1`) and are bumped at `0.0.59` (this release).
+`device-service` 는 4개 gRPC service 를 `9090` 에 노출. proto 는 `common-libs/common-grpc` (`com.carenco.grpc.device.v1`) 에 있고, 본 release 기준 `0.0.62`.
 
 ### 7.1 `DeviceLookup.LookupByMac`
 
-Java: `DeviceLookupGrpcService extends DeviceLookupGrpc.DeviceLookupImplBase`.
+Java. `DeviceLookupGrpcService extends DeviceLookupGrpc.DeviceLookupImplBase`.
 
-Cluster-internal endpoint used by `measure-service` (v1.0.1 measurement pipeline) to resolve a raw MAC into the canonical device record. If the MAC is not in the pool, the service auto-provisions a `TMP-{MAC}` row (provisional) and replies `allowed=false` with `rejectReason=NOT_REGISTERED` so that the measurement layer can store `device_serial=TMP-{MAC}` for later reconciliation.
+`measure-service` (v1.0.1 측정 파이프라인) 가 raw MAC 으로 표준 device record 를 resolve 할 때 사용. MAC 이 풀에 없으면 자동으로 `TMP-{MAC}` provisional row 를 만들고 `allowed=false, rejectReason=NOT_REGISTERED` 응답 → 측정 layer 가 `device_serial=TMP-{MAC}` 로 저장 후 추후 reconciliation.
 
 #### Request
 
-| Field | Type | Required | Notes |
+| 필드 | 타입 | 필수 | 비고 |
 |---|---|---|---|
-| `mac_address` | string | yes | Normalized internally |
-| `caller_owner_type` | string | yes | `USER` or `B2B_CENTER` |
-| `caller_owner_id` | string | yes | Owner id |
-| `caller_ip` | string | no | Stored as `lastUsedIp` when allowed |
+| `mac_address` | string | yes | 내부에서 정규화 |
+| `caller_owner_type` | string | yes | `USER` 또는 `B2B_CENTER` |
+| `caller_owner_id` | string | yes | owner id |
+| `caller_ip` | string | no | 허용 시 `lastUsedIp` 저장 |
 
 #### Response
 
-| Field | Type | Notes |
+| 필드 | 타입 | 비고 |
 |---|---|---|
-| `allowed` | boolean | `true` only when device exists, owner matches, and status is `ACTIVE` |
-| `device_id` | string | set on success |
-| `hardware_serial` | string | always set (real or `TMP-{MAC}` for provisional) — measurement layer stores this for traceability |
-| `owner_type` | string | set on success |
-| `owner_id` | string | set on success |
-| `device_type` | string | `DeviceType` name; set on success |
-| `auto_provisioned` | boolean | `true` when the service just created a `TMP-` pool row in this call |
-| `reject_reason` | string | one of `NOT_REGISTERED`, `INVALID_MAC`, `NOT_OWNER`, `DEVICE_INACTIVE`; set on failure |
+| `allowed` | boolean | device 존재 + owner 일치 + `ACTIVE` 인 경우만 `true` |
+| `device_id` | string | 성공 시 |
+| `hardware_serial` | string | 항상 (실 시리얼 또는 provisional 의 `TMP-{MAC}`) — 측정 추적용 |
+| `owner_type` | string | 성공 시 |
+| `owner_id` | string | 성공 시 |
+| `device_type` | string | `DeviceType` 이름 |
+| `auto_provisioned` | boolean | 이번 호출에서 `TMP-` row 를 새로 만들었는지 |
+| `reject_reason` | string | 실패 시 `NOT_REGISTERED` / `INVALID_MAC` / `NOT_OWNER` / `DEVICE_INACTIVE` |
 
-### 7.2 `DeviceManagement` (B2B organization device asset)
+### 7.2 `DeviceManagement` (B2B organization device 자산)
 
-Java: `DeviceManagementGrpcService extends DeviceManagementGrpc.DeviceManagementImplBase`.
+Java. `DeviceManagementGrpcService extends DeviceManagementGrpc.DeviceManagementImplBase`.
 
-Used by `b2b-service` to manage device assets attached to organizations. Distinct from user (`USER`) device registration — these devices have `owner_type=B2B_CENTER` and carry `alias`, `registered_by`, `deactivated_by`, etc.
+`b2b-service` 가 organization 의 device 자산을 관리할 때 사용. USER device 등록과는 별도 — `owner_type=B2B_CENTER` + `alias`, `registered_by`, `deactivated_by` 등.
 
-| RPC | Notes |
+| RPC | 비고 |
 |---|---|
-| `RegisterDevice` | Pool-backed register (organizationId, serialNumber, alias, registeredBy) |
-| `GetDevice` | By device id |
-| `ListDevices` | Paged by organization, with status filter + sort (`NAME`/`REGISTERED_AT`/`LAST_USED`/**`BATTERY`** new in 0.0.61) |
-| `UpdateDevice` | Update alias |
-| `DeactivateDevice` | Soft-deactivate (DEACTIVATED). Reversible |
-| `UnregisterDevice` | **New in 0.0.59.** Permanent revoke (REVOKED + pool unclaim). Distinct from `DeactivateDevice` — REVOKED rows are terminal |
-| `PreviewBySerial` | **New in 0.0.61.** Lookup pool row by `hardware_serial` only — no claim, no write. b2b UI registration preview step. Returns `{found, already_claimed, hardware_serial, device_type, firmware_version}` |
+| `RegisterDevice` | 풀 기반 등록 (organizationId, serialNumber, alias, registeredBy). model 미입력 시 풀의 model fallback |
+| `GetDevice` | 단건 |
+| `ListDevices` | organization 별 페이지 + 상태 필터 + 정렬 (`NAME`/`REGISTERED_AT`/`LAST_USED`/`BATTERY` (0.0.61)) |
+| `UpdateDevice` | alias 변경 |
+| `DeactivateDevice` | 일시 정지 (DEACTIVATED). 가역적 |
+| `UnregisterDevice` | **0.0.59 신규.** 영구 해제 (REVOKED + 풀 unclaim). 일시 정지와 다름 — REVOKED 는 terminal |
+| `PreviewBySerial` | **0.0.61 신규.** 시리얼만으로 풀 조회 — claim 안 함, write 없음. b2b UI 등록 preview 단계. `{found, already_claimed, hardware_serial, device_type, firmware_version}` 반환 |
 
-`Device` proto fields added in 0.0.61: `battery_level` (int32, `-1` = unknown), `battery_reported_at` (ISO-8601, `""` = none).
+0.0.61 에서 `Device` proto 에 추가된 필드. `battery_level` (int32, `-1` = unknown), `battery_reported_at` (ISO-8601, `""` = 없음).
 
-`OrganizationDeviceError` cases map to gRPC `Status`:
+`OrganizationDeviceError` → gRPC `Status` 매핑.
 
 | Error case | gRPC Status |
 |---|---|
@@ -553,86 +560,97 @@ Used by `b2b-service` to manage device assets attached to organizations. Distinc
 | `AlreadyClaimed`, `DuplicateRegistration` | `ALREADY_EXISTS` |
 | `NotFound` | `NOT_FOUND` |
 
-### 7.3 `DeviceLifecycle.UnregisterAllByOwner` (new in 0.0.59)
+### 7.3 `DeviceLifecycle.UnregisterAllByOwner` (0.0.59 신규)
 
-Java: `DeviceLifecycleGrpcService extends DeviceLifecycleGrpc.DeviceLifecycleImplBase`.
+Java. `DeviceLifecycleGrpcService extends DeviceLifecycleGrpc.DeviceLifecycleImplBase`.
 
-Called by `user-service` deletion outbox worker (`UserOutboxDeletionRetryExecutor.unregisterAllDevices`) during user-account hard-delete. Walks all owner devices and applies REVOKED + pool unclaim. Idempotent — devices already REVOKED are skipped.
+`user-service` 의 탈퇴 outbox worker (`UserOutboxDeletionRetryExecutor.unregisterAllDevices`) 가 사용자 hard-delete 직전에 호출. owner 의 모든 device 를 REVOKED + 풀 unclaim. Idempotent — 이미 REVOKED 인 device 는 skip.
 
 #### Request
 
-| Field | Type | Required | Notes |
+| 필드 | 타입 | 필수 | 비고 |
 |---|---|---|---|
-| `owner_type` | string | yes | `USER` or `B2B_CENTER` — invalid → `INVALID_ARGUMENT` |
+| `owner_type` | string | yes | `USER` 또는 `B2B_CENTER` — invalid → `INVALID_ARGUMENT` |
 | `owner_id` | string | yes | blank → `INVALID_ARGUMENT` |
-| `revoked_by` | string | no | audit (default `"user-service:deletion-worker"`) |
-| `reason` | string | no | audit (default `"user_deletion"`) |
+| `revoked_by` | string | no | 감사 (기본 `"user-service:deletion-worker"`) |
+| `reason` | string | no | 감사 (기본 `"user_deletion"`) |
 
 #### Response
 
-| Field | Type | Notes |
+| 필드 | 타입 | 비고 |
 |---|---|---|
-| `unregistered_count` | int | devices newly transitioned to REVOKED in this call |
-| `active_before` | int | active devices observed before transition |
+| `unregistered_count` | int | 이번 호출에서 신규로 REVOKED 전이된 device 수 |
+| `active_before` | int | 전이 전 owner 가 가지고 있던 active device 수 |
 
-### 7.4 `DeviceMetrics.ReportBattery` (new in 0.0.61)
+### 7.4 `DeviceMetrics.ReportMetrics` (0.0.62 신규, battery + firmware 통합)
 
-Java: `DeviceMetricsGrpcService extends DeviceMetricsGrpc.DeviceMetricsImplBase`.
+Java. `DeviceMetricsGrpcService extends DeviceMetricsGrpc.DeviceMetricsImplBase`.
 
-Called by `measure-service` fire-and-forget after every footprint / vision record save (`RecordServiceImpl.createFootprint` / `createByVision`). Updates `device.battery_level` + `battery_reported_at`. Failures (NOT_FOUND, INVALID_ARGUMENT, deadline exceeded) are swallowed at the caller so they cannot delay measurement responses.
+`measure-service` 가 footprint / vision record 저장 직후 fire-and-forget 호출 (`RecordServiceImpl.createFootprint` / `createByVision`). `device.battery_level` / `battery_reported_at` / `firmware_version` / `firmware_reported_at` + `allowed_devices.current_firmware_version` 을 동시 갱신. 실패 (NOT_FOUND, INVALID_ARGUMENT, deadline exceeded) 는 caller 측에서 삼킴 → 측정 응답 지연 영향 0.
 
-#### Request
+`battery_level=-1` 또는 `firmware_version=""` 시 해당 필드 no-op (기존 값 유지). 사용자가 firmware 안 보내고 battery 만 보고하거나 그 반대 가능.
 
-| Field | Type | Required | Notes |
+#### Request — `ReportMetricsRequest`
+
+| 필드 | 타입 | 필수 | 비고 |
 |---|---|---|---|
-| `device_id` | string | yes | NOT_FOUND if missing |
-| `battery_level` | int32 | yes | 0-100; INVALID_ARGUMENT if out of range |
-| `reported_at` | string | no | ISO-8601 (UTC). Empty → server now |
-| `reported_by` | string | no | Audit (e.g. `measure-service:record`) |
+| `device_id` | string | yes | 없으면 NOT_FOUND |
+| `battery_level` | int32 | no | 0-100. `-1` = 미보고 (기존 값/timestamp 유지). 범위 밖 → INVALID_ARGUMENT |
+| `firmware_version` | string | no | 빈 문자열 = 미보고 |
+| `reported_at` | string | no | ISO-8601 (UTC). 빈 문자열 → server now |
+| `reported_by` | string | no | 감사 (예. `measure-service:record`) |
 
-#### Response
+#### Response — `ReportMetricsResponse`
 
-| Field | Type | Notes |
+| 필드 | 타입 | 비고 |
 |---|---|---|
-| `battery_level` | int32 | Echo of stored value |
-| `battery_reported_at` | string | ISO-8601 of stored timestamp |
+| `battery_level` | int32 | 저장된 현재 값 (no-op 시 기존 값) |
+| `battery_reported_at` | string | ISO-8601 |
+| `firmware_version` | string | 저장된 현재 값 |
+| `firmware_reported_at` | string | ISO-8601 |
 
-Dev verification (2026-06-01): one footprint upload via newman `device-mac-lookup-flow` → `DeviceApplicationService.reportBattery args=[deviceId, 99, ...]` succeeded in 12ms.
+#### 기존 `ReportBattery` (0.0.61)
 
-### 7.5 Removed gRPC
+호환을 위해 유지되지만 0.0.62 부터는 `ReportMetrics` 사용 권장 (battery + firmware 한 호출에 통합).
 
-- `DeviceValidator.Validate` — removed in `common-libs` `0.0.58`. Its functionality is split: measurement uses `DeviceLookup.LookupByMac`; B2B uses `DeviceManagement.GetDevice` + status check.
+dev 검증 (2026-06-01). newman `device-mac-lookup-flow` 1회 footprint 측정 → `DeviceApplicationService.reportMetrics args=[deviceId, 99, null, ...]` 성공 33ms. battery=99 정상 갱신, firmware=null 이라 firmware 컬럼은 no-op.
+
+### 7.5 제거된 gRPC
+
+- `DeviceValidator.Validate` — common-libs `0.0.58` 에서 제거. 기능 분리. 측정은 `DeviceLookup.LookupByMac`, B2B 는 `DeviceManagement.GetDevice` + 상태 체크.
 
 ---
 
-## 8. Data Model
+## 8. 데이터 모델
 
-### 8.1 `allowed_devices` (shipped-device pool)
+### 8.1 `allowed_devices` (출고 기기 풀)
 
-| Column | Type | Required | Notes |
+| 컬럼 | 타입 | 필수 | 비고 |
 |---|---|---|---|
-| `id` | `VARCHAR(36)` | yes | PK; `gen_random_uuid()` default |
+| `id` | `VARCHAR(36)` | yes | PK. `gen_random_uuid()` default |
 | `version` | `BIGINT` | yes | JPA optimistic lock |
-| `mac_address` | `VARCHAR(17)` | yes | normalized lowercase colon |
-| `hardware_serial` | `VARCHAR(64)` | yes | factory serial (e.g. `CN1G00226KR1700001JP`); `TMP-{MAC}` while provisional |
+| `mac_address` | `VARCHAR(17)` | yes | 정규화된 lowercase 콜론 |
+| `hardware_serial` | `VARCHAR(64)` | yes | 출고 시리얼 (예. `CN1G00226KR1700001JP`). provisional 동안 `TMP-{MAC}` |
 | `device_type` | `VARCHAR(30)` | yes | [`DeviceType`](#devicetype) |
-| `firmware_version` | `VARCHAR(64)` | no | seeded from factory record |
-| `product_code` | `VARCHAR(32)` | no | xlsx `제품코드` (e.g. `CN1G002`) |
+| `firmware_version` | `VARCHAR(64)` | no | **출고 시 펌웨어 (factory, immutable)**. OTA 후에도 변경 X |
+| `current_firmware_version` | `VARCHAR(64)` | no | **OTA 갱신 시 최신 펌웨어** (V11, 0.0.62). `ReportMetrics` 시 동기 |
+| `model` | `VARCHAR(64)` | no | 출고 시 모델명 (V11, 0.0.62). 사용자 register 시 model 미입력하면 fallback |
+| `product_code` | `VARCHAR(32)` | no | xlsx `제품코드` (예. `CN1G002`) |
 | `production_country` | `VARCHAR(8)` | no | ISO-2 |
 | `production_week` | `INTEGER` | no | xlsx `생산주차` |
-| `production_year` | `INTEGER` | no | 2-digit (e.g. `26` for 2026) |
-| `serial_number` | `INTEGER` | no | within-week counter |
+| `production_year` | `INTEGER` | no | 2자리 (예. `26` → 2026) |
+| `serial_number` | `INTEGER` | no | 주차 내 카운터 |
 | `shipping_country` | `VARCHAR(8)` | no | ISO-2 |
-| `manufactured_at` | `TIMESTAMP` | no | factory record timestamp |
-| `claimed` | `BOOLEAN` | yes | flips `true` on user register, `false` on unregister/unclaim |
+| `manufactured_at` | `TIMESTAMP` | no | 공장 등록 시각 |
+| `claimed` | `BOOLEAN` | yes | 사용자 등록 시 `true`, unregister 시 `false` |
 | `claimed_by_device_id` | `VARCHAR(36)` | no | weak FK to `devices.id` |
-| `claimed_at` | `TIMESTAMP` | no | first claim time |
-| `is_provisional` | `BOOLEAN` | yes | `true` while serial is `TMP-{MAC}` auto-provisioned by `DeviceLookup` |
+| `claimed_at` | `TIMESTAMP` | no | 첫 claim 시각 |
+| `is_provisional` | `BOOLEAN` | yes | `true` 동안 시리얼이 `TMP-{MAC}` (DeviceLookup auto-provision) |
 | `created_at`, `updated_at`, `deleted_at` | `TIMESTAMP` | no | `BaseTimeEntity` |
 
-Indexes / constraints:
+인덱스 / 제약.
 
-| Name | Columns |
+| 이름 | 컬럼 |
 |---|---|
 | `pk_allowed_devices` | `id` |
 | `uk_allowed_devices_mac_serial` | `mac_address`, `hardware_serial` |
@@ -640,112 +658,110 @@ Indexes / constraints:
 | `uk_allowed_devices_mac` | `mac_address` |
 | `idx_allowed_devices_claimed` | `claimed` |
 
-Seed data: V5 Flyway migration seeds 35 rows from the legacy `mac_database.xlsx` (first-row anomaly tracked under follow-up I).
+Seed. V5 Flyway 가 legacy `mac_database.xlsx` 의 35 row seed. (V5 첫 row 누락 anomaly 는 follow-up I.)
 
 ### 8.2 `devices`
 
-| Column | Type | Required | Notes |
+| 컬럼 | 타입 | 필수 | 비고 |
 |---|---|---|---|
 | `id` | `VARCHAR(36)` | yes | PK |
 | `version` | `BIGINT` | yes | JPA optimistic lock |
-| `mac_address` | `VARCHAR(17)` | yes | normalized MAC, copied from pool on register |
-| `hardware_serial` | `VARCHAR(64)` | yes | factory serial, copied from pool on register |
-| `device_type` | `VARCHAR(30)` | yes | [`DeviceType`](#devicetype), copied from pool |
+| `mac_address` | `VARCHAR(17)` | yes | 정규화된 MAC. 등록 시 풀에서 복사 |
+| `hardware_serial` | `VARCHAR(64)` | yes | 출고 시리얼. 등록 시 풀에서 복사 |
+| `device_type` | `VARCHAR(30)` | yes | [`DeviceType`](#devicetype). 풀에서 복사 |
 | `owner_type` | `VARCHAR(20)` | yes | [`OwnerType`](#ownertype) |
-| `owner_id` | `VARCHAR(36)` | yes | cross-MSA id; no FK |
-| `organization_id` | `VARCHAR(36)` | no | set for B2B-owned rows (`DeviceManagement.RegisterDevice`) |
+| `owner_id` | `VARCHAR(36)` | yes | cross-MSA id. FK 없음 |
+| `organization_id` | `VARCHAR(36)` | no | B2B 등록 시 set |
 | `alias` | `VARCHAR(64)` | no | B2B alias |
 | `status` | `VARCHAR(20)` | yes | [`DeviceStatus`](#devicestatus) |
-| `model` | `VARCHAR(64)` | no | free text |
-| `firmware_version` | `VARCHAR(64)` | no | reported/registered version |
-| `registered_by` | `VARCHAR(64)` | no | B2B audit |
-| `deactivated_at` | `TIMESTAMP` | no | set on `DEACTIVATED` transition |
-| `deactivated_by` | `VARCHAR(64)` | no | audit |
-| `deactivation_reason` | `VARCHAR(255)` | no | audit |
-| `revoked_at` | `TIMESTAMP` | no | set on `REVOKED` transition |
-| `revoked_by` | `VARCHAR(64)` | no | audit |
-| `revocation_reason` | `VARCHAR(255)` | no | audit |
-| `last_used_at` | `TIMESTAMP` | no | set on successful validation/lookup |
+| `model` | `VARCHAR(64)` | no | free text. 미입력 시 `allowed_devices.model` fallback |
+| `firmware_version` | `VARCHAR(64)` | no | **현재 펌웨어** (OTA 시 갱신). `ReportMetrics` 가 갱신 |
+| `registered_by` | `VARCHAR(64)` | no | B2B 감사 |
+| `deactivated_at` | `TIMESTAMP` | no | DEACTIVATED 전이 시 |
+| `deactivated_by` | `VARCHAR(64)` | no | 감사 |
+| `deactivation_reason` | `VARCHAR(255)` | no | 감사 |
+| `last_used_at` | `TIMESTAMP` | no | validation / lookup 통과 시 |
 | `last_used_ip` | `VARCHAR(45)` | no | IPv4/IPv6 |
-| `battery_level` | `INTEGER` | no | 0-100; updated by `DeviceMetrics.ReportBattery` (V10) |
-| `battery_reported_at` | `TIMESTAMP` | no | timestamp of last battery report (V10) |
+| `battery_level` | `INTEGER` | no | 0-100. `ReportMetrics` 가 갱신 (V10) |
+| `battery_reported_at` | `TIMESTAMP` | no | 마지막 battery 보고 시각 (V10) |
+| `firmware_reported_at` | `TIMESTAMP` | no | 마지막 firmware 보고 시각 (V11, 0.0.62) |
 | `created_at`, `updated_at`, `deleted_at` | `TIMESTAMP` | no | `BaseTimeEntity` |
 
-Indexes / constraints:
+인덱스 / 제약.
 
-| Name | Columns | Notes |
+| 이름 | 컬럼 | 비고 |
 |---|---|---|
 | `pk_devices` | `id` | — |
-| `uk_devices_mac_serial_active` | `mac_address`, `hardware_serial` | **partial unique** `WHERE status != 'REVOKED'` (V9). Lets the same `(mac, serial)` be re-registered after revoke |
+| `uk_devices_mac_serial_active` | `mac_address`, `hardware_serial` | **partial unique** `WHERE status != 'REVOKED'` (V9). 같은 `(mac, serial)` 가 revoke 후 재등록 가능 |
 | `idx_devices_owner` | `owner_type`, `owner_id` | — |
 | `idx_devices_mac` | `mac_address` | — |
 | `idx_devices_type` | `device_type` | — |
-| `idx_devices_organization` | `organization_id` | B2B lookups |
-| `idx_devices_battery_level` | `battery_level` | sort by battery (V10) |
+| `idx_devices_organization` | `organization_id` | B2B lookup |
+| `idx_devices_battery_level` | `battery_level` | battery 정렬 (V10) |
 
 ### 8.3 `device_firmwares`
 
-| Column | Type | Required | Notes |
+| 컬럼 | 타입 | 필수 | 비고 |
 |---|---|---|---|
 | `id` | `VARCHAR(36)` | yes | PK |
 | `version_lock` | `BIGINT` | yes | JPA optimistic lock |
 | `device_type` | `VARCHAR(30)` | yes | [`DeviceType`](#devicetype) |
-| `version` | `VARCHAR(64)` | yes | Semver/date/free text |
-| `download_url` | `VARCHAR(2000)` | yes | Firmware binary URL |
-| `is_latest` | `BOOLEAN` | yes | default `false` |
-| `notes` | `VARCHAR(500)` | no | release notes |
-| `released_at` | `TIMESTAMP` | no | defaults to `Instant.now()` in service |
+| `version` | `VARCHAR(64)` | yes | Semver / 날짜 / free text |
+| `download_url` | `VARCHAR(2000)` | yes | 펌웨어 바이너리 URL |
+| `is_latest` | `BOOLEAN` | yes | 기본 `false` |
+| `notes` | `VARCHAR(500)` | no | release note |
+| `released_at` | `TIMESTAMP` | no | service 에서 `Instant.now()` default |
 | `created_at`, `updated_at`, `deleted_at` | `TIMESTAMP` | no | `BaseTimeEntity` |
 
-Indexes / constraints:
+인덱스 / 제약.
 
-| Name | Columns |
+| 이름 | 컬럼 |
 |---|---|
 | `pk_device_firmwares` | `id` |
 | `uk_firmwares_type_version` | `device_type`, `version` |
 | `idx_firmwares_type` | `device_type` |
-| `uk_firmwares_one_latest_per_type` | partial unique on `device_type` where `is_latest = TRUE` |
+| `uk_firmwares_one_latest_per_type` | `device_type` 의 partial unique `WHERE is_latest = TRUE` |
 
 ---
 
-## 9. Schemas
+## 9. 스키마
 
 ### `DeviceRegisterRequest`
 
-| Field | Type | Required | Validation |
+| 필드 | 타입 | 필수 | validation |
 |---|---|---|---|
 | `hardwareSerial` | string | yes | `@NotBlank`, `@Size(max=64)` |
-| `model` | string | no | `@Size(max=64)` |
-| `firmwareVersion` | string | no | `@Size(max=64)` |
+| `model` | string | no | `@Size(max=64)`. 미입력 시 `allowed_devices.model` fallback |
+| `firmwareVersion` | string | no | `@Size(max=64)`. 미입력 시 `allowed_devices.firmware_version` fallback |
 
-> `macAddress` / `deviceType` are no longer accepted — the pool is authoritative.
+> `macAddress` / `deviceType` 은 더 이상 받지 않음 — 풀이 권위.
 
 ### `DeviceUpdateStatusRequest`
 
-| Field | Type | Required |
+| 필드 | 타입 | 필수 |
 |---|---|---|
 | `status` | [`DeviceStatus`](#devicestatus) | yes |
 
 ### `DeviceValidateRequest`
 
-| Field | Type | Required | Validation |
+| 필드 | 타입 | 필수 | validation |
 |---|---|---|---|
-| `macAddress` | string | yes | `@NotBlank`, `@Size(max=17)`, domain MAC format validation |
+| `macAddress` | string | yes | `@NotBlank`, `@Size(max=17)`, 도메인 MAC 형식 validation |
 | `hardwareSerial` | string | yes | `@NotBlank`, `@Size(max=64)` |
 
 ### `DeviceResponse`
 
-| Field | Type | Notes |
+| 필드 | 타입 | 비고 |
 |---|---|---|
 | `id` | string | UUID |
-| `macAddress` | string | normalized lowercase colon format |
-| `hardwareSerial` | string | serial |
+| `macAddress` | string | 정규화된 lowercase 콜론 |
+| `hardwareSerial` | string | 시리얼 |
 | `deviceType` | [`DeviceType`](#devicetype) | — |
 | `ownerType` | [`OwnerType`](#ownertype) | — |
-| `ownerId` | string | UUID string |
+| `ownerId` | string | UUID |
 | `status` | [`DeviceStatus`](#devicestatus) | — |
 | `model` | string | nullable |
-| `firmwareVersion` | string | nullable |
+| `firmwareVersion` | string | nullable. 현재 펌웨어 |
 | `lastUsedAt` | string date-time | nullable |
 | `lastUsedIp` | string | nullable |
 | `createdAt` | string date-time | nullable |
@@ -753,78 +769,78 @@ Indexes / constraints:
 
 ### `DeviceValidateResponse`
 
-| Field | Type | Notes |
+| 필드 | 타입 | 비고 |
 |---|---|---|
-| `allowed` | boolean | Always `true` on REST success |
+| `allowed` | boolean | REST 성공 시 항상 `true` |
 | `deviceId` | string | matched device id |
 
 ### `AllowedDeviceRegisterRequest`
 
-| Field | Type | Required | Validation |
+| 필드 | 타입 | 필수 | validation |
 |---|---|---|---|
-| `macAddress` | string | yes | `@NotBlank`, MAC format |
+| `macAddress` | string | yes | `@NotBlank`, MAC 형식 |
 | `hardwareSerial` | string | yes | `@NotBlank`, `@Size(max=64)` |
 | `deviceType` | [`DeviceType`](#devicetype) | yes | — |
 | `firmwareVersion` | string | no | — |
 | `productCode` | string | no | xlsx `제품코드` |
 | `productionCountry` | string | no | ISO-2 |
 | `productionWeek` | integer | no | — |
-| `productionYear` | integer | no | 2-digit |
-| `serialNumber` | integer | no | within-week counter |
+| `productionYear` | integer | no | 2자리 |
+| `serialNumber` | integer | no | 주차 내 카운터 |
 | `shippingCountry` | string | no | ISO-2 |
 | `manufacturedAt` | string date-time | no | — |
 
 ### `ConfirmSerialRequest`
 
-| Field | Type | Required | Validation |
+| 필드 | 타입 | 필수 | validation |
 |---|---|---|---|
 | `hardwareSerial` | string | yes | `@NotBlank`, `@Size(max=64)` |
 
 ### `AllowedDeviceResponse`
 
-Mirror of `allowed_devices` columns plus `claimed`, `claimedByDeviceId`, `claimedAt`, `isProvisional`.
+`allowed_devices` 컬럼 + `claimed`, `claimedByDeviceId`, `claimedAt`, `isProvisional` 미러.
 
 ### `AllowedDevicePageResponse`
 
-| Field | Type | Notes |
+| 필드 | 타입 | 비고 |
 |---|---|---|
 | `content` | [`AllowedDeviceResponse`](#alloweddeviceresponse)[] | page content |
-| `page` | int | current page |
-| `size` | int | page size |
-| `totalElements` | long | total |
-| `totalPages` | int | total pages |
+| `page` | int | 현재 페이지 |
+| `size` | int | 페이지 크기 |
+| `totalElements` | long | 총 row 수 |
+| `totalPages` | int | 총 페이지 수 |
 | `hasNext` | boolean | — |
 
 ### `AllowedDeviceBulkResponse`
 
-| Field | Type | Notes |
+| 필드 | 타입 | 비고 |
 |---|---|---|
-| `added` | int | newly inserted row count |
-| `skippedCount` | int | duplicates (already in pool) |
-| `failedCount` | int | other failures |
+| `added` | int | 신규 insert row 수 |
+| `skippedCount` | int | duplicate |
+| `failedCount` | int | 그 외 실패 |
 | `skipped` | `RowResult[]` | `{ row, hardwareSerial, macAddress, reason }` |
-| `failed` | `RowResult[]` | same shape |
+| `failed` | `RowResult[]` | 동일 shape |
 
 ### `FirmwareRegisterRequest`
 
-| Field | Type | Required | Validation |
+| 필드 | 타입 | 필수 | validation |
 |---|---|---|---|
 | `deviceType` | [`DeviceType`](#devicetype) | yes | `@NotNull` |
 | `version` | string | yes | `@NotBlank`, `@Size(max=64)` |
 | `downloadUrl` | string | yes | `@NotBlank`, `@Size(max=2000)` |
-| `makeLatest` | boolean | yes | primitive, default `false` when omitted by JSON mapper |
+| `makeLatest` | boolean | yes | primitive. JSON mapper 가 생략하면 `false` |
 | `notes` | string | no | `@Size(max=500)` |
-| `releasedAt` | string date-time | no | defaults to now when null |
+| `releasedAt` | string date-time | no | null 시 now default |
 
 ### `FirmwareResponse`
 
-| Field | Type | Notes |
+| 필드 | 타입 | 비고 |
 |---|---|---|
 | `id` | string | UUID |
 | `deviceType` | [`DeviceType`](#devicetype) | — |
 | `version` | string | — |
 | `downloadUrl` | string | — |
-| `isLatest` | boolean | JSON property from record component |
+| `isLatest` | boolean | record component 의 JSON property |
 | `notes` | string | nullable |
 | `releasedAt` | string date-time | nullable |
 | `createdAt` | string date-time | nullable |
@@ -832,37 +848,37 @@ Mirror of `allowed_devices` columns plus `claimed`, `claimedByDeviceId`, `claime
 
 ### `FirmwareUpgradeResponse`
 
-| Field | Type | Notes |
+| 필드 | 타입 | 비고 |
 |---|---|---|
-| `latestVersion` | string | latest firmware version |
-| `downloadUrl` | string | firmware binary URL |
+| `latestVersion` | string | 최신 버전 |
+| `downloadUrl` | string | 펌웨어 바이너리 URL |
 
 ### `DeviceType`
 
-| Value | Notes |
+| 값 | 비고 |
 |---|---|
 | `SCALE2` | — |
 | `SCALE_PUZZLE` | — |
 
 ### `OwnerType`
 
-| Value | Meaning |
+| 값 | 의미 |
 |---|---|
-| `USER` | personal user (`user-service.user.id`) |
-| `B2B_CENTER` | B2B center / organization owner id |
+| `USER` | 개인 사용자 (`user-service.user.id`) |
+| `B2B_CENTER` | B2B 센터 / organization owner id |
 
 ### `DeviceStatus`
 
-| Value | Meaning | Usable by validate |
+| 값 | 의미 | validate 사용 가능? |
 |---|---|---|
-| `REGISTERED` | registered but not active | no |
-| `ACTIVE` | usable | yes |
-| `DEACTIVATED` | temporarily disabled — reversible | no |
-| `REVOKED` | permanently revoked; row persists for audit but pool unclaim happens at the same time | no |
+| `REGISTERED` | 등록만 됨. 비활성 | no |
+| `ACTIVE` | 사용 가능 | yes |
+| `DEACTIVATED` | 일시 정지 — 가역적 | no |
+| `REVOKED` | 영구 해제. row 는 감사 보존, 풀 unclaim 은 동시에 발생 | no |
 
-### CncResponse envelopes
+### CncResponse envelope 들
 
-| Schema | Data shape |
+| 스키마 | data shape |
 |---|---|
 | `CncResponse_DeviceResponse` | [`DeviceResponse`](#deviceresponse) |
 | `CncResponse_DeviceResponseList` | [`DeviceResponse`](#deviceresponse)[] |
@@ -874,18 +890,19 @@ Mirror of `allowed_devices` columns plus `claimed`, `claimedByDeviceId`, `claime
 | `CncResponse_FirmwareResponseList` | [`FirmwareResponse`](#firmwareresponse)[] |
 | `CncResponse_FirmwareUpgradeResponse` | [`FirmwareUpgradeResponse`](#firmwareupgraderesponse) |
 
-All envelopes share the shape `{ success, data, token, error, timestamp }`.
+모든 envelope shape. `{ success, data, token, error, timestamp }`.
 
 ---
 
-## 10. Notes
+## 10. 메모
 
-- The shipped-device pool (`allowed_devices`) is authoritative for `(mac, deviceType, firmwareVersion)`. End-user registration only carries `hardwareSerial`.
-- MAC normalization to lowercase colon happens in domain service before persistence and pool lookup.
-- `DELETE /api/v1/devices/{id}` is idempotent: a second call on an already-REVOKED device returns 200 with the existing row, and no extra pool side-effect.
-- The pool partial unique (`status != 'REVOKED'`) lets a user re-register the same `(mac, serial)` after a previous owner unregistered.
-- The provisional flow: `DeviceLookup.LookupByMac` for an unknown MAC inserts an `allowed_devices` row with `hardware_serial=TMP-{MAC}` and `is_provisional=true`, then rejects the measurement with `NOT_REGISTERED`. The measurement layer still records `device_serial=TMP-{MAC}` so analytics can later reconcile via `PATCH /admin/allowed-devices/{id}/serial`.
-- `user-service` deletion outbox worker calls `DeviceLifecycle.UnregisterAllByOwner` between the activities/records cleanup steps and the OAuth/hard-delete steps. Failures are retried twice with exponential backoff.
-- gRPC clients should use `etc.<svc>-grpc=device.carenco.svc.cluster.local:9090` config with a deadline interceptor (default 5000 ms).
-- Firmware `makeLatest` and `promote` both unmark the previous latest for the same `deviceType`.
-- `DELETE /firmware/{id}` calls repository delete. Because entities extend `BaseTimeEntity`, confirm physical vs soft-delete behavior against common-core JPA implementation when relying on retention semantics.
+- 출고 풀 (`allowed_devices`) 이 `(mac, deviceType, firmwareVersion, model)` 의 권위. 사용자 등록은 `hardwareSerial` 만 보낸다.
+- MAC 정규화 (lowercase 콜론) 는 domain service 에서 — persist + 풀 lookup 전에 적용.
+- `DELETE /api/v1/devices/{id}` 는 idempotent — 이미 REVOKED 인 device 에 다시 호출해도 200 + 기존 row, 풀 추가 side-effect 없음.
+- 풀의 partial unique (`status != 'REVOKED'`) 가 같은 `(mac, serial)` 의 재등록을 허용 (이전 owner 가 unregister 한 후).
+- provisional 흐름. 모르는 MAC 으로 `DeviceLookup.LookupByMac` 호출이 오면 `hardware_serial=TMP-{MAC}` + `is_provisional=true` 인 풀 row 를 만들고 `NOT_REGISTERED` 로 reject. 측정 layer 는 그래도 `device_serial=TMP-{MAC}` 저장 → 어드민이 `PATCH /admin/allowed-devices/{id}/serial` 로 확정 가능.
+- `user-service` 의 탈퇴 outbox worker 가 activities / records 정리와 OAuth / hard-delete 사이 단계에서 `DeviceLifecycle.UnregisterAllByOwner` 를 호출. 실패 시 exponential backoff 로 최대 2회 retry.
+- gRPC client 는 `etc.<svc>-grpc=device.carenco.svc.cluster.local:9090` config + deadline interceptor (기본 5000 ms) 사용.
+- 펌웨어 `makeLatest` / `promote` 는 같은 `deviceType` 의 기존 latest 를 unmark.
+- `DELETE /firmware/{id}` 는 repository delete. `BaseTimeEntity` 의 physical vs soft-delete 동작을 common-core JPA 구현 기준으로 확인 후 retention 의도 결정.
+- `ReportMetrics` 는 fire-and-forget. measure-service 가 매 측정마다 호출. battery 또는 firmware 한쪽만 보내면 다른 쪽 컬럼은 그대로 유지. client (앱) 가 firmware 를 보내기 시작하면 자동으로 `device.firmware_version` + `allowed_devices.current_firmware_version` 갱신.

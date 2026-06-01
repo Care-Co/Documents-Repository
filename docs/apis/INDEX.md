@@ -28,7 +28,7 @@ Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 | [graph-service](./graph-service.md) | 7 endpoints (shoe recommendation + catalog) | `api-version: 1.0.0` | in-memory `shoes.json` |
 | [payment-service](./payment-service.md) | 17 REST + 1 webhook | unversioned | Paddle Billing v2 |
 | [ML-service](./ml-service.md) | 6 routes (footprint + pose + measurement) | `api-version: 1.0.0` (reserved, not branched) | Flask blueprints |
-| [device-service](./device-service.md) | 18 REST + 4 gRPC | `api-version: 1.0.0` (proto v0.0.61) | shipped-device pool, owner-scoped registry, MAC lookup, B2B device assets + serial preview, deletion-worker bulk unregister, battery metrics, OTA firmware |
+| [device-service](./device-service.md) | 18 REST + 4 gRPC | `api-version: 1.0.0` (proto v0.0.62) | 출고 풀 / owner 별 등록 / measure MAC lookup / B2B 자산 + 등록 preview / 탈퇴 worker 일괄 unregister / battery+firmware metrics / OTA |
 
 ## Repositories Without API Controllers
 
