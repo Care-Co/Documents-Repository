@@ -3,7 +3,7 @@
 > OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
 
 Source: `/Users/jonghak/GitHub/Care&Co/payment-service`
-Updated: 2026-05-15
+Updated: 2026-06-08
 
 Payment integration service backed by **Paddle Billing API v2** (sandbox). Hookdeck relays webhooks for local development. Persists customers, subscriptions, transactions, refunds, and webhook events to PostgreSQL. Exposes a gRPC read-only license query for `b2b-service`.
 
@@ -200,18 +200,12 @@ Builds the config payload that the frontend passes to `Paddle.Checkout.open(...)
 
 ```json
 {
-  "items": [{ "priceId": "pri_01kpmjn40qe4pqjjn0sehkmk0a", "quantity": 1 }],
-  "customer": { "email": "owner@example.com", "name": "홍길동" },
-  "customData": { "organization_id": "01HXORG..." },
-  "plan": {
-    "planCode": "pro",
-    "planSeats": 20,
-    "displayName": "Pro",
-    "billingInterval": "MONTHLY"
-  },
-  "paddleCustomerId": "ctm_01abc..."
+  "transactionId": "txn_01abc...",
+  "checkoutUrl": "https://buy.paddle.com/checkout/..."
 }
 ```
+
+> payment-service 가 Paddle `POST /transactions` 로 transaction 을 server-side pre-create 하고 reference 만 반환. FE 는 `Paddle.Checkout.open({ transactionId })` 또는 `checkoutUrl` redirect. `custom_data` (organization_id / user_id / user_pool) 는 transaction 단계에서 서버가 박아 FE 변조 불가, 결제 완료 시 Paddle 이 subscription 으로 상속.
 
 ### `POST` /api/payment/subscriptions/{paddleSubscriptionId}/link-organization
 
@@ -317,7 +311,8 @@ No external REST API. Customer rows are created/updated by two internal flows on
   "planSeats": 20, "planCode": "pro",
   "status": "ACTIVE",
   "nextBilledAt": "...", "canceledAt": null,
-  "createdAt": "..."
+  "createdAt": "...",
+  "currentPeriodStart": "...", "currentPeriodEnd": "..."
 }
 ```
 
@@ -566,7 +561,7 @@ Looks up the latest `subscription` for the given `organization_id` and maps its 
 | Paddle status | `LicenseState` |
 |---|---|
 | `ACTIVE`, `TRIALING` | `LICENSE_STATE_ACTIVE` |
-| `PAST_DUE` | `LICENSE_STATE_GRACE` (grace period = `nextBilledAt + 7d`) |
+| `PAST_DUE` | `LICENSE_STATE_GRACE` (grace period = `nextBilledAt + 7d`; `grace_remaining_days` + `grace_remaining_seconds` 응답 필드로 잔여 시간 노출, 그 외 상태에선 0) |
 | `PAUSED` | `LICENSE_STATE_SUSPENDED` |
 | `CANCELED`, `EXPIRED` | `LICENSE_STATE_EXPIRED` |
 | (no row) | `LICENSE_STATE_NONE` |
@@ -657,36 +652,10 @@ Partial update — `null` fields keep current value.
 
 | Field | Type | Description |
 |---|---|---|
-| `items` | array<[`CheckoutItem`](#checkoutitem)> | passed verbatim to `Paddle.Checkout.open({ items })` |
-| `customer` | [`CheckoutCustomer`](#checkoutcustomer) | for `Paddle.Checkout.open({ customer })` when no `paddleCustomerId` |
-| `customData` | object | server-stamped — always `{ organization_id }` |
-| `plan` | [`PlanInfo`](#planinfo) | display-only metadata |
-| `paddleCustomerId` | string \| null | when set, frontend uses `customer: { id }` instead — reuses card vault |
+| `transactionId` | string | Paddle `txn_...` — server-side pre-created via `POST /transactions`. FE 가 `Paddle.Checkout.open({ transactionId })` 에 전달 |
+| `checkoutUrl` | string | Paddle hosted checkout URL — FE 가 redirect 로도 사용 가능 |
 
-### `CheckoutItem`
-
-| Field | Type |
-|---|---|
-| `priceId` | string |
-| `quantity` | integer |
-
-### `CheckoutCustomer`
-
-| Field | Type |
-|---|---|
-| `email` | string |
-| `name` | string |
-
-### `PlanInfo`
-
-| Field | Type | Description |
-|---|---|---|
-| `planCode` | string | — |
-| `planSeats` | integer | — |
-| `displayName` | string | — |
-| `billingInterval` | enum (`MONTHLY` / `YEARLY`) | — |
-
-> Pricing intentionally omitted — frontend resolves it via `Paddle.PricePreview()`.
+> 이전 응답 (`items` / `customer` / `customData` / `plan` / `paddleCustomerId`) 은 단종됨. `custom_data` 가 FE 변조 가능했던 문제를 해결하기 위해 transaction pre-create 로 전환. Pricing / plan 메타데이터는 FE 가 `Paddle.PricePreview()` + `GET /api/payment/plans` 로 별도 조회.
 
 ### `LinkOrganizationRequest`
 
@@ -744,6 +713,8 @@ Partial update — `null` fields keep current value.
 | `nextBilledAt` | string (date-time, UTC) | — |
 | `canceledAt` | string (date-time, UTC) | nullable |
 | `createdAt` | string (date-time, UTC) | — |
+| `currentPeriodStart` | string (date-time, UTC) | Paddle `current_billing_period.starts_at`. nullable (백필 전 row). additive — payment-service 가 unversioned 라 dual versioning 불가, Jackson default 로 모르는 필드 무시 가정 |
+| `currentPeriodEnd` | string (date-time, UTC) | Paddle `current_billing_period.ends_at`. nullable |
 
 ### `Transaction`
 

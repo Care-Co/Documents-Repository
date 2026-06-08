@@ -3,9 +3,11 @@
 > OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
 
 Source: `/Users/jonghak/GitHub/Care&Co/agent-service`
-Updated: 2026-04-27
+Updated: 2026-06-08
 
-Conversational LLM gateway. Wraps an external **Física Agent API** for chat + greeting flows, persists sessions/messages/usage in MySQL, and aggregates token usage. Tool-call output (e.g. `shoe_recommend`) is surfaced via `meta` on the response.
+Conversational LLM gateway. Drives an OpenAI chat-completions tool loop and executes `fisica-mcp` tools directly inside agent-service, persists sessions/messages/usage in PostgreSQL, and aggregates token usage. Tool-call output (e.g. `shoe_recommend`) is surfaced via `meta` on the response.
+
+Chat requests are rate-limited per user (15 requests / day, Asia/Seoul calendar day). Both chat and greeting endpoints validate that the caller exists as a Física user before processing.
 
 **Servers**
 - `https://api.example.com`
@@ -27,7 +29,7 @@ Conversational LLM gateway. Wraps an external **Física Agent API** for chat + g
 **Tags** &nbsp;`agent`
 **Security** &nbsp;none
 
-Send a user message; returns the agent reply (synchronously calls Física via Feign).
+Send a user message; returns the agent reply (synchronously runs the OpenAI chat tool loop with native MCP tool execution).
 
 ### Parameters
 
@@ -62,7 +64,9 @@ Send a user message; returns the agent reply (synchronously calls Física via Fe
 |---|---|---|---|
 | **200** | OK | `application/json` | [`CncResponse_AgentJobResponse`](#cncresponse_agentjobresponse) |
 | **400** | Validation failed (`user_id` / `user_msg` blank) | `application/json` | [`ErrorResponse`](#errorresponse) |
-| **502** | External Física API failure | `application/json` | [`ErrorResponse`](#errorresponse) |
+| **404** | `user_id` not found in user-service (`Fisica user not found`) | `application/json` | [`ErrorResponse`](#errorresponse) |
+| **429** | Daily chat request limit exceeded (15 / day, Asia/Seoul) | `application/json` | [`ErrorResponse`](#errorresponse) |
+| **502** | User-service lookup failure or external LLM/MCP error | `application/json` | [`ErrorResponse`](#errorresponse) |
 
 #### 200 — example
 
@@ -113,7 +117,8 @@ Open a session with an agent greeting. `directives` is ignored. Note: the contro
 | Status | Description | Content-Type | Schema |
 |---|---|---|---|
 | **200** | OK | `application/json` | [`CncResponse_AgentJobResponse`](#cncresponse_agentjobresponse) |
-| **502** | External Física API failure | `application/json` | [`ErrorResponse`](#errorresponse) |
+| **404** | `user_id` not found in user-service (`Fisica user not found`) | `application/json` | [`ErrorResponse`](#errorresponse) |
+| **502** | User-service lookup failure | `application/json` | [`ErrorResponse`](#errorresponse) |
 
 #### 200 — example
 
@@ -196,12 +201,12 @@ Open a session with an agent greeting. `directives` is ignored. Note: the contro
 | `SessionUsage` | request count, total/today tokens, token limit |
 | `ChatUsage` | per-message `inputTokens`, `outputTokens` |
 | `ToolCall` | `toolName`, `status`, raw output, metadata |
+| `fisica_agent_user_daily_usage` | `(user_id, usage_date)` 유니크, `request_count` — daily 15 cap counter |
 
-## External calls (informational, OpenFeign — base `${etc.agent}`)
+## External calls (informational)
 
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/api/chat` | main chat |
-| POST | `/api/chat/greeting` | greeting |
-| GET | `/api/v1/recommend/shoes?user_id=` | shoe recommendation |
-| GET | `/session/{session_id}` | history retrieval |
+| Method | Path | Base | Notes |
+|---|---|---|---|
+| GET | `/api/public/users/{userId}` | user-service | existence check before chat / greeting |
+| (LLM) | OpenAI chat-completions API | OpenAI | tool loop driven from `OpenAiChatToolClient` |
+| (MCP) | `fisica-mcp` tools | internal | executed directly via `McpToolClient` (no remote `/api/chat` Feign call) |

@@ -3,7 +3,7 @@
 > OpenAPI 3.1 style markdown. Field tables, request bodies, and response schemas mirror the current Spring controllers and DTO records.
 
 Source: `/Users/ijunseong/carenco/repos/graph-service`
-Updated: 2026-05-26
+Updated: 2026-06-08
 
 In-memory running-shoe recommendation and catalog service backed by `src/main/resources/shoes.json`. The legacy Neo4j graph dependency is no longer part of the current runtime path. Recommendation APIs rank shoes from footprint/pressure/class input; catalog APIs expose searchable shoe and brand data.
 
@@ -78,6 +78,9 @@ Personalized recommendation using `userId` and optionally a specific `recordId`.
       "support": 0.7,
       "flexibility": 0.4,
       "responsiveness": 0.5
+    },
+    "requirementsText": {
+      "en": "Looks for cushioning and support."
     },
     "recommendations": [
       {
@@ -301,6 +304,7 @@ Returns the full catalog detail for one shoe.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `needs` | [`Needs`](#needs) | yes | User need scores inferred from measurement data. |
+| `requirementsText` | [`LocalizedText`](#localizedtext) | no | Class-based natural language summary of requirements. `null` when no class signal available. |
 | `recommendations` | [`RecommendedShoeMatch`](#recommendedshoematch)[] | yes | Detailed match data keyed by product id. |
 
 ### `CncResponse_RecommendedShoeList`
@@ -390,6 +394,7 @@ Returns the full catalog detail for one shoe.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `needs` | [`Needs`](#needs) | yes | User need scores. |
+| `requirementsText` | [`LocalizedText`](#localizedtext) | no | Class-based natural language summary of requirements. `null` when no class signal available. |
 | `recommendations` | [`RecommendedShoeFull`](#recommendedshoefull)[] | yes | Full shoe recommendation objects. |
 
 ### `SingleShoeMatch`
@@ -397,7 +402,14 @@ Returns the full catalog detail for one shoe.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `needs` | [`Needs`](#needs) | yes | User need scores. |
+| `requirementsText` | [`LocalizedText`](#localizedtext) | no | Class-based natural language summary of requirements. `null` when no class signal available. |
 | `recommendation` | [`RecommendedShoeFull`](#recommendedshoefull) | yes | Match result for one shoe. |
+
+### `LocalizedText`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `en` | string | no | English text. Other locales may be added later. |
 
 ### `RecommendedShoeFull`
 

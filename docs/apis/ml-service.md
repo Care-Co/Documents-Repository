@@ -4,7 +4,7 @@
 
 Source: `/Users/jonghak/GitHub/Care&Co/ML-service`
 Framework: Flask (blueprint-based)
-Updated: 2026-04-27
+Updated: 2026-06-08
 
 Inference service for plantar pressure (footprint) and human pose estimation. Used by `measure-service` to produce per-record analysis bundles.
 
@@ -22,6 +22,8 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 |---|---|---|
 | `semaphore_req` | 15 | `/footprint`, `/footprint/classification`, `/weight`, `/measure` |
 | `semaphore_req_pose` | 5 | `/pose` |
+
+`/footprint/size-mask` 는 세마포어 미적용 (경량 CPU 연산).
 
 **Security** &nbsp;none — guard at the gateway.
 
@@ -147,6 +149,52 @@ Decode weight only from the same hex payload.
 ```json
 { "success": true, "message": "Weight processed successfully", "data": { "weight": 70.5 } }
 ```
+
+---
+
+## `POST` /footprint/size-mask
+
+**Operation ID** &nbsp;`footprintSizeMask`
+**Tags** &nbsp;`footprint`
+
+발 크기만 측정 (압력/분류/체중 없음). 클라이언트가 측정 세션 동안 누적한 binary contact mask (셀이 한 번이라도 접촉했는지) 를 입력으로 받아, 좌/우 발의 width / length 와 quality / confidence 를 산출한다. 분류·체중 경로와 독립.
+
+### Request body
+
+`application/json` &nbsp;**Required**
+
+**Schema** — [`FootSizeMaskRequest`](#footsizemaskrequest)
+
+### Responses
+
+| Status | Content-Type | Schema |
+|---|---|---|
+| **201** | `application/json` | [`Envelope_FootSizeMaskResult`](#envelope_footsizemaskresult) |
+| **400** | `application/json` | [`Envelope`](#envelope) — mask shape/값 오류 |
+| **500** | `application/json` | [`Envelope`](#envelope) |
+
+#### 201 — example
+
+```json
+{
+  "success": true,
+  "message": "Footprint processed successfully",
+  "data": {
+    "left_foot_width": 95.0,
+    "left_foot_length": 250.0,
+    "right_foot_width": 96.0,
+    "right_foot_length": 251.0,
+    "quality": "complete",
+    "confidence": 0.87,
+    "left":  { "widthCm": 95.0, "lengthCm": 250.0, "quality": "complete", "confidence": 0.87 },
+    "right": { "widthCm": 96.0, "lengthCm": 251.0, "quality": "complete", "confidence": 0.89 },
+    "frameCount": 120,
+    "durationMs": 4000
+  }
+}
+```
+
+> `frameCount` / `durationMs` 는 요청에서 제공된 경우에만 응답에 echo. `left` / `right` 객체에는 측정 통계 (`rowSpan`, `colSpan`, `cellCount`, `touchesSensorEdge` 등) 가 함께 담긴다.
 
 ---
 
@@ -287,6 +335,14 @@ Footprint + dual pose + optional scoring.
 | `gender` | string | no | enum: `male` `female` (any case) | — |
 | `version` | string | no | enum: `01` `02` | Default `01`. |
 
+### `FootSizeMaskRequest`
+
+| Field | Type | Required | Validation | Description |
+|---|---|---|---|---|
+| `mask` | array | yes | 29×22 grid 또는 flat length 638; 값은 0/1 또는 boolean (유한 수치) | 클라이언트가 측정 세션 동안 누적한 binary contact mask. `> 0` 인 셀이 "한 번이라도 접촉" 으로 간주. |
+| `frameCount` | integer | no | 1-10000 | 누적에 사용된 프레임 수 (응답에 echo). |
+| `durationMs` | integer | no | 1-600000 | 측정 세션 길이(ms) (응답에 echo). |
+
 ### `Envelope_FootprintResult`
 
 `Envelope` with `data` =
@@ -305,6 +361,36 @@ Footprint + dual pose + optional scoring.
 | `leftTop` `leftMiddle` `leftBottom` `leftTotal` | number | normalized |
 | `rightTop` `rightMiddle` `rightBottom` `rightTotal` | number | normalized |
 | `cogX` `cogY` | number | center of gravity |
+
+### `Envelope_FootSizeMaskResult`
+
+`Envelope` with `data` =
+
+| Field | Type | Description |
+|---|---|---|
+| `left_foot_width` / `left_foot_length` | number | cm. `widthCm` / `lengthCm` 와 동일 값. |
+| `right_foot_width` / `right_foot_length` | number | cm |
+| `quality` | string | overall — `complete` (양발 모두 complete) / `partial` (한쪽 이상이 absent 가 아님) / `incomplete` (양발 모두 absent) |
+| `confidence` | number | 0-1, 양 side confidence 의 최솟값 (absent 제외). |
+| `left` | object | 좌측 측정 + 통계 (아래 [`FootSizeMaskSide`](#footsizemaskside)) |
+| `right` | object | 우측 측정 + 통계 |
+| `frameCount` | integer | 요청에 포함된 경우에만 echo |
+| `durationMs` | integer | 요청에 포함된 경우에만 echo |
+
+### `FootSizeMaskSide`
+
+| Field | Type | Description |
+|---|---|---|
+| `widthCm` / `lengthCm` | number | side dimension (cm) |
+| `quality` | string | `complete` / `partial` / `incomplete` / `absent` |
+| `confidence` | number | 0-1 |
+| `rawCellCount` / `cellCount` / `removedCellCount` | integer | clean 전/후 셀 개수 통계 |
+| `componentCount` / `keptComponentCount` / `minKeptComponentCells` | integer | connected component 통계 |
+| `rowTop` / `rowBottom` / `rowSpan` | integer / null | 접촉 row 범위 |
+| `colMin` / `colMax` / `colSpan` | integer / null | 접촉 col 범위 |
+| `touchesSensorEdge` | boolean | 발이 센서 가장자리 (29 row 끝, 11 col 끝) 에 닿았는지 |
+
+> `left` / `right` 객체에는 위 필드 외에 PCA/dimension 디버그 키가 함께 포함될 수 있다. 응답 컨슈머는 알려진 키만 읽고 모르는 키는 무시한다.
 
 ### `Envelope_PoseResult`
 
