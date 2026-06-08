@@ -12,18 +12,18 @@
 
 | 도메인          | endpoint 수 | 주요 권한       | 섹션                                          |
 |-----------------|-------------|-----------------|-----------------------------------------------|
-| Auth            | 5           | Public · Auth  | [§2.1 ~ §2.6](#21-post-apiv2b2bauthlogin)     |
-| User            | 5           | Self only      | [§2.7 ~ §2.11](#27-post-apiv2b2busers)        |
-| Organization    | 5           | Public · Auth · OWNER · ADMIN | [§2.12 ~ §2.16](#212-post-apiv2b2borganizations) |
-| Membership      | 7           | Public · OWNER · ADMIN | [§2.18 ~ §2.24](#218-post-apiv2b2borganizationsorgidjoin-requests) |
-| Invite Code     | 4           | Public · Auth · OWNER · ADMIN | [§2.25 ~ §2.28](#225-post-apiv2b2borganizationsorgidinvite-codes) |
-| Device          | 7           | Auth · OWNER · ADMIN | [§2.29 ~ §2.33.2](#229-post-apiv2b2borganizationsorgiddevices) |
-| Measurement     | 3           | OWNER · ADMIN · TRAINER | [§2.34 ~ §2.36](#234-get-apiv2b2borganizationsorgidmembersmemberidmeasurements) |
-| Feedback        | 5           | Auth · OWNER · ADMIN · TRAINER · Author only | [§2.37 ~ §2.41](#237-post-apiv2b2bfeedbacksmembershipsid) |
-| License         | 2           | Auth           | [§2.42 ~ §2.43](#242-get-apiv2b2blicense-summary) |
-| Billing         | 3           | OWNER · ADMIN  | [§2.44 ~ §2.46](#244-post-apiv2b2bbillingcheckout-init) |
+| Auth            | 5           | Public · Auth  | [2.1 ~ 2.6](#21-post-apiv2b2bauthlogin)     |
+| User            | 5           | Self only      | [2.7 ~ 2.11](#27-post-apiv2b2busers)        |
+| Organization    | 5           | Public · Auth · OWNER · ADMIN | [2.12 ~ 2.16](#212-post-apiv2b2borganizations) |
+| Membership      | 7           | Public · OWNER · ADMIN | [2.18 ~ 2.24](#218-post-apiv2b2borganizationsorgidjoin-requests) |
+| Invite Code     | 4           | Public · Auth · OWNER · ADMIN | [2.25 ~ 2.28](#225-post-apiv2b2borganizationsorgidinvite-codes) |
+| Device          | 7           | Auth · OWNER · ADMIN | [2.29 ~ 2.33.2](#229-post-apiv2b2borganizationsorgiddevices) |
+| Measurement     | 3           | OWNER · ADMIN · TRAINER | [2.34 ~ 2.36](#234-get-apiv2b2borganizationsorgidmembersmemberidmeasurements) |
+| Feedback        | 5           | Auth · OWNER · ADMIN · TRAINER · Author only | [2.37 ~ 2.41](#237-post-apiv2b2bfeedbacksmembershipsid) |
+| License         | 2           | Auth           | [2.42 ~ 2.43](#242-get-apiv2b2blicense-summary) |
+| Billing         | 3           | OWNER · ADMIN  | [2.44 ~ 2.46](#244-post-apiv2b2bbillingcheckout-init) |
 
-총 46 endpoint. § 번호 결번 (§2.4 `GET /auth/me`, §2.17 `GET /organizations/mine`) 은 코드에서 제거된 슬롯 — 추적 편의상 유지.
+총 46 endpoint. 번호 결번 (2.4 `GET /auth/me`, 2.17 `GET /organizations/mine`) 은 코드에서 제거된 슬롯 — 추적 편의상 유지.
 
 ---
 
@@ -186,7 +186,7 @@ Google ID 토큰 검증 후 가입/로그인 후 JWT 발급.
 
 ### 2.6 `POST /api/v2/b2b/auth/oauth2/apple`
 
-Apple ID 토큰 검증 후 가입/로그인 후 JWT 발급. §2.5 와 동일 shape, 검증 verifier 만 Apple JWKS.
+Apple ID 토큰 검증 후 가입/로그인 후 JWT 발급. 2.5 와 동일 shape, 검증 verifier 만 Apple JWKS.
 
 ---
 
@@ -383,7 +383,7 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 
 **응답 — 204**.
 
-**에러**. §2.9 와 동일 (NotSelf / NotFound).
+**에러**. 2.9 와 동일 (NotSelf / NotFound).
 
 ---
 
@@ -460,7 +460,7 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 
 **권한**. Public
 
-**응답 — 200** — `OrganizationResponse` (4.12 와 동일 shape).
+**응답 — 200** — `OrganizationResponse` (2.12 와 동일 shape).
 
 **에러**
 
@@ -703,7 +703,7 @@ ACTIVE → SUSPENDED.
 
 **응답 — 200** — `MembershipResponse` (status=SUSPENDED).
 
-**에러**. §2.20 와 동일.
+**에러**. 2.20 와 동일.
 
 ---
 
@@ -1008,7 +1008,7 @@ InBody 등 측정 device 등록. device-service gRPC 위임.
 }
 ```
 
-**응답 — 201** — `DeviceResponse`
+**응답 — 201 (v1.0.0, default)** — `DeviceResponse`
 
 ```json
 {
@@ -1024,7 +1024,36 @@ InBody 등 측정 device 등록. device-service gRPC 위임.
     "deactivatedAt": null,
     "deactivatedBy": null,
     "deactivationReason": null,
-    "lastUsedAt": null
+    "lastUsedAt": null,
+    "batteryLevel": null,
+    "batteryReportedAt": null
+  }
+}
+```
+
+**응답 — 201 (v1.0.1, header `api-version: 1.0.1`)** — `DeviceResponseV1_0_1`
+
+v1.0.0 의 모든 필드 + `deviceType` (0.0.63) + `deviceNumber` (0.0.73).
+
+```json
+{
+  "success": true, "code": "201", "message": "Created",
+  "data": {
+    "deviceId": "dev-c3d4",
+    "organizationId": "org-A",
+    "serialNumber": "INBODY-770-2024-0123",
+    "alias": "1번 InBody",
+    "status": "ACTIVE",
+    "registeredAt": "2026-05-13T10:00:00Z",
+    "registeredBy": "u-9f3e",
+    "deactivatedAt": null,
+    "deactivatedBy": null,
+    "deactivationReason": null,
+    "lastUsedAt": null,
+    "batteryLevel": null,
+    "batteryReportedAt": null,
+    "deviceType": "SCALE2",
+    "deviceNumber": "FS2-001"
   }
 }
 ```
@@ -1052,7 +1081,7 @@ device 목록.
 | `status` | `DeviceStatus` (`ACTIVE` / `INACTIVE`) | 필터 |
 | `sortBy` | string | `name` / `registered_at` (default DESC) / `last_used` / **`battery`** (0.0.61, NULLS LAST) |
 
-**응답 — 200**
+**응답 — 200 (v1.0.0, default)**
 
 ```json
 {
@@ -1081,6 +1110,37 @@ device 목록.
 
 `batteryLevel` / `batteryReportedAt` 는 0.0.61 추가. 측정 record 가 저장될 때마다 ML 응답의 battery 가 fire-and-forget 으로 갱신됨. 측정 이력 없는 device 는 둘 다 `null`.
 
+**응답 — 200 (v1.0.1, header `api-version: 1.0.1`)**
+
+각 item 에 `deviceType` (0.0.63) + `deviceNumber` (0.0.73) 추가. 그 외 동일.
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "items": [
+      {
+        "deviceId": "dev-c3d4",
+        "organizationId": "org-A",
+        "serialNumber": "INBODY-770-2024-0123",
+        "alias": "1번 InBody",
+        "status": "ACTIVE",
+        "registeredAt": "2026-05-13T10:00:00Z",
+        "registeredBy": "u-9f3e",
+        "deactivatedAt": null,
+        "deactivatedBy": null,
+        "deactivationReason": null,
+        "lastUsedAt": "2026-05-13T11:20:00Z",
+        "batteryLevel": 87,
+        "batteryReportedAt": "2026-05-13T11:20:00Z",
+        "deviceType": "SCALE2",
+        "deviceNumber": "FS2-001"
+      }
+    ]
+  }
+}
+```
+
 **에러**
 
 | HTTP | 코드 | 케이스 |
@@ -1095,7 +1155,7 @@ device 단건.
 
 **권한**. Auth (멤버)
 
-**응답 — 200** — `DeviceResponse` (4.29 와 동일).
+**응답 — 200** — `DeviceResponse` (2.29 와 동일). 헤더 `api-version: 1.0.1` 시 v1.0.1 응답 (`deviceType` + `deviceNumber` 추가).
 
 **에러**
 
@@ -1117,7 +1177,7 @@ alias 만 변경 가능. device-service gRPC 가 `alias=null` 을 "변경 없음
 { "alias": "1번 InBody (대기실)" }
 ```
 
-**응답 — 200** — `DeviceResponse`.
+**응답 — 200** — `DeviceResponse` (2.29 와 동일). 헤더 `api-version: 1.0.1` 시 v1.0.1 응답 (`deviceType` + `deviceNumber` 추가).
 
 ---
 
@@ -1169,7 +1229,7 @@ device 비활성화 (status=INACTIVE).
 
 ### 2.33.2 `DELETE .../devices/{deviceId}` (0.0.61 신규)
 
-영구 삭제 — `status=REVOKED` + 풀 row unclaim. 일시 정지 ([§2.33](#233-post-apiv2b2borganizationsorgiddevicesdeviceiddeactivate)) 와 다름. 같은 `(mac, serial)` 가 다른 organization 에 재등록 가능해짐.
+영구 삭제 — `status=REVOKED` + 풀 row unclaim. 일시 정지 ([2.33](#233-post-apiv2b2borganizationsorgiddevicesdeviceiddeactivate)) 와 다름. 같은 `(mac, serial)` 가 다른 organization 에 재등록 가능해짐.
 
 **권한**. OWNER · ADMIN
 
@@ -1400,7 +1460,7 @@ soft 삭제 (deletedAt 채움).
 
 **권한**. Auth
 
-**Query / Response**. §2.40 와 동일 shape.
+**Query / Response**. 2.40 와 동일 shape.
 
 ---
 
