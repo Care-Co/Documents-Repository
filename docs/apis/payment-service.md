@@ -343,6 +343,8 @@ Cancel (effective at next billing period).
 | Status | Schema |
 |---|---|
 | **200** | [`Subscription`](#subscription) |
+| **404** | [`ProblemDetail`](#problemdetail) (`NotFound` — `Subscription not found: {id}`) |
+| **409** | [`ProblemDetail`](#problemdetail) (`IllegalStateTransition` — `Cannot cancel subscription {id} in status {currentStatus}`) |
 
 ### `POST` /api/subscriptions/{id}/pause
 
@@ -350,11 +352,27 @@ Cancel (effective at next billing period).
 
 Status → `PAUSED`.
 
+#### Responses
+
+| Status | Schema |
+|---|---|
+| **200** | [`Subscription`](#subscription) |
+| **404** | [`ProblemDetail`](#problemdetail) (`NotFound`) |
+| **409** | [`ProblemDetail`](#problemdetail) (`IllegalStateTransition` — `Cannot pause subscription {id} in status {currentStatus}`) |
+
 ### `POST` /api/subscriptions/{id}/resume
 
 **Operation ID** &nbsp;`resumeSubscription`  &nbsp;**Tags** &nbsp;`subscription`
 
 Status → `ACTIVE`.
+
+#### Responses
+
+| Status | Schema |
+|---|---|
+| **200** | [`Subscription`](#subscription) |
+| **404** | [`ProblemDetail`](#problemdetail) (`NotFound`) |
+| **409** | [`ProblemDetail`](#problemdetail) (`IllegalStateTransition` — `Cannot resume subscription {id} in status {currentStatus}`) |
 
 ### `POST` /api/subscriptions/{paddleSubscriptionId}/sync
 
@@ -472,7 +490,9 @@ Create refund (full or partial).
 | Status | Content-Type | Schema | Headers |
 |---|---|---|---|
 | **201** | `application/json` | [`Refund`](#refund) | `Location: /api/refunds/{id}` |
-| **400** | `application/problem+json` | [`ProblemDetail`](#problemdetail) | — |
+| **400** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`InvalidItem` / `AmountExceedsOriginal` / `InvalidAmount` / `DuplicateItem`) | — |
+| **404** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`TransactionNotFound`) | — |
+| **409** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`TransactionNotRefundable` — `Transaction {id} is not refundable in status {status}`) | — |
 
 ### `GET` /api/refunds/{id}
 
@@ -500,6 +520,51 @@ Create refund (full or partial).
 | Status | Schema |
 |---|---|
 | **200** | [`Refund`](#refund)[] |
+
+---
+
+## Test API (dev only)
+
+활성화 조건. `@Profile("dev-k3s")` + `payment.test-api.enabled=true` 둘 다 충족해야 노출. 운영 / staging 에서는 컴파일은 되지만 bean 자체가 등록되지 않아 호출 시 404. integration-tests 진입점 — Paddle webhook 우회로 license `ACTIVE` 시드.
+
+### `POST` /api/v1/test/payment/seed-active-subscription
+
+**Operation ID** &nbsp;`seedActiveSubscription`  &nbsp;**Tags** &nbsp;`test-api`
+
+Paddle webhook 없이 customer + subscription 행을 직접 INSERT 해 `LICENSE_STATE_ACTIVE` 상태를 만든다. e2e flow (b2b-service 가 license 를 ACTIVE 로 인지) 검증용.
+
+#### Request body
+
+`application/json` &nbsp;**Required** — [`SeedSubscriptionRequest`](#seedsubscriptionrequest)
+
+```json
+{
+  "organizationId": "01HXORG...",
+  "userId": "01HXOWNER...",
+  "planCode": "pro",
+  "planSeats": 20
+}
+```
+
+#### Responses
+
+| Status | Content-Type | Schema |
+|---|---|---|
+| **201** | `application/json` | [`SeedSubscriptionResponse`](#seedsubscriptionresponse) |
+| **400** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (request validation) |
+| **404** | — | profile / property 조건 미충족 시 bean 미등록 |
+
+#### 201 — example
+
+```json
+{
+  "subscriptionId": "...",
+  "customerId": "...",
+  "organizationId": "01HXORG...",
+  "paddleSubscriptionId": "sub_test_...",
+  "licenseState": "LICENSE_STATE_ACTIVE"
+}
+```
 
 ---
 
@@ -800,6 +865,27 @@ Partial update — `null` fields keep current value.
 | `occurred_at` | string (date-time, UTC) | — |
 | `notification_id` | string | — |
 | `data` | object | event-specific payload |
+
+### `SeedSubscriptionRequest`
+
+dev-only test API payload.
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `organizationId` | string | yes | `@NotBlank` |
+| `userId` | string | yes | `@NotBlank` |
+| `planCode` | string | yes | `@NotBlank` |
+| `planSeats` | integer | yes | `@Min(1)` |
+
+### `SeedSubscriptionResponse`
+
+| Field | Type | Description |
+|---|---|---|
+| `subscriptionId` | string | local pk of seeded `subscriptions` row |
+| `customerId` | string | local pk of seeded `customers` row |
+| `organizationId` | string | echo of request |
+| `paddleSubscriptionId` | string | synthetic `sub_test_...` id (Paddle 미호출) |
+| `licenseState` | string | `LICENSE_STATE_ACTIVE` 확인용 (b2b-service gRPC 와 매칭) |
 
 ### `ProblemDetail`
 
