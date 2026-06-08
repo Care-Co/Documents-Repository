@@ -354,11 +354,3 @@ Manually delete `INACTIVE` / `INVALID_TOKEN` devices past retention.
 | `code` | string | yes |
 | `message` | string | yes |
 | `timestamp` | string (date-time, UTC) | yes |
-
----
-
-## Notes
-
-- FCM job creation returns `202 Accepted`; clients poll `GET /jobs/{jobId}`.
-- Device upsert lets logout-deactivated devices reactivate on next `PUT /devices`.
-- History endpoints have no pagination — consider gateway-side limits.

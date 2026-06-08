@@ -812,14 +812,3 @@ Partial update — `null` fields keep current value.
   "errors": [{ "field": "email", "message": "must be a well-formed email address" }]
 }
 ```
-
----
-
-## Notes
-
-- Local IDs and Paddle IDs are stored side-by-side; sync endpoints reconcile drift.
-- Webhook is the source of truth for subscription / transaction state — REST sync endpoints exist mainly for ops.
-- Plan / variant catalog is the source of truth for "which plan is sellable"; pricing itself lives in Paddle (country-specific overrides included).
-- `customers.paddle_customer_id` is **non-unique** by design (multi-pool customers share Paddle's email-keyed customer).
-- `customData.organization_id` is server-stamped in `CheckoutLinkService` and never trusted from the frontend.
-- CORS: `*` origin / `GET POST PUT DELETE PATCH OPTIONS` / max age 3600 s.

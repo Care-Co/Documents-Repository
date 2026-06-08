@@ -133,9 +133,3 @@ Retrieve a single MSA instance by id.
 | `updateTitle` | string | yes | — |
 | `updateReason` | string | yes | — |
 
----
-
-## Notes
-
-- Instance state comes from Spring Boot Admin's in-memory `InstanceRepository` (real-time, not persistent).
-- `Mono<ResponseEntity<...>>` is used for the single-instance lookup so `404` propagates reactively.

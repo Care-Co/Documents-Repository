@@ -426,11 +426,3 @@ Keypoint names: `nose`, `leftEye`, `rightEye`, `leftEar`, `rightEar`, `leftShoul
 | `score` | object | only present when `height` and `age` provided |
 | `score.bodyScore` | number | — |
 | `score.predictedAge` | number | — |
-
----
-
-## Notes
-
-- `api-version` header is reserved (default `1.0.0`) but not branched on.
-- `/measure` is the canonical entry point used by `measure-service` when persisting a record.
-- Models auto-download via `gdown` when missing; CUDA EP + CPU EP, 2 GB GPU memory cap, 3-session pool.

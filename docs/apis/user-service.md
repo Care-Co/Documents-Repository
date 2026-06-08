@@ -775,11 +775,3 @@ Validation reuses the register validators (`@ValidName`, `@ValidEmail`, `@ValidP
 | `changes` | string (JSON) |
 | `ipAddress` `traceId` `description` | string |
 | `createdAt` | string (date-time, UTC) |
-
----
-
-## Notes
-
-- All token-bearing endpoints use a single `CncResponse` envelope; only the `data` shape differs per route.
-- Resource-owner check: `@PreAuthorize("hasAnyRole('ROLE_ADMIN') or (hasAnyRole('ROLE_USER') and @tokenUtils.isResourceOwner(#userId))")`.
-- The deprecated OAuth2 controller still exists but is not part of the active routing.

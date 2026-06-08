@@ -566,11 +566,3 @@ Returns the full catalog detail for one shoe.
 | `message` | string | yes | Human-readable message. |
 | `error` | string | no | Underlying detail. |
 | `timestamp` | string (date-time) | no | Error timestamp when supplied by common response handling. |
-
----
-
-## Notes
-
-- Catalog search uses exact case-insensitive `brand`/`category`, substring `name`, inclusive `minPrice`, and exclusive `maxPrice`.
-- `metric` accepts repeatable values formatted as `metricName:min:max`; malformed empty metric names return 400.
-- `GET /api/recommendation/shoes` is intentionally documented separately from `CncResponse` wrappers because the controller builds a raw `Map` response.

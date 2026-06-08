@@ -200,21 +200,6 @@ Removes the object + metadata. Same `key`/`id` parameters as download.
 
 ---
 
-## Flows
-
-**Direct upload**
-
-1. `POST /api/v2/pre-sign/upload` → `{ uploadUrl, downloadUrl }`
-2. `PUT` file bytes to `uploadUrl` directly to S3
-3. `POST /api/v2/confirm-upload` to persist metadata
-
-**Direct download**
-
-1. `GET /api/v2/pre-sign/download?filename=…` → presigned GET URL
-2. `GET` from S3 directly
-
----
-
 ## Schemas
 
 ### `UploadParts`
@@ -288,9 +273,3 @@ Removes the object + metadata. Same `key`/`id` parameters as download.
 | 404 | Object/metadata not found |
 | 500 | S3/DB error |
 
----
-
-## Notes
-
-- v1 endpoints will be removed after `2026-12-31`. Migrate clients to v2 (especially the presigned-URL flow).
-- `FolderCategory` values: `FOOT_PRINT`, `POSE_ESTIMATION`, `PROFILE_PHOTO`.

@@ -216,24 +216,3 @@ RFC 7807. agent-service 는 `ResponseStatusException` 만 던지고 별도 `@Con
 | `status` | integer | yes | HTTP status code. |
 | `detail` | string | yes | `ResponseStatusException` 의 reason 문자열 (`Fisica user not found`, `Daily chat request limit exceeded` 등). |
 | `instance` | string | yes | 요청 URI (`/llm/chat`, `/llm/chat/greeting`). |
-
----
-
-## Persistence (informational)
-
-| Entity | Notes |
-|---|---|
-| `ChatSession` | `id`, `userId`, `lastActivityAt`, embedded `SessionUsage` |
-| `ChatMessage` | role (`USER`/`AGENT`), content, status, embedded `ToolCall` & `ChatUsage` |
-| `SessionUsage` | request count, total/today tokens, token limit |
-| `ChatUsage` | per-message `inputTokens`, `outputTokens` |
-| `ToolCall` | `toolName`, `status`, raw output, metadata |
-| `fisica_agent_user_daily_usage` | `(user_id, usage_date)` 유니크, `request_count` — daily 15 cap counter |
-
-## External calls (informational)
-
-| Method | Path | Base | Notes |
-|---|---|---|---|
-| GET | `/api/public/users/{userId}` | user-service | existence check before chat / greeting |
-| (LLM) | OpenAI chat-completions API | OpenAI | tool loop driven from `OpenAiChatToolClient` |
-| (MCP) | `fisica-mcp` tools | internal | executed directly via `McpToolClient` (no remote `/api/chat` Feign call) |
