@@ -219,13 +219,24 @@ Google ID 토큰 검증 후 가입/로그인 후 JWT 발급.
 }
 ```
 
-**Response — 200** — `TokenPair` (2.1 모바일 응답과 동일 shape).
+**Response — 200** — `TokenPair`
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `userId` | string | 유저 PK |
 | `accessToken` | string | JWT access token |
-| `refreshToken` | string | refresh token |
+| `refreshToken` | string | refresh token (rotation 대상) |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "userId": "u-9f3e",
+    "accessToken": "eyJhbGciOiJIUzI1NiJ9.OAUTH_GOOGLE...",
+    "refreshToken": "rt_google_b4d2..."
+  }
+}
+```
 
 **Errors** (`OAuth2Error`)
 
@@ -241,11 +252,56 @@ Google ID 토큰 검증 후 가입/로그인 후 JWT 발급.
 
 ### 2.6 `POST /api/v2/b2b/auth/oauth2/apple`
 
-Apple ID 토큰 검증 후 가입/로그인 후 JWT 발급. 2.5 와 동일 shape, 검증 verifier 만 Apple JWKS.
+Apple ID 토큰 검증 후 가입/로그인 후 JWT 발급. verifier 는 Apple JWKS — `aud` 는 `com.carenco.b2b.web` (웹) 또는 모바일 client id.
 
 | Method | Path | 권한 | Idempotent | Versioned |
 |---|---|---|---|---|
 | POST | /api/v2/b2b/auth/oauth2/apple | Public (단 `b2b.oauth2.enabled=true` 시에만 라우트 등록, false 시 404) | no | no |
+
+**Request Body** — `OAuth2LoginRequest`
+
+| 필드 | 타입 | 필수 | 검증 / 설명 |
+|---|---|---|---|
+| `idToken` | string | yes | Apple ID Token (JWT, RS256) |
+| `deviceId` | string | no | rotation 추적용 |
+| `deviceType` | string | no | rotation 추적용 |
+
+```json
+{
+  "idToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IkFwcGxlS2lk...",
+  "deviceId": "iphone-15-uuid",
+  "deviceType": "iOS"
+}
+```
+
+**Response — 200** — `TokenPair`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `userId` | string | 유저 PK |
+| `accessToken` | string | JWT access token |
+| `refreshToken` | string | refresh token (rotation 대상) |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "userId": "u-9f3e",
+    "accessToken": "eyJhbGciOiJIUzI1NiJ9.OAUTH_APPLE...",
+    "refreshToken": "rt_apple_c5e3..."
+  }
+}
+```
+
+**Errors** (`OAuth2Error`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 401 | `AUTH-401-001` | InvalidIdToken — 서명/만료/issuer 불일치 (Apple JWKS) |
+| 401 | `AUTH-401-001` | InvalidAudience — aud 가 `com.carenco.b2b.web` (또는 모바일 client id) 와 다름 |
+| 400 | `CMN-400-001` | EmailMissing — Apple 가 이메일 미제공 (private relay 거부 등) |
+| 403 | `AUTH-403-003` | AccountSuspended — DELETION_PENDING 등 |
+| 502 | `CMN-502-001` | VerifierUnavailable — Apple JWKS 다운 |
 
 ---
 
@@ -532,7 +588,12 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 
 **Response — 204**.
 
-**Errors**. 2.9 와 동일 (NotSelf / NotFound).
+**Errors** (`UserError`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 403 | `AUTH-403-002` | NotSelf |
+| 404 | `USR-404-001` | NotFound |
 
 ---
 
@@ -542,9 +603,9 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 
 | Method | Path | 권한 | Idempotent | Versioned |
 |---|---|---|---|---|
-| POST | /api/v2/b2b/organizations | Auth | no | no |
+| POST | /api/v2/b2b/organizations | Auth | no | yes |
 
-**Request Body** — `CreateOrganizationRequest`
+**Request Body (v1.0.0, default)** — `CreateOrganizationRequest`
 
 | 필드 | 타입 | 필수 | 검증 / 설명 |
 |---|---|---|---|
@@ -553,7 +614,7 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 | `description` | string | no | 시설 소개 |
 | `phoneNumber` | string | no | E.164 |
 | `photoUrl` | string | no | URL |
-| `country` | string | yes | ValidCountryCode |
+| `country` | string | yes | ValidCountryCode (ISO-3166 alpha-2) |
 | `postalCode` | string | no | 우편번호 |
 | `regionLevel1` | string | no | 시/도 |
 | `regionLevel2` | string | no | 구/군 |
@@ -582,9 +643,51 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 }
 ```
 
+**Request Body (v1.0.1, header `api-version: 1.0.1`)** — `CreateOrganizationRequestV1_0_1`
+
+v1.0.0 의 모든 필드 + `businessRegistrationNumber` 필수 (0.0.64 신규). country 별 정규식 검증 (`BusinessRegistrationNumberValidator`).
+
+| 필드 | 타입 | 필수 | 검증 / 설명 |
+|---|---|---|---|
+| `name` | string | yes | NotBlank, ≤ 200 |
+| `type` | string | yes | `OrganizationType` enum |
+| `description` | string | no | ≤ 65535 |
+| `phoneNumber` | string | no | E.164 (nullable 허용) |
+| `photoUrl` | string | no | ≤ 500 |
+| `country` | string | yes | `@NotBlank @ValidCountryCode`, 2자 |
+| `postalCode` | string | no | ≤ 20 |
+| `regionLevel1` | string | no | ≤ 100 |
+| `regionLevel2` | string | no | ≤ 100 |
+| `addressLine1` | string | no | ≤ 255 |
+| `addressLine2` | string | no | ≤ 255 |
+| `businessRegistrationNumber` | string | **yes** | `@NotBlank`, ≤ 40, country 별 정규식 (0.0.64 신규) |
+| `searchable` | boolean | no | 검색 노출 (default false) |
+| `inviteCodeEnabled` | boolean | no | 초대 코드 발급 (default false) |
+| `approvalRequired` | boolean | no | 가입 승인 (default false) |
+
+```json
+{
+  "name": "강남점",
+  "type": "PILATES",
+  "description": "강남구 신논현역 5분 거리",
+  "phoneNumber": "+82215551234",
+  "photoUrl": "https://cdn.carenco.com/org/gangnam.jpg",
+  "country": "KR",
+  "postalCode": "06000",
+  "regionLevel1": "서울",
+  "regionLevel2": "강남구",
+  "addressLine1": "테헤란로 123",
+  "addressLine2": "456호",
+  "businessRegistrationNumber": "123-45-67890",
+  "searchable": true,
+  "inviteCodeEnabled": true,
+  "approvalRequired": true
+}
+```
+
 `OrganizationType` enum. `GYM | PILATES | YOGA | PT_STUDIO | CROSSFIT | FUNCTIONAL | BOXING | ETC`.
 
-**Response — 201** — `OrganizationResponse`
+**Response — 201 (v1.0.0, default)** — `OrganizationResponse`
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
@@ -630,11 +733,57 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 }
 ```
 
+**Response — 201 (v1.0.1, header `api-version: 1.0.1`)** — `OrganizationResponseV1_0_1`
+
+v1.0.0 의 모든 필드 + `businessRegistrationNumber` (0.0.64) + `stats` (0.0.63). 모두 nullable.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| (v1.0.0 의 모든 필드) | — | 위 v1.0.0 응답 동일 |
+| `businessRegistrationNumber` | string \| null | 사업자등록번호 (country 별 정규식) |
+| `stats` | object — `{ totalMembers, activeMembers, byRole, suspended }` | 멤버 통계 (LEFT 제외). 생성 직후는 OWNER 1 만 |
+
+```json
+{
+  "success": true, "code": "201", "message": "Created",
+  "data": {
+    "id": "org-A",
+    "name": "강남점",
+    "type": "PILATES",
+    "description": "강남구 신논현역 5분 거리",
+    "phoneNumber": "+82215551234",
+    "photoUrl": "https://cdn.carenco.com/org/gangnam.jpg",
+    "address": {
+      "country": "KR",
+      "postalCode": "06000",
+      "regionLevel1": "서울",
+      "regionLevel2": "강남구",
+      "addressLine1": "테헤란로 123",
+      "addressLine2": "456호"
+    },
+    "businessRegistrationNumber": "123-45-67890",
+    "ownerUserId": "u-9f3e",
+    "searchable": true,
+    "inviteCodeEnabled": true,
+    "approvalRequired": true,
+    "seatsUsed": 1,
+    "status": "ACTIVE",
+    "stats": {
+      "totalMembers": 1,
+      "activeMembers": 1,
+      "byRole": { "OWNER": 1, "ADMIN": 0, "TRAINER": 0, "MEMBER": 0 },
+      "suspended": 0
+    }
+  }
+}
+```
+
 **Errors** (`OrganizationError`)
 
 | HTTP | 코드 | 케이스 |
 |---|---|---|
 | 400 | `CMN-400-001` | InvalidInput |
+| 400 | `CMN-400-002` | InvalidBusinessRegistrationNumber (v1.0.1, country 별 정규식 위반) |
 
 ---
 
@@ -644,7 +793,7 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 
 | Method | Path | 권한 | Idempotent | Versioned |
 |---|---|---|---|---|
-| GET | /api/v2/b2b/organizations/{id} | Public | yes | no |
+| GET | /api/v2/b2b/organizations/{id} | Public | yes | yes |
 
 **Path Parameters**
 
@@ -652,7 +801,90 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 |---|---|---|
 | `id` | string (uuid) | organization PK |
 
-**Response — 200** — `OrganizationResponse` (2.12 와 동일 shape).
+**Response — 200 (v1.0.0, default)** — `OrganizationResponse`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `id` | string (uuid) | organization PK |
+| `name` | string | 시설명 |
+| `type` | string | `OrganizationType` |
+| `description` | string \| null | 시설 소개 |
+| `phoneNumber` | string \| null | E.164 |
+| `photoUrl` | string \| null | 시설 사진 URL |
+| `address` | object | 주소 (country/postalCode/regionLevel1/regionLevel2/addressLine1/addressLine2) |
+| `ownerUserId` | string (uuid) | OWNER 유저 |
+| `searchable` | boolean | 검색 노출 |
+| `inviteCodeEnabled` | boolean | 초대 코드 발급 가능 |
+| `approvalRequired` | boolean | 가입 승인 필요 |
+| `seatsUsed` | integer | 사용 좌석 |
+| `status` | string | `ACTIVE` / `DELETED` |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "id": "org-A",
+    "name": "강남점",
+    "type": "PILATES",
+    "description": "강남구 신논현역 5분 거리",
+    "phoneNumber": "+82215551234",
+    "photoUrl": "https://cdn.carenco.com/org/gangnam.jpg",
+    "address": {
+      "country": "KR",
+      "postalCode": "06000",
+      "regionLevel1": "서울",
+      "regionLevel2": "강남구",
+      "addressLine1": "테헤란로 123",
+      "addressLine2": "456호"
+    },
+    "ownerUserId": "u-9f3e",
+    "searchable": true,
+    "inviteCodeEnabled": true,
+    "approvalRequired": true,
+    "seatsUsed": 12,
+    "status": "ACTIVE"
+  }
+}
+```
+
+**Response — 200 (v1.0.1, header `api-version: 1.0.1`)** — `OrganizationResponseV1_0_1`
+
+v1.0.0 + `businessRegistrationNumber` (0.0.64) + `stats` (0.0.63).
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "id": "org-A",
+    "name": "강남점",
+    "type": "PILATES",
+    "description": "강남구 신논현역 5분 거리",
+    "phoneNumber": "+82215551234",
+    "photoUrl": "https://cdn.carenco.com/org/gangnam.jpg",
+    "address": {
+      "country": "KR",
+      "postalCode": "06000",
+      "regionLevel1": "서울",
+      "regionLevel2": "강남구",
+      "addressLine1": "테헤란로 123",
+      "addressLine2": "456호"
+    },
+    "businessRegistrationNumber": "123-45-67890",
+    "ownerUserId": "u-9f3e",
+    "searchable": true,
+    "inviteCodeEnabled": true,
+    "approvalRequired": true,
+    "seatsUsed": 12,
+    "status": "ACTIVE",
+    "stats": {
+      "totalMembers": 14,
+      "activeMembers": 12,
+      "byRole": { "OWNER": 1, "ADMIN": 2, "TRAINER": 5, "MEMBER": 4 },
+      "suspended": 2
+    }
+  }
+}
+```
 
 **Errors**
 
@@ -998,7 +1230,13 @@ ACTIVE → SUSPENDED.
 
 **Response — 200** — `MembershipResponse` (status=SUSPENDED, 2.18 schema 참조).
 
-**Errors**. 2.20 와 동일.
+**Errors**
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 404 | `CMN-404-001` | MembershipNotFound |
+| 403 | `AUTH-403-002` | NotOwnerOrAdmin |
+| 409 | `CMN-409-001` | InvalidStateTransition |
 
 ---
 
@@ -1647,7 +1885,77 @@ device 단건.
 | `orgId` | string (uuid) | organization PK |
 | `deviceId` | string (uuid) | device PK |
 
-**Response — 200** — `DeviceResponse` (2.29 와 동일). 헤더 `api-version: 1.0.1` 시 v1.0.1 응답 (`deviceType` + `deviceNumber` 추가).
+**Response — 200 (v1.0.0, default)** — `DeviceResponse`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `deviceId` | string (uuid) | device PK |
+| `organizationId` | string (uuid) | 소유 시설 |
+| `serialNumber` | string | 하드웨어 시리얼 |
+| `alias` | string | 표시명 |
+| `status` | string | `ACTIVE` / `INACTIVE` / `REVOKED` |
+| `registeredAt` | string (date-time, UTC) | 등록 시각 |
+| `registeredBy` | string (uuid) | 등록자 |
+| `deactivatedAt` | string (date-time, UTC) \| null | 비활성화 시각 |
+| `deactivatedBy` | string (uuid) \| null | 비활성화 자 |
+| `deactivationReason` | string \| null | 비활성화 사유 |
+| `lastUsedAt` | string (date-time, UTC) \| null | 최근 사용 시각 |
+| `batteryLevel` | integer \| null | 배터리 % (0.0.61+) |
+| `batteryReportedAt` | string (date-time, UTC) \| null | 배터리 보고 시각 |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "deviceId": "dev-c3d4",
+    "organizationId": "org-A",
+    "serialNumber": "INBODY-770-2024-0123",
+    "alias": "1번 InBody",
+    "status": "ACTIVE",
+    "registeredAt": "2026-05-13T10:00:00Z",
+    "registeredBy": "u-9f3e",
+    "deactivatedAt": null,
+    "deactivatedBy": null,
+    "deactivationReason": null,
+    "lastUsedAt": "2026-05-13T11:20:00Z",
+    "batteryLevel": 87,
+    "batteryReportedAt": "2026-05-13T11:20:00Z"
+  }
+}
+```
+
+**Response — 200 (v1.0.1, header `api-version: 1.0.1`)** — `DeviceResponseV1_0_1`
+
+v1.0.0 의 모든 필드 + `deviceType` (0.0.63) + `deviceNumber` (0.0.73).
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| (v1.0.0 의 모든 필드) | — | 상기 schema 참조 |
+| `deviceType` | string | `DeviceType` enum (e.g. `SCALE2`) |
+| `deviceNumber` | string \| null | 풀에서 부여된 디바이스 번호 (e.g. `FS2-001`) |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "deviceId": "dev-c3d4",
+    "organizationId": "org-A",
+    "serialNumber": "INBODY-770-2024-0123",
+    "alias": "1번 InBody",
+    "status": "ACTIVE",
+    "registeredAt": "2026-05-13T10:00:00Z",
+    "registeredBy": "u-9f3e",
+    "deactivatedAt": null,
+    "deactivatedBy": null,
+    "deactivationReason": null,
+    "lastUsedAt": "2026-05-13T11:20:00Z",
+    "batteryLevel": 87,
+    "batteryReportedAt": "2026-05-13T11:20:00Z",
+    "deviceType": "SCALE2",
+    "deviceNumber": "FS2-001"
+  }
+}
+```
 
 **Errors**
 
@@ -1688,7 +1996,85 @@ alias 만 변경 가능. device-service gRPC 가 `alias=null` 을 "변경 없음
 { "alias": "1번 InBody (대기실)" }
 ```
 
-**Response — 200** — `DeviceResponse` (2.29 와 동일). 헤더 `api-version: 1.0.1` 시 v1.0.1 응답 (`deviceType` + `deviceNumber` 추가).
+**Response — 200 (v1.0.0, default)** — `DeviceResponse`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `deviceId` | string (uuid) | device PK |
+| `organizationId` | string (uuid) | 소유 시설 |
+| `serialNumber` | string | 하드웨어 시리얼 |
+| `alias` | string | 표시명 (변경된 값) |
+| `status` | string | `ACTIVE` / `INACTIVE` / `REVOKED` |
+| `registeredAt` | string (date-time, UTC) | 등록 시각 |
+| `registeredBy` | string (uuid) | 등록자 |
+| `deactivatedAt` | string (date-time, UTC) \| null | 비활성화 시각 |
+| `deactivatedBy` | string (uuid) \| null | 비활성화 자 |
+| `deactivationReason` | string \| null | 비활성화 사유 |
+| `lastUsedAt` | string (date-time, UTC) \| null | 최근 사용 시각 |
+| `batteryLevel` | integer \| null | 배터리 % |
+| `batteryReportedAt` | string (date-time, UTC) \| null | 배터리 보고 시각 |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "deviceId": "dev-c3d4",
+    "organizationId": "org-A",
+    "serialNumber": "INBODY-770-2024-0123",
+    "alias": "1번 InBody (대기실)",
+    "status": "ACTIVE",
+    "registeredAt": "2026-05-13T10:00:00Z",
+    "registeredBy": "u-9f3e",
+    "deactivatedAt": null,
+    "deactivatedBy": null,
+    "deactivationReason": null,
+    "lastUsedAt": "2026-05-13T11:20:00Z",
+    "batteryLevel": 87,
+    "batteryReportedAt": "2026-05-13T11:20:00Z"
+  }
+}
+```
+
+**Response — 200 (v1.0.1, header `api-version: 1.0.1`)** — `DeviceResponseV1_0_1`
+
+v1.0.0 의 모든 필드 + `deviceType` + `deviceNumber`.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| (v1.0.0 의 모든 필드) | — | 상기 schema 참조 |
+| `deviceType` | string | `DeviceType` enum (e.g. `SCALE2`) |
+| `deviceNumber` | string \| null | 풀에서 부여된 디바이스 번호 |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "deviceId": "dev-c3d4",
+    "organizationId": "org-A",
+    "serialNumber": "INBODY-770-2024-0123",
+    "alias": "1번 InBody (대기실)",
+    "status": "ACTIVE",
+    "registeredAt": "2026-05-13T10:00:00Z",
+    "registeredBy": "u-9f3e",
+    "deactivatedAt": null,
+    "deactivatedBy": null,
+    "deactivationReason": null,
+    "lastUsedAt": "2026-05-13T11:20:00Z",
+    "batteryLevel": 87,
+    "batteryReportedAt": "2026-05-13T11:20:00Z",
+    "deviceType": "SCALE2",
+    "deviceNumber": "FS2-001"
+  }
+}
+```
+
+**Errors** (`DeviceError`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 403 | `AUTH-403-002` | OrgRoleRequired |
+| 404 | `CMN-404-001` | DeviceNotInOrg |
+| 400 | `CMN-400-002` | FieldCannotBeCleared (alias 를 null 로 시도) |
 
 ---
 
@@ -1698,7 +2084,7 @@ device 비활성화 (status=INACTIVE).
 
 | Method | Path | 권한 | Idempotent | Versioned |
 |---|---|---|---|---|
-| POST | /api/v2/b2b/organizations/{orgId}/devices/{deviceId}/deactivate | OWNER · ADMIN | yes | no |
+| POST | /api/v2/b2b/organizations/{orgId}/devices/{deviceId}/deactivate | OWNER · ADMIN | yes | yes |
 
 **Path Parameters**
 
@@ -1717,7 +2103,14 @@ device 비활성화 (status=INACTIVE).
 { "reason": "수리 입고" }
 ```
 
-**Response — 200** — `DeviceResponse` (status=INACTIVE, deactivatedAt/deactivatedBy 채워짐, 2.29 schema 참조).
+**Response — 200** — `DeviceResponse` (status=INACTIVE, deactivatedAt/deactivatedBy 채워짐, 2.29 schema 참조). 헤더 `api-version: 1.0.1` 시 v1.0.1 응답 (`deviceType` + `deviceNumber` 추가).
+
+**Errors** (`DeviceError`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 403 | `AUTH-403-002` | OrgRoleRequired |
+| 404 | `CMN-404-001` | DeviceNotInOrg |
 
 ---
 
@@ -1765,7 +2158,7 @@ device 비활성화 (status=INACTIVE).
 
 | Method | Path | 권한 | Idempotent | Versioned |
 |---|---|---|---|---|
-| DELETE | /api/v2/b2b/organizations/{orgId}/devices/{deviceId} | OWNER · ADMIN | yes | no |
+| DELETE | /api/v2/b2b/organizations/{orgId}/devices/{deviceId} | OWNER · ADMIN | yes | yes |
 
 **Path Parameters**
 
@@ -1780,7 +2173,7 @@ device 비활성화 (status=INACTIVE).
 |---|---|---|---|
 | `reason` | string | no | audit (예. `lost` / `discarded` / `replaced`) |
 
-**Response — 200** — `DeviceResponse` (status=INACTIVE, deactivatedAt/deactivatedBy/deactivationReason 채워짐, batteryLevel 마지막 값 유지, 2.29 schema 참조).
+**Response — 200** — `DeviceResponse` (status=REVOKED, deactivatedAt/deactivatedBy/deactivationReason 채워짐, batteryLevel 마지막 값 유지, 2.29 schema 참조). 헤더 `api-version: 1.0.1` 시 v1.0.1 응답 (`deviceType` + `deviceNumber` 추가).
 
 **Idempotent**. 이미 REVOKED 인 device 에 다시 호출해도 200 + 같은 row 반환.
 
@@ -1936,6 +2329,13 @@ denormalized 요약 (measure-service `user_measurement_summary`).
 
 이력 없으면 `lastMeasuredAt` 외 모두 null/0.
 
+**Errors** (`MeasurementError`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 403 | `AUTH-403-002` | RoleRequired |
+| 404 | `CMN-404-001` | TargetNotActiveMember |
+
 ---
 
 ### 2.37 `POST /api/v2/b2b/feedbacks/memberships/{membershipId}`
@@ -2062,6 +2462,13 @@ soft 삭제 (deletedAt 채움).
 
 **Response — 200** — `FeedbackResponse` (deletedAt 채워진 상태로 echo, 2.37 schema 참조).
 
+**Errors** (`FeedbackError`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 404 | `CMN-404-001` | FeedbackNotFound |
+| 403 | `AUTH-403-002` | NotAuthor |
+
 ---
 
 ### 2.40 `GET /api/v2/b2b/feedbacks/memberships/{membershipId}`
@@ -2128,7 +2535,40 @@ soft 삭제 (deletedAt 채움).
 |---|---|---|
 | `recordId` | string (uuid) | measurement record PK |
 
-**Query / Response**. 2.40 와 동일 shape.
+**Query Parameters**
+
+| 이름 | 타입 | 필수 | 비고 |
+|---|---|---|---|
+| `page` | int | no | 기본 0 |
+| `size` | int | no | 기본 20 |
+
+**Response — 200**
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `items` | array<`FeedbackResponse`> | 2.37 schema 의 feedback 목록 |
+| `page` | integer | 현재 페이지 |
+| `totalElements` | integer | 전체 개수 |
+| `hasNext` | boolean | 다음 페이지 |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "items": [
+      { "id": "f-1234", "organizationId": "org-A",
+        "memberMembershipId": "m-7c1d", "authorUserId": "u-staff-1",
+        "measurementRecordId": "r-9e8d",
+        "body": "어깨 가동범위가 좋아졌습니다. 다음 주는 하체 위주로.",
+        "visibility": "MEMBER",
+        "createdAt": "2026-05-13T12:00:00Z", "editedAt": null }
+    ],
+    "page": 0,
+    "totalElements": 1,
+    "hasNext": false
+  }
+}
+```
 
 ---
 
