@@ -1,77 +1,35 @@
 # B2B Service API
 
 > 갱신. 2026-06-08
-> 스타일. OpenAPI 3.1 + 다이어그램 + 코드 체인 매핑 + 전체 요청/응답 샘플
 > Base path. `/api/v2/b2b/...`
-> 응답 envelope. [`CncResponse`](#71-cncresponse-envelope) (Pattern B)
-> 권한 매트릭스 (서비스 측). [`b2b-service/docs/authorization.md`](../../../b2b-service/docs/authorization.md)
-> 시나리오 (프론트엔드용). [`docs/scenarios/b2b-device-management.md`](../scenarios/b2b-device-management.md)
+> 응답 envelope. `CncResponse` (Pattern B)
 
 ---
 
+## 1. 목차
 
-## 3. Endpoint Catalog
+표기. 🔓 Public · 🔒 Auth · 👑 OWNER/ADMIN · 👥 OWNER/ADMIN/TRAINER · 🧍 self only.
 
-표기. 🔓 Public / 🔒 Auth / 👑 OWNER/ADMIN / 👥 OWNER/ADMIN/TRAINER / 🧍 self only.
+| 도메인          | endpoint 수 | 주요 권한       | 섹션                                          |
+|-----------------|-------------|-----------------|-----------------------------------------------|
+| Auth            | 5           | 🔓 / 🔒        | [§2.1 ~ §2.6](#21-post-apiv2b2bauthlogin)     |
+| User            | 5           | 🧍              | [§2.7 ~ §2.11](#27-post-apiv2b2busers)        |
+| Organization    | 5           | 🔓 / 🔒 / 👑   | [§2.12 ~ §2.16](#212-post-apiv2b2borganizations) |
+| Membership      | 7           | 🔓 / 👑         | [§2.18 ~ §2.24](#218-post-apiv2b2borganizationsorgidjoin-requests) |
+| Invite Code     | 4           | 🔓 / 🔒 / 👑   | [§2.25 ~ §2.28](#225-post-apiv2b2borganizationsorgidinvite-codes) |
+| Device          | 7           | 🔒 / 👑         | [§2.29 ~ §2.33.2](#229-post-apiv2b2borganizationsorgiddevices) |
+| Measurement     | 3           | 👥              | [§2.34 ~ §2.36](#234-get-apiv2b2borganizationsorgidmembersmemberidmeasurements) |
+| Feedback        | 5           | 🔒 / 👥 / 작성자 | [§2.37 ~ §2.41](#237-post-apiv2b2bfeedbacksmembershipsid) |
+| License         | 2           | 🔒              | [§2.42 ~ §2.43](#242-get-apiv2b2blicense-summary) |
+| Billing         | 3           | 👑              | [§2.44 ~ §2.46](#244-post-apiv2b2bbillingcheckout-init) |
 
-| # | Method | Path | 권한 | 코드 매핑 |
-|---|---|---|---|---|
-| 1 | POST | `/api/v2/b2b/auth/login` | 🔓 | [§4.1](#41-post-apiv2b2bauthlogin) |
-| 2 | POST | `/api/v2/b2b/auth/token` | 🔓 | [§4.2](#42-post-apiv2b2bauthtoken) |
-| 3 | POST | `/api/v2/b2b/auth/logout` | 🔒 | [§4.3](#43-post-apiv2b2bauthlogout) |
-| 4 | POST | `/api/v2/b2b/auth/oauth2/google` | 🔓 | [§4.5](#45-post-apiv2b2bauthoauth2google) |
-| 5 | POST | `/api/v2/b2b/auth/oauth2/apple` | 🔓 | [§4.6](#46-post-apiv2b2bauthoauth2apple) |
-| 6 | POST | `/api/v2/b2b/users` | 🔓 | [§4.7](#47-post-apiv2b2busers) |
-| 7 | GET | `/api/v2/b2b/users/{b2bUserId}` | 🧍 | [§4.8](#48-get-apiv2b2busersb2buserid) |
-| 8 | PATCH | `/api/v2/b2b/users/{b2bUserId}` | 🧍 | [§4.9](#49-patch-apiv2b2busersb2buserid) |
-| 9 | POST | `/api/v2/b2b/users/{b2bUserId}/password` | 🧍 | [§4.10](#410-post-apiv2b2busersb2buseridpassword) |
-| 10 | DELETE | `/api/v2/b2b/users/{b2bUserId}` | 🧍 | [§4.11](#411-delete-apiv2b2busersb2buserid) |
-| 11 | POST | `/api/v2/b2b/organizations` | 🔒 | [§4.12](#412-post-apiv2b2borganizations) |
-| 12 | GET | `/api/v2/b2b/organizations/{id}` | 🔓 | [§4.13](#413-get-apiv2b2borganizationsid) |
-| 13 | PATCH | `/api/v2/b2b/organizations/{id}` | 👑 | [§4.14](#414-patch-apiv2b2borganizationsid) |
-| 14 | DELETE | `/api/v2/b2b/organizations/{id}` | 👑 | [§4.15](#415-delete-apiv2b2borganizationsid) |
-| 15 | GET | `/api/v2/b2b/organizations/search` | 🔓 | [§4.16](#416-get-apiv2b2borganizationssearch) |
-| 16 | POST | `/api/v2/b2b/organizations/{orgId}/join-requests` | 🔓 | [§4.18](#418-post-apiv2b2borganizationsorgidjoin-requests) |
-| 17 | POST | `/api/v2/b2b/memberships/{id}/approve` | 👑 | [§4.19](#419-post-apiv2b2bmembershipsidapprove) |
-| 18 | POST | `/api/v2/b2b/memberships/{id}/reject` | 👑 | [§4.20](#420-post-apiv2b2bmembershipsidreject) |
-| 19 | POST | `/api/v2/b2b/memberships/{id}/suspend` | 👑 | [§4.21](#421-post-apiv2b2bmembershipsidsuspend) |
-| 20 | POST | `/api/v2/b2b/memberships/{id}/leave` | 🔓 | [§4.22](#422-post-apiv2b2bmembershipsidleave) |
-| 21 | POST | `/api/v2/b2b/organizations/{orgId}/staff` | 👑 | [§4.23](#423-post-apiv2b2borganizationsorgidstaff) |
-| 22 | GET | `/api/v2/b2b/organizations/{orgId}/members` | 👥 | [§4.24](#424-get-apiv2b2borganizationsorgidmembers) |
-| 23 | POST | `/api/v2/b2b/organizations/{orgId}/invite-codes` | 👑 | [§4.25](#425-post-apiv2b2borganizationsorgidinvite-codes) |
-| 24 | GET | `/api/v2/b2b/organizations/{orgId}/invite-codes` | 🔒 | [§4.26](#426-get-apiv2b2borganizationsorgidinvite-codes) |
-| 25 | POST | `/api/v2/b2b/invite-codes/{id}/revoke` | 👑 | [§4.27](#427-post-apiv2b2binvite-codesidrevoke) |
-| 26 | POST | `/api/v2/b2b/invite-codes/redeem` | 🔓 | [§4.28](#428-post-apiv2b2binvite-codesredeem) |
-| 27 | POST | `/api/v2/b2b/organizations/{orgId}/devices` | 👑 | [§4.29](#429-post-apiv2b2borganizationsorgiddevices) |
-| 28 | GET | `/api/v2/b2b/organizations/{orgId}/devices` | 🔒 | [§4.30](#430-get-apiv2b2borganizationsorgiddevices) |
-| 29 | GET | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}` | 🔒 | [§4.31](#431-get-apiv2b2borganizationsorgiddevicesdeviceid) |
-| 30 | PATCH | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}` | 👑 | [§4.32](#432-patch-apiv2b2borganizationsorgiddevicesdeviceid) |
-| 31 | POST | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}/deactivate` | 👑 | [§4.33](#433-post-apiv2b2borganizationsorgiddevicesdeviceiddeactivate) |
-| 31a | GET | `/api/v2/b2b/organizations/{orgId}/devices/preview?serial=...` | 👑 | [§4.33.1](#4331-get-devicespreview-new-in-0061) |
-| 31b | DELETE | `/api/v2/b2b/organizations/{orgId}/devices/{deviceId}?reason=...` | 👑 | [§4.33.2](#4332-delete-devicesdeviceid-new-in-0061) |
-| 32 | GET | `…/members/{memberId}/measurements` | 👥 | [§4.34](#434-get-apiv2b2borganizationsorgidmembersmemberidmeasurements) |
-| 33 | GET | `…/measurements/{recordId}` | 👥 | [§4.35](#435-get-apiv2b2borganizationsorgidmembersmemberidmeasurementsrecordid) |
-| 34 | GET | `…/measurements/summary` | 👥 | [§4.36](#436-get-apiv2b2borganizationsorgidmembersmemberidmeasurementssummary) |
-| 35 | POST | `/api/v2/b2b/feedbacks/memberships/{id}` | 👥 | [§4.37](#437-post-apiv2b2bfeedbacksmembershipsid) |
-| 36 | PATCH | `/api/v2/b2b/feedbacks/{id}` | 작성자 | [§4.38](#438-patch-apiv2b2bfeedbacksid) |
-| 37 | DELETE | `/api/v2/b2b/feedbacks/{id}` | 작성자 | [§4.39](#439-delete-apiv2b2bfeedbacksid) |
-| 38 | GET | `/api/v2/b2b/feedbacks/memberships/{id}` | 🔒 | [§4.40](#440-get-apiv2b2bfeedbacksmembershipsid) |
-| 39 | GET | `/api/v2/b2b/feedbacks/measurements/{recordId}` | 🔒 | [§4.41](#441-get-apiv2b2bfeedbacksmeasurementsrecordid) |
-| 40 | GET | `/api/v2/b2b/license-summary` | 🔒 | [§4.42](#442-get-apiv2b2blicense-summary) |
-| 41 | GET | `/api/v2/b2b/license-summary/{orgId}` | 🔒 | [§4.43](#443-get-apiv2b2blicense-summaryorgid) |
-| 42 | POST | `/api/v2/b2b/billing/checkout-init` | 👑 | [§4.44](#444-post-apiv2b2bbillingcheckout-init) |
-| 43 | POST | `/api/v2/b2b/billing/plan-change` | 👑 | [§4.45](#445-post-apiv2b2bbillingplan-change) |
-| 44 | GET | `/api/v2/b2b/billing/organizations/{orgId}/transactions` | 👑 | [§4.46](#446-get-apiv2b2bbillingorganizationsorgidtransactions) |
-
-전 응답은 [`CncResponse`](#71-cncresponse-envelope) envelope 으로 감싸진다. 본 문서의 응답 샘플은 envelope 전체를 보여 준다.
-
-> § 4.4 (`GET /auth/me`), § 4.17 (`GET /organizations/mine`) 은 코드에서 제거됨 — 표 번호는 코드 기준 44개. § 번호는 결번 (변경 추적 용이).
+총 46 endpoint. § 번호 결번 (§2.4 `GET /auth/me`, §2.17 `GET /organizations/mine`) 은 코드에서 제거된 슬롯 — 추적 편의상 유지.
 
 ---
 
-## 4. Endpoint Detail
+## 2. Endpoint Detail
 
-### 4.1 `POST /api/v2/b2b/auth/login`
+### 2.1 `POST /api/v2/b2b/auth/login`
 
 로그인. `X-Client-Type` 헤더로 web 세션 / 모바일 토큰 분기.
 
@@ -131,7 +89,7 @@
 
 ---
 
-### 4.2 `POST /api/v2/b2b/auth/token`
+### 2.2 `POST /api/v2/b2b/auth/token`
 
 refresh token rotation. 모바일에서 access token 만료 시 호출. family rotation — 같은 refresh 재사용 시 family 전체 폐기.
 
@@ -167,7 +125,7 @@ refresh token rotation. 모바일에서 access token 만료 시 호출. family r
 
 ---
 
-### 4.3 `POST /api/v2/b2b/auth/logout`
+### 2.3 `POST /api/v2/b2b/auth/logout`
 
 JTI revocation + (web 흐름) Session invalidate.
 
@@ -192,7 +150,7 @@ JTI revocation + (web 흐름) Session invalidate.
 
 ---
 
-### 4.5 `POST /api/v2/b2b/auth/oauth2/google`
+### 2.5 `POST /api/v2/b2b/auth/oauth2/google`
 
 Google ID 토큰 검증 후 가입/로그인 후 JWT 발급.
 
@@ -221,13 +179,13 @@ Google ID 토큰 검증 후 가입/로그인 후 JWT 발급.
 
 ---
 
-### 4.6 `POST /api/v2/b2b/auth/oauth2/apple`
+### 2.6 `POST /api/v2/b2b/auth/oauth2/apple`
 
-Apple ID 토큰 검증 후 가입/로그인 후 JWT 발급. 4.5 와 동일 shape, 검증 verifier 만 Apple JWKS.
+Apple ID 토큰 검증 후 가입/로그인 후 JWT 발급. §2.5 와 동일 shape, 검증 verifier 만 Apple JWKS.
 
 ---
 
-### 4.7 `POST /api/v2/b2b/users`
+### 2.7 `POST /api/v2/b2b/users`
 
 관리자 회원가입 (이메일 + 비밀번호 + 이름).
 
@@ -279,7 +237,7 @@ Apple ID 토큰 검증 후 가입/로그인 후 JWT 발급. 4.5 와 동일 shape
 
 ---
 
-### 4.8 `GET /api/v2/b2b/users/{b2bUserId}`
+### 2.8 `GET /api/v2/b2b/users/{b2bUserId}`
 
 본인 프로필 + 소속 organization (multi-org, license 포함).
 
@@ -347,7 +305,7 @@ UserController.get → ensureSelf(pathUserId, principal)
 
 ---
 
-### 4.9 `PATCH /api/v2/b2b/users/{b2bUserId}`
+### 2.9 `PATCH /api/v2/b2b/users/{b2bUserId}`
 
 프로필 부분 수정. JsonNullable 의 3-state semantics 사용.
 
@@ -381,7 +339,7 @@ UserController.get → ensureSelf(pathUserId, principal)
 
 ---
 
-### 4.10 `POST /api/v2/b2b/users/{b2bUserId}/password`
+### 2.10 `POST /api/v2/b2b/users/{b2bUserId}/password`
 
 비밀번호 변경. 변경 성공 시 모든 session/token 폐기.
 
@@ -408,7 +366,7 @@ UserController.get → ensureSelf(pathUserId, principal)
 
 ---
 
-### 4.11 `DELETE /api/v2/b2b/users/{b2bUserId}`
+### 2.11 `DELETE /api/v2/b2b/users/{b2bUserId}`
 
 soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive outbox 가 비동기로 Carenco Archive Collector 에 publish.
 
@@ -416,11 +374,11 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 
 **응답 — 204**.
 
-**에러**. 4.9 와 동일 (NotSelf / NotFound).
+**에러**. §2.9 와 동일 (NotSelf / NotFound).
 
 ---
 
-### 4.12 `POST /api/v2/b2b/organizations`
+### 2.12 `POST /api/v2/b2b/organizations`
 
 시설 등록. 호출한 b2b_user 가 OWNER 로 자동 멤버십 생성 (`joinedVia=OWNER_INIT`).
 
@@ -486,7 +444,7 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 
 ---
 
-### 4.13 `GET /api/v2/b2b/organizations/{id}`
+### 2.13 `GET /api/v2/b2b/organizations/{id}`
 
 단건 조회 (공개).
 
@@ -501,7 +459,7 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 
 ---
 
-### 4.14 `PATCH /api/v2/b2b/organizations/{id}`
+### 2.14 `PATCH /api/v2/b2b/organizations/{id}`
 
 부분 수정 (owner 만). JsonNullable 의 3-state semantics.
 
@@ -531,7 +489,7 @@ NotNullable. `name`, `type`, `searchable`, `inviteCodeEnabled`, `approvalRequire
 
 ---
 
-### 4.15 `DELETE /api/v2/b2b/organizations/{id}`
+### 2.15 `DELETE /api/v2/b2b/organizations/{id}`
 
 soft 삭제 (owner 만). `status=DELETED` + 모든 멤버십 LEFT + 모든 invite code REVOKED cascade. archive outbox 비동기 publish.
 
@@ -547,7 +505,7 @@ soft 삭제 (owner 만). `status=DELETED` + 모든 멤버십 LEFT + 모든 invit
 
 ---
 
-### 4.16 `GET /api/v2/b2b/organizations/search`
+### 2.16 `GET /api/v2/b2b/organizations/search`
 
 `searchable=true` + `status=ACTIVE` 시설 검색.
 
@@ -594,7 +552,7 @@ soft 삭제 (owner 만). `status=DELETED` + 모든 멤버십 LEFT + 모든 invit
 
 ---
 
-### 4.18 `POST /api/v2/b2b/organizations/{orgId}/join-requests`
+### 2.18 `POST /api/v2/b2b/organizations/{orgId}/join-requests`
 
 Carenco user 가 가입 신청. `searchable=true` 시설만 가능.
 
@@ -642,7 +600,7 @@ Carenco user 가 가입 신청. `searchable=true` 시설만 가능.
 
 ---
 
-### 4.19 `POST /api/v2/b2b/memberships/{membershipId}/approve`
+### 2.19 `POST /api/v2/b2b/memberships/{membershipId}/approve`
 
 PENDING → ACTIVE. 좌석 +1 + license guard.
 
@@ -697,7 +655,7 @@ MembershipController.approve → MembershipFlowService.approve
 
 ---
 
-### 4.20 `POST /api/v2/b2b/memberships/{membershipId}/reject`
+### 2.20 `POST /api/v2/b2b/memberships/{membershipId}/reject`
 
 PENDING → LEFT (좌석 차감 없음).
 
@@ -714,7 +672,7 @@ PENDING → LEFT (좌석 차감 없음).
 
 ---
 
-### 4.21 `POST /api/v2/b2b/memberships/{membershipId}/suspend`
+### 2.21 `POST /api/v2/b2b/memberships/{membershipId}/suspend`
 
 ACTIVE → SUSPENDED.
 
@@ -728,11 +686,11 @@ ACTIVE → SUSPENDED.
 
 **응답 — 200** — `MembershipResponse` (status=SUSPENDED).
 
-**에러**. 4.20 와 동일.
+**에러**. §2.20 와 동일.
 
 ---
 
-### 4.22 `POST /api/v2/b2b/memberships/{membershipId}/leave`
+### 2.22 `POST /api/v2/b2b/memberships/{membershipId}/leave`
 
 본인 탈퇴. body 의 `requesterId` 와 멤버십의 `memberId` 가 일치해야 함. 좌석 −1 + archive outbox publish.
 
@@ -754,7 +712,7 @@ ACTIVE → SUSPENDED.
 
 ---
 
-### 4.23 `POST /api/v2/b2b/organizations/{orgId}/staff`
+### 2.23 `POST /api/v2/b2b/organizations/{orgId}/staff`
 
 OWNER/ADMIN 이 기존 b2b_user 를 staff 로 지정. role 은 ADMIN 또는 TRAINER.
 
@@ -803,7 +761,7 @@ OWNER/ADMIN 이 기존 b2b_user 를 staff 로 지정. role 은 ADMIN 또는 TRAI
 
 ---
 
-### 4.24 `GET /api/v2/b2b/organizations/{orgId}/members`
+### 2.24 `GET /api/v2/b2b/organizations/{orgId}/members`
 
 회원 목록 (membership + user-service 정보 + measurement 요약). PDF 흐름 4.
 
@@ -868,7 +826,7 @@ OWNER/ADMIN 이 기존 b2b_user 를 staff 로 지정. role 은 ADMIN 또는 TRAI
 
 ---
 
-### 4.25 `POST /api/v2/b2b/organizations/{orgId}/invite-codes`
+### 2.25 `POST /api/v2/b2b/organizations/{orgId}/invite-codes`
 
 초대 코드 발급. 헷갈리는 문자 (0/O, 1/l/I) 회피 generator. TTL 48h.
 
@@ -913,7 +871,7 @@ OWNER/ADMIN 이 기존 b2b_user 를 staff 로 지정. role 은 ADMIN 또는 TRAI
 
 ---
 
-### 4.26 `GET /api/v2/b2b/organizations/{orgId}/invite-codes`
+### 2.26 `GET /api/v2/b2b/organizations/{orgId}/invite-codes`
 
 ACTIVE 코드 목록.
 
@@ -936,7 +894,7 @@ ACTIVE 코드 목록.
 
 ---
 
-### 4.27 `POST /api/v2/b2b/invite-codes/{inviteCodeId}/revoke`
+### 2.27 `POST /api/v2/b2b/invite-codes/{inviteCodeId}/revoke`
 
 수동 폐기 (ACTIVE → REVOKED).
 
@@ -952,7 +910,7 @@ ACTIVE 코드 목록.
 
 ---
 
-### 4.28 `POST /api/v2/b2b/invite-codes/redeem`
+### 2.28 `POST /api/v2/b2b/invite-codes/redeem`
 
 Carenco user 가 코드 입력하여 가입.
 
@@ -1011,7 +969,7 @@ InviteCodeController.redeem → InviteCodeService.redeem
 
 ---
 
-### 4.29 `POST /api/v2/b2b/organizations/{orgId}/devices`
+### 2.29 `POST /api/v2/b2b/organizations/{orgId}/devices`
 
 InBody 등 측정 device 등록. device-service gRPC 위임.
 
@@ -1055,7 +1013,7 @@ InBody 등 측정 device 등록. device-service gRPC 위임.
 
 ---
 
-### 4.30 `GET /api/v2/b2b/organizations/{orgId}/devices`
+### 2.30 `GET /api/v2/b2b/organizations/{orgId}/devices`
 
 device 목록.
 
@@ -1104,7 +1062,7 @@ device 목록.
 
 ---
 
-### 4.31 `GET /api/v2/b2b/organizations/{orgId}/devices/{deviceId}`
+### 2.31 `GET /api/v2/b2b/organizations/{orgId}/devices/{deviceId}`
 
 device 단건.
 
@@ -1119,7 +1077,7 @@ device 단건.
 
 ---
 
-### 4.32 `PATCH /api/v2/b2b/organizations/{orgId}/devices/{deviceId}`
+### 2.32 `PATCH /api/v2/b2b/organizations/{orgId}/devices/{deviceId}`
 
 alias 만 변경 가능. device-service gRPC 가 `alias=null` 을 "변경 없음" 으로 해석 → `null` 거부 (JsonNullableNonNull).
 
@@ -1135,7 +1093,7 @@ alias 만 변경 가능. device-service gRPC 가 `alias=null` 을 "변경 없음
 
 ---
 
-### 4.33 `POST /api/v2/b2b/organizations/{orgId}/devices/{deviceId}/deactivate`
+### 2.33 `POST /api/v2/b2b/organizations/{orgId}/devices/{deviceId}/deactivate`
 
 device 비활성화 (status=INACTIVE).
 
@@ -1151,7 +1109,7 @@ device 비활성화 (status=INACTIVE).
 
 ---
 
-### 4.33.1 `GET .../devices/preview` (0.0.61 신규)
+### 2.33.1 `GET .../devices/preview` (0.0.61 신규)
 
 시리얼만으로 풀 조회 — 등록 전 미리보기. claim 안 함, write 없음. UI 의 "기기 등록" 흐름에서 serial 입력 후 alias 입력 전 호출.
 
@@ -1178,9 +1136,9 @@ device 비활성화 (status=INACTIVE).
 
 ---
 
-### 4.33.2 `DELETE .../devices/{deviceId}` (0.0.61 신규)
+### 2.33.2 `DELETE .../devices/{deviceId}` (0.0.61 신규)
 
-영구 삭제 — `status=REVOKED` + 풀 row unclaim. 일시 정지 ([§4.33](#433-post-apiv2b2borganizationsorgiddevicesdeviceiddeactivate)) 와 다름. 같은 `(mac, serial)` 가 다른 organization 에 재등록 가능해짐.
+영구 삭제 — `status=REVOKED` + 풀 row unclaim. 일시 정지 ([§2.33](#233-post-apiv2b2borganizationsorgiddevicesdeviceiddeactivate)) 와 다름. 같은 `(mac, serial)` 가 다른 organization 에 재등록 가능해짐.
 
 **권한** 👑 (OWNER / ADMIN).
 
@@ -1200,7 +1158,7 @@ device 비활성화 (status=INACTIVE).
 
 ---
 
-### 4.34 `GET /api/v2/b2b/organizations/{orgId}/members/{memberId}/measurements`
+### 2.34 `GET /api/v2/b2b/organizations/{orgId}/members/{memberId}/measurements`
 
 회원 측정 이력 — measure-service gRPC.
 
@@ -1247,7 +1205,7 @@ device 비활성화 (status=INACTIVE).
 
 ---
 
-### 4.35 `GET /api/v2/b2b/organizations/{orgId}/members/{memberId}/measurements/{recordId}`
+### 2.35 `GET /api/v2/b2b/organizations/{orgId}/members/{memberId}/measurements/{recordId}`
 
 단건 측정.
 
@@ -1262,7 +1220,7 @@ device 비활성화 (status=INACTIVE).
 
 ---
 
-### 4.36 `GET /api/v2/b2b/organizations/{orgId}/members/{memberId}/measurements/summary`
+### 2.36 `GET /api/v2/b2b/organizations/{orgId}/members/{memberId}/measurements/summary`
 
 denormalized 요약 (measure-service `user_measurement_summary`).
 
@@ -1289,7 +1247,7 @@ denormalized 요약 (measure-service `user_measurement_summary`).
 
 ---
 
-### 4.37 `POST /api/v2/b2b/feedbacks/memberships/{membershipId}`
+### 2.37 `POST /api/v2/b2b/feedbacks/memberships/{membershipId}`
 
 피드백 작성 — TRAINER/ADMIN/OWNER 가 회원에 코멘트.
 
@@ -1335,7 +1293,7 @@ denormalized 요약 (measure-service `user_measurement_summary`).
 
 ---
 
-### 4.38 `PATCH /api/v2/b2b/feedbacks/{feedbackId}`
+### 2.38 `PATCH /api/v2/b2b/feedbacks/{feedbackId}`
 
 본문 수정 (작성자 본인만).
 
@@ -1357,7 +1315,7 @@ denormalized 요약 (measure-service `user_measurement_summary`).
 
 ---
 
-### 4.39 `DELETE /api/v2/b2b/feedbacks/{feedbackId}`
+### 2.39 `DELETE /api/v2/b2b/feedbacks/{feedbackId}`
 
 soft 삭제 (deletedAt 채움).
 
@@ -1367,7 +1325,7 @@ soft 삭제 (deletedAt 채움).
 
 ---
 
-### 4.40 `GET /api/v2/b2b/feedbacks/memberships/{membershipId}`
+### 2.40 `GET /api/v2/b2b/feedbacks/memberships/{membershipId}`
 
 회원 피드백 목록.
 
@@ -1397,17 +1355,17 @@ soft 삭제 (deletedAt 채움).
 
 ---
 
-### 4.41 `GET /api/v2/b2b/feedbacks/measurements/{recordId}`
+### 2.41 `GET /api/v2/b2b/feedbacks/measurements/{recordId}`
 
 특정 측정에 달린 피드백 목록 (회원이 본인 측정 결과를 볼 때).
 
 **권한** 🔒.
 
-**Query / Response**. 4.40 와 동일 shape.
+**Query / Response**. §2.40 와 동일 shape.
 
 ---
 
-### 4.42 `GET /api/v2/b2b/license-summary`
+### 2.42 `GET /api/v2/b2b/license-summary`
 
 본인 가입/소유 organization 들의 license + seat 요약 (한 번에).
 
@@ -1455,7 +1413,7 @@ soft 삭제 (deletedAt 채움).
 
 ---
 
-### 4.43 `GET /api/v2/b2b/license-summary/{organizationId}`
+### 2.43 `GET /api/v2/b2b/license-summary/{organizationId}`
 
 특정 organization 의 license 단건.
 
@@ -1471,7 +1429,7 @@ soft 삭제 (deletedAt 채움).
 
 ---
 
-### 4.44 `POST /api/v2/b2b/billing/checkout-init`
+### 2.44 `POST /api/v2/b2b/billing/checkout-init`
 
 결제 시작 진입점. b2b 가 권한 검증 후 payment-service 위임.
 
@@ -1530,7 +1488,7 @@ BillingController.checkoutInit → BillingService.initCheckout
 
 ---
 
-### 4.45 `POST /api/v2/b2b/billing/plan-change`
+### 2.45 `POST /api/v2/b2b/billing/plan-change`
 
 기존 구독의 plan 변경 (price 변경). b2b 가 OWNER 검증 후 payment-service REST 위임. Paddle PATCH 즉시 반영 + 후속 webhook 으로 DB 정합 확정.
 
@@ -1587,7 +1545,7 @@ BillingController.planChange → BillingService.changePlan
 
 ---
 
-### 4.46 `GET /api/v2/b2b/billing/organizations/{organizationId}/transactions`
+### 2.46 `GET /api/v2/b2b/billing/organizations/{organizationId}/transactions`
 
 organization 의 결제 transaction 이력. payment-service REST 응답을 그대로 echo.
 
@@ -1671,304 +1629,3 @@ BillingController.listTransactions → BillingService.listTransactions
   ├─ owner 검증
   └─ PaymentClient.listTransactions(organizationId) (HTTP → payment-service)
 ```
-
-## 7. Schemas
-
-### 7.1 CncResponse envelope
-
-```json
-{
-  "success": boolean,
-  "code": "string (예: 200, CMN-404-001)",
-  "message": "string (i18n resolved)",
-  "data": <any>,
-  "error": "string? (failure 시 description)",
-  "token": "string? (TokenPair 등 일부 응답)"
-}
-```
-
-성공 시 `success=true, code="200"|"201"|"204", data=<payload>`. 실패 시 `success=false, code=<ErrorCode.getCode()>, message=<i18n>, error=<description>`.
-
-### 7.2 TokenPair
-
-```json
-{ "userId": "u-...", "accessToken": "...", "refreshToken": "..." }
-```
-
-### 7.3 UserResponse
-
-```json
-{
-  "id": "u-...",
-  "email": "...",
-  "firstName": "...",
-  "lastName": "...",
-  "phoneNumber": "...",
-  "country": "KR",
-  "profileImageUrl": "...?",
-  "accountStatus": "ACTIVE|SUSPENDED|BANNED|DELETION_PENDING|DELETED",
-  "lastLoginTime": "...?",
-  "createdAt": "...",
-  "organizations": [
-    { "id": "...", "name": "...", "type": "PILATES",
-      "role": "OWNER|ADMIN|TRAINER|MEMBER",
-      "seatsUsed": 12, "planSeats": 50,
-      "licenseState": "ACTIVE|GRACE|EXPIRED|SUSPENDED|NONE" }
-  ]
-}
-```
-
-### 7.4 OrganizationResponse
-
-```json
-{
-  "id": "...", "name": "...",
-  "type": "GYM|PILATES|YOGA|PT_STUDIO|CROSSFIT|FUNCTIONAL|BOXING|ETC",
-  "description": "...?",
-  "phoneNumber": "...?",
-  "photoUrl": "...?",
-  "address": {
-    "country": "KR", "postalCode": "...",
-    "regionLevel1": "...", "regionLevel2": "...",
-    "addressLine1": "...", "addressLine2": "..."
-  },
-  "ownerUserId": "...",
-  "searchable": true,
-  "inviteCodeEnabled": true,
-  "approvalRequired": true,
-  "seatsUsed": 12,
-  "status": "ACTIVE|SUSPENDED|DELETED"
-}
-```
-
-### 7.5 MembershipResponse
-
-```json
-{
-  "id": "...",
-  "organizationId": "...",
-  "memberType": "B2B|CARENCO",
-  "memberId": "...",
-  "role": "OWNER|ADMIN|TRAINER|MEMBER",
-  "status": "PENDING|ACTIVE|SUSPENDED|LEFT",
-  "memberNumber": "M260608-001?",
-  "joinedVia": "OWNER_INIT|SEARCH_REQUEST|INVITE_CODE|DIRECT_INVITE",
-  "inviteCodeId": "...?",
-  "approvedBy": "...?",
-  "approvedAt": "...?",
-  "joinedAt": "...?",
-  "leftAt": "...?",
-  "note": "...?"
-}
-```
-
-**`memberNumber` 형식 (V16, 2026-06-08).** `{RolePrefix}{yyMMdd}-{NNN}` — role prefix `O`(OWNER) / `A`(ADMIN) / `T`(TRAINER) / `M`(MEMBER) + 가입일 6자리 + role 별 같은 날 순번. 예. `M260608-001` = 2026-06-08 의 첫 MEMBER 가입.
-
-### 7.6 InviteCodeResponse
-
-```json
-{
-  "id": "...",
-  "organizationId": "...",
-  "code": "Hk7mPqR3",
-  "description": "...?",
-  "expiresAt": "...",
-  "usedAt": "...?",
-  "status": "ACTIVE|USED|EXPIRED|REVOKED",
-  "createdBy": "..."
-}
-```
-
-### 7.7 MemberListItemResponse
-
-```json
-{
-  "membershipId": "...", "memberId": "...", "memberNumber": "...?",
-  "role": "MEMBER", "status": "ACTIVE", "joinedAt": "...",
-
-  "name": "...?", "nickname": "...?", "email": "...?",
-  "phoneNumber": "...?", "photoUrl": "...?",
-  "birthdate": "1990-01-01?", "gender": "FEMALE|MALE|OTHER?",
-  "countryCode": "KR?", "height": 165.0,
-
-  "totalMeasurements": 12, "currentMonthMeasurements": 3,
-  "lastMeasuredAt": "...?", "lastWeight": 54.2, "lastBodyScore": 78.5
-}
-```
-
-user-service / measure-service 다운 시 user/measurement 필드 모두 null.
-
-### 7.8 DeviceResponse (v1.0.0 / v1.0.1)
-
-기본 응답 = **v1.0.0** (`DeviceResponse`). header `api-version: 1.0.1` 로 호출 시 **v1.0.1** (`DeviceResponseV1_0_1`) 반환 — v1.0.0 의 모든 필드 + `deviceType` (0.0.63) + `deviceNumber` (0.0.73).
-
-**v1.0.0**
-```json
-{
-  "deviceId": "...", "organizationId": "...",
-  "serialNumber": "...", "alias": "...?",
-  "status": "ACTIVE|INACTIVE",
-  "registeredAt": "...", "registeredBy": "...",
-  "deactivatedAt": "...?", "deactivatedBy": "...?", "deactivationReason": "...?",
-  "lastUsedAt": "...?",
-  "batteryLevel": 87, "batteryReportedAt": "...?"
-}
-```
-
-**v1.0.1** (header `api-version: 1.0.1`)
-```json
-{
-  "deviceId": "...", "organizationId": "...",
-  "serialNumber": "...", "alias": "...?",
-  "status": "ACTIVE|INACTIVE",
-  "registeredAt": "...", "registeredBy": "...",
-  "deactivatedAt": "...?", "deactivatedBy": "...?", "deactivationReason": "...?",
-  "lastUsedAt": "...?",
-  "batteryLevel": 87, "batteryReportedAt": "...?",
-  "deviceType": "SCALE2",
-  "deviceNumber": "FS2-001?"
-}
-```
-
-`deviceNumber` 형식. `{TypePrefix}-{NNN}` — `FS2`(SCALE2) / `FZ`(SCALE_PUZZLE) + owner 별 type 별 누적 순번 (예. 같은 조직의 두 번째 SCALE2 → `FS2-002`). 미부여 = null.
-
-### 7.9 MeasurementInfo
-
-```json
-{
-  "recordId": "...", "userId": "...",
-  "measuredAt": "...",
-  "weight": 54.2, "height": 165.0, "age": 29,
-  "bodyScore": 78.5, "predictedAge": 27.0,
-  "deviceId": "...?"
-}
-```
-
-### 7.10 MeasurementSummary
-
-```json
-{
-  "userId": "...",
-  "totalRecords": 12,
-  "currentMonthRecords": 3,
-  "lastMeasuredAt": "...?",
-  "lastBodyScore": 78.5,
-  "lastWeight": 54.2,
-  "lastPredictedAge": 27.0
-}
-```
-
-### 7.11 FeedbackResponse
-
-```json
-{
-  "id": "...", "organizationId": "...",
-  "memberMembershipId": "...", "authorUserId": "...",
-  "measurementRecordId": "...?",
-  "body": "...",
-  "visibility": "MEMBER|INTERNAL",
-  "createdAt": "...", "editedAt": "...?"
-}
-```
-
-### 7.12 LicenseSummaryResponse
-
-```json
-{
-  "organizationId": "...",
-  "organizationName": "...",
-  "state": "ACTIVE|GRACE|EXPIRED|SUSPENDED|NONE",
-  "planCode": "...?",
-  "planSeats": 50,
-  "seatsUsed": 12,
-  "seatsRemaining": 38,
-  "startedAt": "...?",
-  "expiresAt": "...?",
-  "graceRemainingDays": 0,
-  "graceRemainingSeconds": 0,
-  "subscriptionId": "...?"
-}
-```
-
-`state=NONE` 시 `planCode`, `planSeats`, `seatsRemaining`, `subscriptionId` 모두 null. seatsUsed 는 organization master.
-`graceRemainingDays` 는 일 단위 (0~7), `graceRemainingSeconds` 는 동일 잔여 시간의 초 단위 정밀값 (UI 가 시간/분 단위 카운트다운 표시용). `GRACE` 외 상태에서는 둘 다 0.
-
-### 7.13 PaymentCheckoutLinkResponse
-
-```json
-{
-  "items": [{ "priceId": "pri_xxx", "quantity": 1 }],
-  "customer": { "email": "...", "name": "..." },
-  "customData": { "organization_id": "..." },
-  "plan": {
-    "planCode": "...", "planSeats": 50,
-    "displayName": "...", "amount": 99000, "currency": "KRW"
-  },
-  "paddleCustomerId": "ctm_xxx?"
-}
-```
-
-### 7.14 PaymentPlanChangeResponse
-
-```json
-{
-  "paddleSubscriptionId": "sub_xxx",
-  "newPriceId": "pri_...",
-  "newPlanCode": "PILATES_PRO",
-  "newPlanSeats": 100,
-  "newBillingInterval": "month|year",
-  "prorationMode": "prorated_immediately|do_not_prorate|...",
-  "status": "active|trialing|past_due|..."
-}
-```
-
-### 7.15 PaymentTransactionView
-
-payment-service 의 transaction 응답을 b2b 가 그대로 echo. 필드 의미는 Paddle Transaction 객체와 동일.
-
-```json
-{
-  "id": "...",
-  "paddleTransactionId": "txn_xxx",
-  "customerId": "ctm_xxx",
-  "subscriptionId": "sub_xxx?",
-  "status": "completed|paid|past_due|...",
-  "currencyCode": "KRW|USD|...",
-  "subtotal": 99000,
-  "discountTotal": 0,
-  "taxTotal": 9900,
-  "totalAmount": 108900,
-  "billingPeriodStartsAt": "...?",
-  "billingPeriodEndsAt": "...?",
-  "billingCountryCode": "KR?",
-  "billingPostalCode": "...?",
-  "billingRegion": "...?",
-  "billingCity": "...?",
-  "billingAddressLine": "...?",
-  "items": [
-    {
-      "id": "...", "paddleItemId": "...",
-      "priceId": "...", "productId": "...",
-      "productName": "...", "productDescription": "...?",
-      "quantity": 1, "unitPrice": 99000,
-      "subtotal": 99000, "discountAmount": 0,
-      "taxAmount": 9900, "total": 108900,
-      "taxRate": "0.10"
-    }
-  ],
-  "payments": [
-    {
-      "id": "...", "amount": 108900,
-      "status": "captured|failed|...",
-      "paymentType": "card|...",
-      "cardType": "visa|master|...?",
-      "cardLast4": "4242?",
-      "cardExpiryMonth": 12, "cardExpiryYear": 2028,
-      "cardholderName": "...?",
-      "capturedAt": "...?"
-    }
-  ],
-  "createdAt": "..."
-}
-```
-
