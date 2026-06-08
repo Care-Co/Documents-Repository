@@ -1,6 +1,6 @@
 # B2B Service API
 
-> 갱신. 2026-06-01
+> 갱신. 2026-06-08
 > 스타일. OpenAPI 3.1 + 다이어그램 + 코드 체인 매핑 + 전체 요청/응답 샘플
 > Base path. `/api/v2/b2b/...`
 > 응답 envelope. [`CncResponse`](#71-cncresponse-envelope) (Pattern B)
@@ -838,7 +838,7 @@ PENDING → ACTIVE. 좌석 +1 + license guard.
     "memberId": "carenco-user-uuid",
     "role": "MEMBER",
     "status": "ACTIVE",
-    "memberNumber": "M-001",
+    "memberNumber": "M260608-001",
     "joinedVia": "SEARCH_REQUEST",
     "approvedBy": "u-9f3e",
     "approvedAt": "2026-05-13T09:10:00Z",
@@ -944,7 +944,7 @@ OWNER/ADMIN 이 기존 b2b_user 를 staff 로 지정. role 은 ADMIN 또는 TRAI
 {
   "b2bUserId": "u-staff-1",
   "role": "TRAINER",
-  "memberNumber": "T-001"
+  "memberNumber": "T260608-001"
 }
 ```
 
@@ -960,7 +960,7 @@ OWNER/ADMIN 이 기존 b2b_user 를 staff 로 지정. role 은 ADMIN 또는 TRAI
     "memberId": "u-staff-1",
     "role": "TRAINER",
     "status": "ACTIVE",
-    "memberNumber": "T-001",
+    "memberNumber": "T260608-001",
     "joinedVia": "DIRECT_INVITE",
     "inviteCodeId": null,
     "approvedBy": "u-9f3e",
@@ -1009,7 +1009,7 @@ OWNER/ADMIN 이 기존 b2b_user 를 staff 로 지정. role 은 ADMIN 또는 TRAI
       {
         "membershipId": "m-7c1d",
         "memberId": "carenco-user-uuid",
-        "memberNumber": "M-001",
+        "memberNumber": "M260608-001",
         "role": "MEMBER",
         "status": "ACTIVE",
         "joinedAt": "2026-05-13T09:10:00Z",
@@ -1976,7 +1976,7 @@ flowchart TD
   "memberId": "...",
   "role": "OWNER|ADMIN|TRAINER|MEMBER",
   "status": "PENDING|ACTIVE|SUSPENDED|LEFT",
-  "memberNumber": "...?",
+  "memberNumber": "M260608-001?",
   "joinedVia": "OWNER_INIT|SEARCH_REQUEST|INVITE_CODE|DIRECT_INVITE",
   "inviteCodeId": "...?",
   "approvedBy": "...?",
@@ -1986,6 +1986,8 @@ flowchart TD
   "note": "...?"
 }
 ```
+
+**`memberNumber` 형식 (V16, 2026-06-08).** `{RolePrefix}{yyMMdd}-{NNN}` — role prefix `O`(OWNER) / `A`(ADMIN) / `T`(TRAINER) / `M`(MEMBER) + 가입일 6자리 + role 별 같은 날 순번. 예. `M260608-001` = 2026-06-08 의 첫 MEMBER 가입.
 
 ### 7.6 InviteCodeResponse
 
@@ -2021,8 +2023,11 @@ flowchart TD
 
 user-service / measure-service 다운 시 user/measurement 필드 모두 null.
 
-### 7.8 DeviceResponse
+### 7.8 DeviceResponse (v1.0.0 / v1.0.1)
 
+기본 응답 = **v1.0.0** (`DeviceResponse`). header `api-version: 1.0.1` 로 호출 시 **v1.0.1** (`DeviceResponseV1_0_1`) 반환 — v1.0.0 의 모든 필드 + `deviceType` (0.0.63) + `deviceNumber` (0.0.73).
+
+**v1.0.0**
 ```json
 {
   "deviceId": "...", "organizationId": "...",
@@ -2030,9 +2035,27 @@ user-service / measure-service 다운 시 user/measurement 필드 모두 null.
   "status": "ACTIVE|INACTIVE",
   "registeredAt": "...", "registeredBy": "...",
   "deactivatedAt": "...?", "deactivatedBy": "...?", "deactivationReason": "...?",
-  "lastUsedAt": "...?"
+  "lastUsedAt": "...?",
+  "batteryLevel": 87, "batteryReportedAt": "...?"
 }
 ```
+
+**v1.0.1** (header `api-version: 1.0.1`)
+```json
+{
+  "deviceId": "...", "organizationId": "...",
+  "serialNumber": "...", "alias": "...?",
+  "status": "ACTIVE|INACTIVE",
+  "registeredAt": "...", "registeredBy": "...",
+  "deactivatedAt": "...?", "deactivatedBy": "...?", "deactivationReason": "...?",
+  "lastUsedAt": "...?",
+  "batteryLevel": 87, "batteryReportedAt": "...?",
+  "deviceType": "SCALE2",
+  "deviceNumber": "FS2-001?"
+}
+```
+
+`deviceNumber` 형식. `{TypePrefix}-{NNN}` — `FS2`(SCALE2) / `FZ`(SCALE_PUZZLE) + owner 별 type 별 누적 순번 (예. 같은 조직의 두 번째 SCALE2 → `FS2-002`). 미부여 = null.
 
 ### 7.9 MeasurementInfo
 

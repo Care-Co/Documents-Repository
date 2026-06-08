@@ -1,6 +1,6 @@
 # Care&Co Workspace API Index
 
-Updated: 2026-05-14
+Updated: 2026-06-08
 Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 
 ## Documentation Standard
@@ -19,7 +19,7 @@ Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 | Doc | Routes | Versioning | Notes |
 |---|---|---|---|
 | [user-service](./user-service.md) | 48 endpoints (auth + user + admin + public + audit) | header `api-version: 1.0.0` | OAuth2 controller deprecated |
-| [b2b-service](./b2b-service.md) | ~40 endpoints (auth + user + organization + membership + invite + device + measurement + feedback + license + billing) | unversioned | 별도 user pool (b2b_users), 다이어그램 + cross-MSA 흐름 + 코드 매핑 포함 |
+| [b2b-service](./b2b-service.md) | ~40 endpoints (auth + user + organization + membership + invite + device + measurement + feedback + license + billing) | mostly unversioned, device 응답 `api-version: 1.0.0` / `1.0.1` (deviceType 0.0.63 + deviceNumber 0.0.73) | 별도 user pool (b2b_users), 다이어그램 + cross-MSA 흐름 + 코드 매핑 포함. memberNumber `M260608-001` 형식 (V16) |
 | [measure-service](./measure-service.md) | 8 endpoints (record + activity + internal sync) | `api-version: 1.0.0` / `1.0.1` (POST records) | record DTO `2026-01-13` (V9: `deviceId` / `deviceSerial` / `source` / `appVersion` 노출), activity DTO `2026-02-02` |
 | [noti-service](./noti-service.md) | 12 endpoints (FCM + device + topic + history) | `api-version: 1.0.0` | async job pattern |
 | [storage-service](./storage-service.md) | 9 endpoints (v1 deprecated + v2 current) | `api-version: 1.0.0` | v1 sunset 2026-12-31 |
@@ -28,7 +28,7 @@ Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 | [graph-service](./graph-service.md) | 7 endpoints (shoe recommendation + catalog) | `api-version: 1.0.0` | in-memory `shoes.json` |
 | [payment-service](./payment-service.md) | 17 REST + 1 webhook | unversioned | Paddle Billing v2 |
 | [ML-service](./ml-service.md) | 6 routes (footprint + pose + measurement) | `api-version: 1.0.0` (reserved, not branched) | Flask blueprints |
-| [device-service](./device-service.md) | 18 REST + 4 gRPC | `api-version: 1.0.0` (proto v0.0.62) | 출고 풀 / owner 별 등록 / measure MAC lookup / B2B 자산 + 등록 preview / 탈퇴 worker 일괄 unregister / battery+firmware metrics / OTA |
+| [device-service](./device-service.md) | 18 REST + 4 gRPC | `api-version: 1.0.0` (proto v0.0.73) | 출고 풀 / owner 별 등록 / measure MAC lookup / B2B 자산 + 등록 preview / 탈퇴 worker 일괄 unregister / battery+firmware metrics / OTA / deviceNumber `FS2-001` (V15) |
 
 ## Repositories Without API Controllers
 
