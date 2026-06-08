@@ -86,6 +86,32 @@ Send a user message; returns the agent reply (synchronously runs the OpenAI chat
 }
 ```
 
+#### 429 — example
+
+> 응답 shape 은 Spring 의 default `ProblemDetail` (RFC 7807) — agent-service 에 별도 `@ControllerAdvice` 없이 `ResponseStatusException` 만 던지기 때문. 문서 매트릭스의 `ErrorResponse` 표기는 doc 의 legacy — 실제는 아래.
+
+```json
+{
+  "type": "about:blank",
+  "title": "Too Many Requests",
+  "status": 429,
+  "detail": "Daily chat request limit exceeded",
+  "instance": "/llm/chat"
+}
+```
+
+#### 404 — example
+
+```json
+{
+  "type": "about:blank",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "Fisica user not found",
+  "instance": "/llm/chat"
+}
+```
+
 ---
 
 ## `POST` /llm/chat/greeting

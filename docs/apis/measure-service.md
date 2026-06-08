@@ -212,6 +212,30 @@ Paginated record search. `api-version` 헤더에 따라 응답 DTO 분기 (v1.0.
 | **200** (v1.0.0) | `application/json` | `Envelope` with `data:` `Page<`[`RecordV1_0_0`](#recordv1_0_0)`>` |
 | **200** (v1.0.1) | `application/json` | `Envelope` with `data:` `Page<`[`RecordV1_0_1`](#recordv1_0_1)`>` |
 
+#### 200 — example (v1.0.1)
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": [
+      {
+        "id": "uuid", "userId": "uuid",
+        "measuredDateTime": "2026-05-29T01:23:45Z", "timezone": "Asia/Seoul",
+        "footprint": { "weight": 70.5, "height": 175.0, "age": 34 },
+        "front": { "type": "POSE" }, "side": { "type": "POSE" },
+        "score": { "bodyScore": 80.0, "predictedAge": 30.0 },
+        "deviceId": "dev-uuid", "deviceSerial": "HW-SN-001234",
+        "source": "SELF", "appVersion": "ios-2.3.1"
+      }
+    ],
+    "totalElements": 47, "totalPages": 5, "number": 0, "size": 10
+  }
+}
+```
+
+> v1.0.0 응답은 `deviceId` / `deviceSerial` / `source` / `appVersion` 미노출 — 그 외 동일.
+
 ---
 
 ## `GET` /api/v2/users/{userId}/records/{recordId}
