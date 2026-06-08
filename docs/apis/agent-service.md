@@ -63,10 +63,10 @@ Send a user message; returns the agent reply (synchronously runs the OpenAI chat
 | Status | Description | Content-Type | Schema |
 |---|---|---|---|
 | **200** | OK | `application/json` | [`CncResponse_AgentJobResponse`](#cncresponse_agentjobresponse) |
-| **400** | Validation failed (`user_id` / `user_msg` blank) | `application/json` | [`ErrorResponse`](#errorresponse) |
-| **404** | `user_id` not found in user-service (`Fisica user not found`) | `application/json` | [`ErrorResponse`](#errorresponse) |
-| **429** | Daily chat request limit exceeded (15 / day, Asia/Seoul) | `application/json` | [`ErrorResponse`](#errorresponse) |
-| **502** | User-service lookup failure or external LLM/MCP error | `application/json` | [`ErrorResponse`](#errorresponse) |
+| **400** | Validation failed (`user_id` / `user_msg` blank) | `application/problem+json` | [`ProblemDetail`](#problemdetail) |
+| **404** | `user_id` not found in user-service (`Fisica user not found`) | `application/problem+json` | [`ProblemDetail`](#problemdetail) |
+| **429** | Daily chat request limit exceeded (15 / day, Asia/Seoul) | `application/problem+json` | [`ProblemDetail`](#problemdetail) |
+| **502** | User-service lookup failure or external LLM/MCP error | `application/problem+json` | [`ProblemDetail`](#problemdetail) |
 
 #### 200 — example
 
@@ -87,8 +87,6 @@ Send a user message; returns the agent reply (synchronously runs the OpenAI chat
 ```
 
 #### 429 — example
-
-> 응답 shape 은 Spring 의 default `ProblemDetail` (RFC 7807) — agent-service 에 별도 `@ControllerAdvice` 없이 `ResponseStatusException` 만 던지기 때문. 문서 매트릭스의 `ErrorResponse` 표기는 doc 의 legacy — 실제는 아래.
 
 ```json
 {
@@ -143,8 +141,8 @@ Open a session with an agent greeting. `directives` is ignored. Note: the contro
 | Status | Description | Content-Type | Schema |
 |---|---|---|---|
 | **200** | OK | `application/json` | [`CncResponse_AgentJobResponse`](#cncresponse_agentjobresponse) |
-| **404** | `user_id` not found in user-service (`Fisica user not found`) | `application/json` | [`ErrorResponse`](#errorresponse) |
-| **502** | User-service lookup failure | `application/json` | [`ErrorResponse`](#errorresponse) |
+| **404** | `user_id` not found in user-service (`Fisica user not found`) | `application/problem+json` | [`ProblemDetail`](#problemdetail) |
+| **502** | User-service lookup failure | `application/problem+json` | [`ProblemDetail`](#problemdetail) |
 
 #### 200 — example
 
@@ -207,14 +205,17 @@ Open a session with an agent greeting. `directives` is ignored. Note: the contro
 | `processingTime` | number (double) | no | `processing_time` | Seconds. |
 | `clientActions` | array<object> | no | `client_actions` | UI actions. |
 
-### `ErrorResponse`
+### `ProblemDetail`
+
+RFC 7807. agent-service 는 `ResponseStatusException` 만 던지고 별도 `@ControllerAdvice` 가 없어 Spring 의 default `ProblemDetail` 매핑이 그대로 응답. content-type `application/problem+json`.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `success` | boolean | yes | Always `false`. |
-| `code` | string | yes | Error code. |
-| `message` | string | yes | Human-readable. |
-| `timestamp` | string (date-time, UTC) | yes | — |
+| `type` | string (URI) | yes | `about:blank` default — 별도 problem type URI 안 씀. |
+| `title` | string | yes | HTTP status reason (`Bad Request` / `Not Found` / `Too Many Requests` / `Bad Gateway` 등). |
+| `status` | integer | yes | HTTP status code. |
+| `detail` | string | yes | `ResponseStatusException` 의 reason 문자열 (`Fisica user not found`, `Daily chat request limit exceeded` 등). |
+| `instance` | string | yes | 요청 URI (`/llm/chat`, `/llm/chat/greeting`). |
 
 ---
 
