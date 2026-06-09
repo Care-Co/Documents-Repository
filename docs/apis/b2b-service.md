@@ -646,15 +646,15 @@ retry 정책. exponential backoff (5s × 2^n, max 1h), MAX_RETRY=10 회 후 FAIL
 | `description` | string | no | 시설 소개 |
 | `phoneNumber` | string | no | E.164 |
 | `photoUrl` | string | no | URL |
-| `country` | string | yes | ValidCountryCode (ISO-3166 alpha-2) |
+| `country` | string | no | ValidCountryCode (ISO-3166 alpha-2). v1.0.0 default null |
 | `postalCode` | string | no | 우편번호 |
 | `regionLevel1` | string | no | 시/도 |
 | `regionLevel2` | string | no | 구/군 |
 | `addressLine1` | string | no | 도로명 주소 |
 | `addressLine2` | string | no | 상세 주소 |
-| `searchable` | boolean | yes | 시설 검색 노출 여부 |
-| `inviteCodeEnabled` | boolean | yes | 초대 코드 발급 가능 여부 |
-| `approvalRequired` | boolean | yes | join request 승인 필요 여부 |
+| `searchable` | boolean | no | 시설 검색 노출 여부. service 가 null → default true |
+| `inviteCodeEnabled` | boolean | no | 초대 코드 발급 가능 여부. service 가 null → default true |
+| `approvalRequired` | boolean | no | join request 승인 필요 여부. service 가 null → default true |
 
 ```json
 {
@@ -693,9 +693,9 @@ v1.0.0 의 모든 필드 + `businessRegistrationNumber` 필수 (0.0.64 신규). 
 | `addressLine1` | string | no | ≤ 255 |
 | `addressLine2` | string | no | ≤ 255 |
 | `businessRegistrationNumber` | string | **yes** | `@NotBlank`, ≤ 40, country 별 정규식 (0.0.64 신규) |
-| `searchable` | boolean | no | 검색 노출 (default false) |
-| `inviteCodeEnabled` | boolean | no | 초대 코드 발급 (default false) |
-| `approvalRequired` | boolean | no | 가입 승인 (default false) |
+| `searchable` | boolean | no | 검색 노출. service 가 null → default true |
+| `inviteCodeEnabled` | boolean | no | 초대 코드 발급. service 가 null → default true |
+| `approvalRequired` | boolean | no | 가입 승인. service 가 null → default true |
 
 ```json
 {
@@ -815,7 +815,7 @@ v1.0.0 의 모든 필드 + `businessRegistrationNumber` (0.0.64) + `stats` (0.0.
 | HTTP | 코드 | 케이스 |
 |---|---|---|
 | 400 | `CMN-400-001` | InvalidInput |
-| 400 | `CMN-400-002` | InvalidBusinessRegistrationNumber (v1.0.1, country 별 정규식 위반) |
+| 400 | `CMN-400-001` | InvalidInput (v1.0.1 의 country 별 정규식 위반 포함 — `OrganizationError.InvalidInput`) |
 
 ---
 
@@ -1142,7 +1142,7 @@ Carenco user 가 가입 신청. `searchable=true` 시설만 가능.
 |---|---|---|
 | 404 | `CMN-404-001` | OrganizationNotFound |
 | 403 | `AUTH-403-001` | OrganizationNotSearchable |
-| 409 | `CMN-409-001` | AlreadyMember |
+| 409 | `INV-409-002` | AlreadyMember (`ALREADY_CONNECTED`) |
 
 ---
 
@@ -1191,7 +1191,7 @@ PENDING → ACTIVE. 좌석 +1 + license guard.
 | 404 | `CMN-404-001` | MembershipNotFound |
 | 403 | `AUTH-403-002` | NotOwnerOrAdmin |
 | 409 | `CMN-409-001` | InvalidStateTransition |
-| 409 | `CMN-409-001` | AlreadyMember |
+| 409 | `INV-409-002` | AlreadyMember (`ALREADY_CONNECTED`) |
 | 403 | `LIC-403-001` | SeatConsumeFailed (NO_SEATS_REMAINING — license SUSPENDED / 만석) |
 
 **연쇄 호출**
@@ -1367,7 +1367,7 @@ OWNER/ADMIN 이 기존 b2b_user 를 staff 로 지정. role 은 ADMIN 또는 TRAI
 |---|---|---|
 | 403 | `AUTH-403-002` | NotOwnerOrAdmin |
 | 400 | `CMN-400-001` | InvalidRoleAssignment (OWNER 부여 시도 등) |
-| 409 | `CMN-409-001` | AlreadyMember |
+| 409 | `INV-409-002` | AlreadyMember (`ALREADY_CONNECTED`) |
 
 ---
 
@@ -1660,7 +1660,7 @@ Carenco user 가 코드 입력하여 가입.
 | 404 | `CMN-404-001` | InviteCodeNotFound |
 | 410 | `INV-410-001` | InviteCodeExpired |
 | 409 | `INV-409-001` | InviteCodeNotActive (USED / REVOKED) |
-| 409 | `CMN-409-002` | AlreadyMember |
+| 409 | `INV-409-002` | AlreadyMember (`ALREADY_CONNECTED`) |
 | 403 | `LIC-403-001` | LicenseBlocked (SeatsExhausted 포함) |
 
 **연쇄 호출**
@@ -1702,7 +1702,7 @@ InBody 등 측정 device 등록. device-service gRPC 위임.
 | 필드 | 타입 | 필수 | 검증 / 설명 |
 |---|---|---|---|
 | `serialNumber` | string | yes | NotBlank, 하드웨어 시리얼 |
-| `alias` | string | yes | NotBlank, 표시명 |
+| `alias` | string | no | ≤ 255. 표시명 (nullable / blank 허용) |
 
 ```json
 {
