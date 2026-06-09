@@ -574,7 +574,7 @@ UserController.get → ensureSelf(pathUserId, principal)
 
 ### 2.11 `DELETE /api/v2/b2b/users/{b2bUserId}`
 
-soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive outbox 가 비동기로 Carenco Archive Collector 에 publish.
+soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기 + archive outbox publish + **cleanup outbox event enqueue** + **Redis 차단 키 (30일)**. archive 송신 완료 후 5초 cycle 워커가 cascade 진행 → 최종 hard delete.
 
 | Method | Path | 권한 | Idempotent | Versioned |
 |---|---|---|---|---|
@@ -594,6 +594,38 @@ soft 탈퇴 — `accountStatus=DELETION_PENDING` + 모든 세션 폐기. archive
 |---|---|---|
 | 403 | `AUTH-403-002` | NotSelf |
 | 404 | `USR-404-001` | NotFound |
+
+**Cleanup cascade (v0.0.76 — V17 마이그 신규)**
+
+`UserService.deleteAccount` 가 soft delete 트랜잭션 안에서.
+
+1. `accountStatus=DELETION_PENDING` 마킹.
+2. `ArchiveOutboxWriter` 가 `B2bUser` snapshot 을 `archive_outbox` 에 PENDING 으로 enqueue.
+3. `AuthService.revokeAllSessions` 가 refresh token + session 폐기.
+4. `B2bUserOutboxStateService.enqueue` 가 `b2b_user_outbox_events` 에 `USER_DELETION_REQUESTED` (INIT) 추가.
+5. `TokenRevocationService.blockUser(userId, "DELETION_PENDING", 30일)` 가 Redis `b2b:blocked:user:{userId}` 키 publish — 인증 필터가 매 요청 검사하여 access token 차단.
+
+`B2bUserOutboxWorker` (`@Scheduled fixedDelay=5s`, `b2b.user-cleanup.enabled` 로 토글) 가 INIT / retry-due event 를 claim → `B2bUserOutboxDeletionProcessor` 호출. cascade step 별로 payload flag (`orgSubsCancelled.{orgId}` / `orgDevicesRevoked.{orgId}` / `orgDeleted.{orgId}` / `membershipsLeftMarked` / `inviteCodesRevoked` / `feedbacksAnonymized` / `userHardDeleted`) 누적 — retry 시 완료된 step 은 skip.
+
+| 순서 | 처리 | 비고 |
+|---|---|---|
+| 1 | OWNER organization cascade delete | payment cancel (404/409 idempotent) + device unregister (gRPC `UnregisterAllByOwner(B2B_CENTER)`) → feedbacks / invite_codes / memberships / organization hard delete |
+| 2 | 본인 (OWNER 아닌) memberships → `status=LEFT` 마킹 (`leftAt` 채움) | 시설은 그대로 유지 |
+| 3 | 본인 발급 active invite codes → `status=REVOKED` | 사용 차단 |
+| 4 | 본인 작성 feedbacks → `authorUserId=null` 익명화 | 본문 보존 (멤버에 제공된 정보) |
+| 5 | `archive_outbox` 의 entityType=B2bUser entityId=userId 가 `SENT` 인지 확인 후 → `b2b_users` hard delete | SENT 아니면 다음 tick 까지 보류 |
+
+cascade 완료 후 같은 email 로 재가입 가능 (unique 제약 해제).
+
+**Cross-MSA 호출 (cleanup worker)**
+
+| 대상 | 호출 | 동작 |
+|---|---|---|
+| payment-service | `POST /api/subscriptions/{id}/cancel` | OWNER organization 의 active subscription 을 Paddle 경유 취소. `LicenseClient.getLicense(orgId).subscriptionId()` 로 lookup. 404 / 409 는 idempotent skip |
+| device-service | `DeviceLifecycle.UnregisterAllByOwner(B2B_CENTER, orgId)` gRPC | OWNER organization 의 모든 device REVOKED + 풀 unclaim |
+| archive-service | (간접) | 기존 `ArchiveOutboxWorker` 가 SENT 처리. cleanup 은 `archive_outbox.status=SENT` 만 확인 |
+
+retry 정책. exponential backoff (5s × 2^n, max 1h), MAX_RETRY=10 회 후 FAILED 마킹.
 
 ---
 
