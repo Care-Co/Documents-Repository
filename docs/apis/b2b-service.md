@@ -22,8 +22,9 @@
 | Feedback        | 5           | Auth · OWNER · ADMIN · TRAINER · Author only | [2.37 ~ 2.41](#237-post-apiv2b2bfeedbacksmembershipsid) |
 | License         | 2           | Auth           | [2.42 ~ 2.43](#242-get-apiv2b2blicense-summary) |
 | Billing         | 3           | OWNER · ADMIN  | [2.44 ~ 2.46](#244-post-apiv2b2bbillingcheckout-init) |
+| B2C / 가용성     | 2           | Public         | [2.47 ~ 2.48](#247-get-apiv2b2bavailability) |
 
-총 46 endpoint. 번호 결번 (2.4 `GET /auth/me`, 2.17 `GET /organizations/mine`) 은 코드에서 제거된 슬롯 — 추적 편의상 유지.
+총 48 endpoint. 번호 결번 (2.4 `GET /auth/me`, 2.17 `GET /organizations/mine`) 은 코드에서 제거된 슬롯 — 추적 편의상 유지.
 
 ---
 
@@ -2971,3 +2972,92 @@ BillingController.listTransactions → BillingService.listTransactions
   ├─ owner 검증
   └─ PaymentClient.listTransactions(organizationId) (HTTP → payment-service)
 ```
+
+---
+
+### 2.47 `GET /api/v2/b2b/availability`
+
+b2b user 가입 전 email 가용성 검사. user-service `/api/v2/availability` 와 같은 shape, b2b namespace.
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| GET | /api/v2/b2b/availability | Public | yes | no |
+
+**Query Parameters**
+
+| 이름 | 타입 | 필수 | 비고 |
+|---|---|---|---|
+| `field` | string | yes | `DuplicationField` enum. 현재 `EMAIL` 만 지원 |
+| `value` | string | yes | 검사할 값 |
+
+**Response — 200** — `AvailabilityResponse`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `field` | string | 검사 대상 (`EMAIL`) |
+| `value` | string | 검사한 값 |
+| `available` | boolean | `true` = 사용 가능 (중복 없음), `false` = 이미 점유 |
+
+```json
+{
+  "data": { "field": "EMAIL", "value": "owner@example.com", "available": true },
+  "success": true,
+  "timestamp": "2026-06-10T09:12:36Z"
+}
+```
+
+**Errors**
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 400 | `CMN-400-002` | `field` 가 `DuplicationField` enum 외 값 (`@ValidEnum`) |
+
+---
+
+### 2.48 `GET /api/v2/b2b/b2c-members/{carencoUserId}/organizations`
+
+B2C (carenco) 회원이 가입한 b2b 시설 목록. b2c app 이 user-service jwt 로 호출 (gateway 검증 가정).
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| GET | /api/v2/b2b/b2c-members/{carencoUserId}/organizations | Public | yes | no |
+
+**Path Parameters**
+
+| 이름 | 타입 | 설명 |
+|---|---|---|
+| `carencoUserId` | string (uuid) | carenco (B2C) 회원 id |
+
+**Response — 200** — `B2cMemberOrganizationView[]`
+
+`memberType=CARENCO` + `memberId=carencoUserId` 인 멤버십 전부 (LEFT 이력 포함). `joinedAt` DESC.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `organizationId` | string (uuid) | 시설 id |
+| `name` | string | 시설명 |
+| `type` | string | `OrganizationType` |
+| `photoUrl` | string \| null | 시설 사진 |
+| `role` | string | 보통 `MEMBER` |
+| `status` | string | `ACTIVE` / `PENDING` / `SUSPENDED` / `LEFT` |
+| `memberNumber` | string \| null | 시설 회원번호 (예. `M260609-008`) |
+| `joinedAt` | string (date-time) \| null | 가입 시각 |
+| `leftAt` | string (date-time) \| null | 탈퇴 시각 (LEFT 일 때) |
+
+```json
+{
+  "data": [
+    {
+      "organizationId": "c07e9099-39bc-4a5d-b559-5f90507fdd9d",
+      "name": "케어엔코", "type": "ETC", "photoUrl": null,
+      "role": "MEMBER", "status": "ACTIVE", "memberNumber": "M260609-008",
+      "joinedAt": "2026-06-09T08:58:26Z", "leftAt": null
+    }
+  ],
+  "success": true,
+  "timestamp": "2026-06-10T09:13:06Z"
+}
+```
+
+이용권 상세 (구독 기간 / 갱신 취소 / 공유자) 는 user-service 의
+`GET /api/v2/users/{userId}/b2b-centers/{organizationId}/license-detail` 가 b2b gRPC 합성으로 제공.

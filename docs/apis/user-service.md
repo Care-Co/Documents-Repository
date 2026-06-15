@@ -487,6 +487,76 @@ Pageable. Default sort `createdAt,desc`, size `20`.
 
 ---
 
+## B2B Center (`/api/v2/users/{userId}/b2b-centers`)
+
+B2C (carenco) 회원이 가입한 b2b 시설의 이용권 상세. b2b-service 의 `B2cMemberQuery` gRPC 합성 (0.0.78).
+
+### `GET` /api/v2/users/{userId}/b2b-centers/{organizationId}/license-detail
+
+**Operation ID** &nbsp;`getB2bCenterLicenseDetail`  &nbsp;**Tags** &nbsp;`b2b-center`
+**Security** &nbsp;resource-owner (`ROLE_ADMIN` 또는 본인 `#userId`)
+
+회원의 특정 시설 이용권 상세 — 멤버십 + 이용권 (구독 기간 / 갱신 취소 여부) + org 담당자 (공유자).
+b2b-service 의 `B2cMemberQuery.GetLicenseDetail(carencoUserId, organizationId)` gRPC 를 호출해 합성.
+
+**Path Parameters**
+
+| In | Name | Type | Required |
+|---|---|---|---|
+| path | `userId` | string (uuid) | yes (`@ValidUuid`, 본인) |
+| path | `organizationId` | string (uuid) | yes (`@ValidUuid`) |
+
+**Responses**
+
+| Status | Schema |
+|---|---|
+| **200** | `Envelope` with `data:` [`B2bCenterLicenseDetail`](#b2bcenterlicensedetail) |
+| **401** | resource-owner 불일치 |
+| **502** | b2b-service gRPC 실패 (다운 / deadline) |
+
+#### 200 — example (가입 + 구독 ACTIVE)
+
+```json
+{
+  "success": true,
+  "data": {
+    "registered": true,
+    "organizationId": "4f97825c-6d9c-4438-b75f-a00f152ab6bb",
+    "organizationName": "센터-1781487663697",
+    "organizationType": "PILATES",
+    "photoUrl": null,
+    "membershipStatus": "ACTIVE",
+    "memberNumber": "M260615-004",
+    "joinedAt": "2026-06-15T01:41:05Z",
+    "licenseState": "ACTIVE",
+    "planCode": "PILATES_BASIC",
+    "startedAt": "2026-06-15T01:41:21Z",
+    "expiresAt": "2026-07-15T01:41:21Z",
+    "canceledAt": null,
+    "managers": [
+      { "firstName": "박", "lastName": "관장", "role": "OWNER" }
+    ]
+  }
+}
+```
+
+#### 200 — example (미가입)
+
+```json
+{ "success": true, "data": { "registered": false, "managers": [] } }
+```
+
+> `B2bCenterLicenseDetail`.
+> - `registered` — `false` 면 해당 시설 멤버십 없음 (나머지 필드 null).
+> - `licenseState` — `ACTIVE` / `GRACE` / `EXPIRED` / `SUSPENDED` / `NONE`.
+> - `canceledAt` — 갱신 취소 예약 시각. `null` = 취소 예약 없음. 값 있으면 그 시점에 구독 종료 예정 (cycle-end cancel, 그 전까지 `ACTIVE`).
+> - `managers` — org 담당자 (공유자). OWNER (`organizations.owner_user_id`) + ACTIVE 인 ADMIN staff 의 `firstName` / `lastName` / `role`.
+> - 프리미엄 리포트 / Fisica AI 채팅 가용 여부는 추후 필드 추가 (현재 미노출).
+
+가입 시설 **목록** 은 b2b-service 의 `GET /api/v2/b2b/b2c-members/{carencoUserId}/organizations` 직접 호출.
+
+---
+
 ## Public (`/api/public`)
 
 Service-to-service. **Security** &nbsp;`permitAll`.
