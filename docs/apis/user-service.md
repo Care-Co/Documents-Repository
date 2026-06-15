@@ -529,7 +529,6 @@ b2b-service 의 `B2cMemberQuery.GetLicenseDetail(carencoUserId, organizationId)`
     "memberNumber": "M260615-004",
     "joinedAt": "2026-06-15T01:41:05Z",
     "licenseState": "ACTIVE",
-    "planCode": "PILATES_BASIC",
     "startedAt": "2026-06-15T01:41:21Z",
     "expiresAt": "2026-07-15T01:41:21Z",
     "canceledAt": null,
