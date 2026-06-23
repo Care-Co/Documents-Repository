@@ -3,7 +3,7 @@
 > OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
 
 Source: `/Users/jonghak/GitHub/Care&Co/user-service`
-Updated: 2026-04-27
+Updated: 2026-06-23
 
 **Servers**
 - `https://api.example.com`
@@ -723,6 +723,9 @@ All return `Page<` [`AuditEvent`](#auditevent) `>`. Default sort `createdAt,desc
 | `languageCode` | string | no | `@ValidEnum(LanguageCode)` | ISO 639-1 |
 | `timeZone` | string | no | `@ValidEnum(TimeZone)` | enum |
 | `zoneIdValue` | string | no | — | IANA zone id |
+
+> **`countryCode` 허용값** (enum 이름, ISO 3166-1 α-2). `UNKNOWN US IT FR AE UK KR NL PT DE BE SG JP CZ CA AU CN TW`. 중국 `CN` · 대만 `TW` 추가 (common-libs 0.0.80).
+> **`languageCode` 허용값** (enum 이름). `UNKNOWN KR IT US SG JP DE FR CZ CA AU ZH_HANS ZH_HANT`. 중국어 간체 `ZH_HANS`(zh-Hans) · 번체 `ZH_HANT`(zh-Hant) 추가 (common-libs 0.0.80). 간체/번체는 국가가 아니라 문자(script) 구분이라 BCP 47 script subtag 기반 — `LanguageCode.toLocale()` 로 `Locale` 변환.
 
 ### `UserLoginRequest`
 
