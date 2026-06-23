@@ -1,6 +1,6 @@
 # B2B Service API
 
-> 갱신. 2026-06-08
+> 갱신. 2026-06-23
 > Base path. `/api/v2/b2b/...`
 > 응답 envelope. `CncResponse` (Pattern B)
 
@@ -719,6 +719,21 @@ v1.0.0 의 모든 필드 + `businessRegistrationNumber` 필수 (0.0.64 신규). 
 ```
 
 `OrganizationType` enum. `GYM | PILATES | YOGA | PT_STUDIO | CROSSFIT | FUNCTIONAL | BOXING | ETC`.
+
+`businessRegistrationNumber` — country 별 형식 (`BusinessRegistrationNumberValidator`). 매칭 우선순위. ① country 전용 정규식 → ② EU VAT → ③ fallback. `country` 는 `@ValidCountryCode` (ISO 3166-1 α-2, 중국 `CN` · 대만 `TW` 포함).
+
+| country | 형식 | 정규식 |
+|---|---|---|
+| KR | 사업자등록번호 10자리 | `^(\d{3}-?\d{2}-?\d{5})$` |
+| US | EIN 9자리 | `^(\d{2}-?\d{7})$` |
+| JP | 법인번호 13자리 | `^\d{13}$` |
+| CN | 통일사회신용코드 18자리 | `^[0-9A-HJ-NPQRTUWXY]{18}$` |
+| TW | 統一編號 8자리 (대만, 신규 — CountryCode.TW 대응) | `^\d{8}$` |
+| VN | 사업자번호 10자리 (+선택 `-`3자리 지점) | `^\d{10}(-?\d{3})?$` |
+| EU* | VAT | `^[A-Z]{2}\d{8,12}$` |
+| 그 외 | fallback (영숫자 + dash, 5~40자) | `^[A-Za-z0-9-]{5,40}$` |
+
+EU* = DE FR IT ES NL BE AT PL SE FI DK IE PT GR CZ HU RO BG HR SI SK EE LV LT MT CY LU.
 
 **Response — 201 (v1.0.0, default)** — `OrganizationResponse`
 
