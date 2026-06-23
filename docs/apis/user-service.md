@@ -724,8 +724,40 @@ All return `Page<` [`AuditEvent`](#auditevent) `>`. Default sort `createdAt,desc
 | `timeZone` | string | no | `@ValidEnum(TimeZone)` | enum |
 | `zoneIdValue` | string | no | — | IANA zone id |
 
-> **`countryCode` 허용값** (enum 이름, ISO 3166-1 α-2). `UNKNOWN US IT FR AE UK KR NL PT DE BE SG JP CZ CA AU CN TW`. 중국 `CN` · 대만 `TW` 추가 (common-libs 0.0.80).
-> **`languageCode` 허용값** (enum 이름). `UNKNOWN KR IT US SG JP DE FR CZ CA AU ZH_HANS ZH_HANT`. 중국어 간체 `ZH_HANS`(zh-Hans) · 번체 `ZH_HANT`(zh-Hant) 추가 (common-libs 0.0.80). 간체/번체는 국가가 아니라 문자(script) 구분이라 BCP 47 script subtag 기반 — `LanguageCode.toLocale()` 로 `Locale` 변환.
+**`countryCode` 허용값** — `CountryCode` enum 이름 (ISO 3166-1 α-2).
+
+| 값 | 국가 | 값 | 국가 |
+|---|---|---|---|
+| `UNKNOWN` | 알 수 없음 | `BE` | 벨기에 |
+| `US` | 미국 | `SG` | 싱가포르 |
+| `IT` | 이탈리아 | `JP` | 일본 |
+| `FR` | 프랑스 | `CZ` | 체코 |
+| `AE` | 아랍에미리트 | `CA` | 캐나다 |
+| `UK` | 영국 | `AU` | 호주 |
+| `KR` | 대한민국 | `CN` | 중국 (0.0.80 신규) |
+| `NL` | 네덜란드 | `TW` | 대만 (0.0.80 신규) |
+| `PT` | 포르투갈 | | |
+| `DE` | 독일 | | |
+
+**`languageCode` 허용값** — `LanguageCode` enum 이름. 값은 BCP 47 language tag 와 매핑되며 `LanguageCode.toLocale()` 로 `Locale` 변환.
+
+| 값 | 언어 | BCP 47 |
+|---|---|---|
+| `UNKNOWN` | 알 수 없음 | — (`Locale.ROOT`) |
+| `KR` | 한국어 | `ko-KR` |
+| `IT` | 이탈리아어 | `it-IT` |
+| `US` | 영어 (미국) | `en-US` |
+| `SG` | 영어 (싱가포르) | `en-SG` |
+| `JP` | 일본어 | `ja-JP` |
+| `DE` | 독일어 | `de-DE` |
+| `FR` | 프랑스어 | `fr-FR` |
+| `CZ` | 체코어 | `cs-CZ` |
+| `CA` | 영어 (캐나다) | `en-CA` |
+| `AU` | 영어 (호주) | `en-AU` |
+| `ZH_HANS` | 중국어 간체 (0.0.80 신규) | `zh-Hans` |
+| `ZH_HANT` | 중국어 번체 (0.0.80 신규) | `zh-Hant` |
+
+> 간체/번체는 국가가 아니라 문자(script) 구분이라 enum 이름이 국가코드가 아닌 BCP 47 script subtag(`ZH_HANS`/`ZH_HANT`) 기반.
 
 ### `UserLoginRequest`
 
