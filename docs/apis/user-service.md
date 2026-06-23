@@ -739,9 +739,13 @@ All return `Page<` [`AuditEvent`](#auditevent) `>`. Default sort `createdAt,desc
 | `PT` | 포르투갈 | | |
 | `DE` | 독일 | | |
 
-> **입력 수용 (common-libs 0.0.83~)** — `countryCode` 입력은 위 **alpha-2 이름** 외에 **ISO 3166-1 alpha-3**(예. `KOR` `USA` `CHN` `TWN`)와 아래 **레거시 별칭**도 받는다. 입력은 모두 alpha-2 로 정규화 → **저장·응답은 항상 alpha-2 단일 형식**(별칭은 입력 전용, DB 에 저장되지 않음).
+> **입력** (common-libs 0.0.83~) — `countryCode` 입력은 alpha-2 외 **ISO 3166-1 alpha-3**(`KOR`·`USA`·`CHN`·`TWN`)·레거시 별칭도 허용. 모두 enum 으로 정규화.
 >
-> 레거시 별칭 (풀네임/구형식, alpha-3 와 별개로 추가 허용).
+> **저장·응답** (0.0.84~) —
+> - **DB 저장**: ISO 3166-1 **alpha-3**(`KOR`). 0.0.83 까지 alpha-2 였고 V33 마이그레이션으로 전환.
+> - **응답**: `api-version` 별 — **`1.0.0`** → alpha-2(`"KR"`, 기존 클라 무영향), **`1.1.0`** → alpha-3(`"KOR"`). gRPC·admin 은 alpha-2 유지.
+>
+> 레거시 별칭 (입력 전용).
 >
 > | alpha-2 | 레거시 별칭 |
 > |---|---|
@@ -751,7 +755,7 @@ All return `Page<` [`AuditEvent`](#auditevent) `>`. Default sort `createdAt,desc
 > | `DE` | `GERMANY` |
 > | `BE` | `BELGIUM` |
 >
-> 그 외 국가는 alpha-3 만 추가 허용 (`KR`←`KOR`, `US`←`USA`, `CN`←`CHN` 등). b2b-service 의 `country`(`@ValidCountryCode`)는 **strict alpha-2** 만 받는다 — 별칭 미적용.
+> 그 외 국가는 alpha-3 만 추가 허용. b2b-service 의 `country`(`@ValidCountryCode`)는 **strict alpha-2** 입력만 받되 DB 저장은 alpha-3(응답 `1.0.2` 노출).
 
 **`languageCode` 허용값** — `LanguageCode` enum 이름. 값은 BCP 47 language tag 와 매핑되며 `LanguageCode.toLocale()` 로 `Locale` 변환.
 
@@ -773,7 +777,9 @@ All return `Page<` [`AuditEvent`](#auditevent) `>`. Default sort `createdAt,desc
 
 > 간체/번체는 국가가 아니라 문자(script) 구분이라 enum 이름이 국가코드가 아닌 BCP 47 script subtag(`ZH_HANS`/`ZH_HANT`) 기반.
 
-> **입력 수용 (common-libs 0.0.82~)** — `languageCode` 는 위 **enum 이름(`ZH_HANS`)** 과 **BCP 47 tag(`zh-Hans`·`ko-KR`)** 를 모두 받는다. 저장·응답은 enum 이름으로 정규화(기존 클라이언트 무영향). `en` 처럼 country 없는 language-only 는 모호(US/SG/CA/AU)하여 비수용 — full tag 만.
+> **입력** (common-libs 0.0.82~) — `languageCode` 는 enum 이름(`ZH_HANS`)·BCP 47 tag(`zh-Hans`·`ko-KR`) 모두 허용. `en` 같은 language-only 는 모호하여 비수용(full tag 만).
+>
+> **저장·응답** (0.0.84~) — **DB 저장**: **BCP 47**(`ko-KR`·`zh-Hans`, V33 마이그레이션). **응답**: `api-version` **`1.0.0`** → enum 이름(`"KR"`/`"ZH_HANS"`, 기존), **`1.1.0`** → BCP 47(`"ko-KR"`/`"zh-Hans"`). gRPC·admin 은 enum 이름 유지.
 
 ### `UserLoginRequest`
 

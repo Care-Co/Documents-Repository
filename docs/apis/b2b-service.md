@@ -735,6 +735,11 @@ v1.0.0 의 모든 필드 + `businessRegistrationNumber` 필수 (0.0.64 신규). 
 
 EU* = DE FR IT ES NL BE AT PL SE FI DK IE PT GR CZ HU RO BG HR SI SK EE LV LT MT CY LU.
 
+> **`country` 저장·응답 형식 (carencoPlatformVersion 0.0.84~)** —
+> - **입력**: alpha-2 (`@ValidCountryCode`, 2자 strict). 변동 없음.
+> - **DB 저장**: ISO 3166-1 **alpha-3**(`KOR`). V18 마이그레이션으로 기존 alpha-2 → alpha-3 백필 (`b2b_organizations.country` VARCHAR(3)).
+> - **응답**: `api-version` 별 — **`1.0.0`/`1.0.1`** → alpha-2(`"KR"`, 기존 호환), 신규 **`1.0.2`**(create/get) → alpha-3(`"KOR"`). v1.0.2 는 v1.0.1 과 동일 shape, `address.country` 만 alpha-3.
+
 **Response — 201 (v1.0.0, default)** — `OrganizationResponse`
 
 | 필드 | 타입 | 설명 |
