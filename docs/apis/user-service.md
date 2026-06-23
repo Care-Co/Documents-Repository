@@ -759,6 +759,8 @@ All return `Page<` [`AuditEvent`](#auditevent) `>`. Default sort `createdAt,desc
 
 > 간체/번체는 국가가 아니라 문자(script) 구분이라 enum 이름이 국가코드가 아닌 BCP 47 script subtag(`ZH_HANS`/`ZH_HANT`) 기반.
 
+> **입력 수용 (common-libs 0.0.82~)** — `languageCode` 는 위 **enum 이름(`ZH_HANS`)** 과 **BCP 47 tag(`zh-Hans`·`ko-KR`)** 를 모두 받는다. 저장·응답은 enum 이름으로 정규화(기존 클라이언트 무영향). `en` 처럼 country 없는 language-only 는 모호(US/SG/CA/AU)하여 비수용 — full tag 만.
+
 ### `UserLoginRequest`
 
 | Field | Type | Required | Validation |
