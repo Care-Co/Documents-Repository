@@ -739,6 +739,20 @@ All return `Page<` [`AuditEvent`](#auditevent) `>`. Default sort `createdAt,desc
 | `PT` | 포르투갈 | | |
 | `DE` | 독일 | | |
 
+> **입력 수용 (common-libs 0.0.83~)** — `countryCode` 입력은 위 **alpha-2 이름** 외에 **ISO 3166-1 alpha-3**(예. `KOR` `USA` `CHN` `TWN`)와 아래 **레거시 별칭**도 받는다. 입력은 모두 alpha-2 로 정규화 → **저장·응답은 항상 alpha-2 단일 형식**(별칭은 입력 전용, DB 에 저장되지 않음).
+>
+> 레거시 별칭 (풀네임/구형식, alpha-3 와 별개로 추가 허용).
+>
+> | alpha-2 | 레거시 별칭 |
+> |---|---|
+> | `AE` | `UAE` |
+> | `NL` | `NETHERLANDS` |
+> | `PT` | `PORTUGAL` |
+> | `DE` | `GERMANY` |
+> | `BE` | `BELGIUM` |
+>
+> 그 외 국가는 alpha-3 만 추가 허용 (`KR`←`KOR`, `US`←`USA`, `CN`←`CHN` 등). b2b-service 의 `country`(`@ValidCountryCode`)는 **strict alpha-2** 만 받는다 — 별칭 미적용.
+
 **`languageCode` 허용값** — `LanguageCode` enum 이름. 값은 BCP 47 language tag 와 매핑되며 `LanguageCode.toLocale()` 로 `Locale` 변환.
 
 | 값 | 언어 | BCP 47 |
