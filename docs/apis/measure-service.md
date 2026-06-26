@@ -22,6 +22,23 @@ DTO calendar versions: `2026-01-13` (record DTO — V9 부터 `deviceId` / `devi
 
 ---
 
+## API 버전 (endpoint별)
+
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| POST | /api/internal/sync-user-info | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
+| GET | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
+| POST | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/users/{userId}/records | 1.0.0 | 1.0.0 |
+| GET | /api/v2/users/{userId}/records | 1.0.0, 1.0.1 | 1.0.1 |
+| POST | /api/v2/users/{userId}/records | 1.0.0, 1.0.1 | 1.0.1 |
+| GET | /api/v2/users/{userId}/records/{recordId} | 1.0.0, 1.0.1 | 1.0.1 |
+
+---
+
 ## `POST` /api/internal/sync-user-info
 
 **Operation ID** &nbsp;`syncUserInfo`

@@ -29,6 +29,23 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 
 ---
 
+## API 버전 (endpoint별)
+
+> ML-service 는 Flask(blueprint) 기반 — Spring API versioning 미사용. 모든 endpoint 가 unversioned(`—`). 경로는 정의된 그대로.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| `GET` | /check | — | unversioned |
+| `POST` | /footprint | — | unversioned |
+| `POST` | /footprint/classification | — | unversioned |
+| `POST` | /footprint/size-mask | — | unversioned |
+| `GET` | /measure/test | — | unversioned |
+| `POST` | /measure | — | unversioned |
+| `POST` | /pose | — | unversioned |
+| `POST` | /weight | — | unversioned |
+
+---
+
 ## `GET` /check
 
 **Operation ID** &nbsp;`healthCheck`

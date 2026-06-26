@@ -19,6 +19,29 @@ Updated: 2026-04-27
 
 ---
 
+## API 버전 (endpoint별)
+
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| POST | `/api/v1/admin/topics` | 1.0.0 | 1.0.0 |
+| DELETE | `/api/v1/admin/topics/{id}` | 1.0.0 | 1.0.0 |
+| PUT | `/api/v1/devices` | 1.0.0 | 1.0.0 |
+| POST | `/api/v1/devices/cleanup` | 1.0.0 | 1.0.0 |
+| PATCH | `/api/v1/devices/deactivate` | 1.0.0 | 1.0.0 |
+| GET | `/api/v1/histories` | 1.0.0 | 1.0.0 |
+| GET | `/api/v1/histories/status/{status}` | 1.0.0 | 1.0.0 |
+| GET | `/api/v1/histories/target/{targetType}` | 1.0.0 | 1.0.0 |
+| GET | `/api/v1/histories/{historyId}` | 1.0.0 | 1.0.0 |
+| POST | `/api/v1/jobs` | 1.0.0 | 1.0.0 |
+| GET | `/api/v1/jobs/{jobId}` | 1.0.0 | 1.0.0 |
+| GET | `/api/v1/users/{userId}/histories` | 1.0.0 | 1.0.0 |
+| DELETE | `/api/v1/users/{userId}/topics/{topicCode}` | 1.0.0 | 1.0.0 |
+| POST | `/api/v1/users/{userId}/topics/{topicCode}` | 1.0.0 | 1.0.0 |
+
+---
+
 ## `POST` /api/v1/jobs
 
 **Operation ID** &nbsp;`createFcmJob`  &nbsp;**Tags** &nbsp;`fcm-job`

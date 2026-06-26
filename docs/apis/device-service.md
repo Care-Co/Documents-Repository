@@ -46,6 +46,33 @@
 
 ---
 
+## API 버전 (endpoint별)
+
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| `GET` | `/api/v1/admin/allowed-devices` | 1.0.0 | 1.0.0 |
+| `POST` | `/api/v1/admin/allowed-devices` | 1.0.0 | 1.0.0 |
+| `POST` | `/api/v1/admin/allowed-devices/bulk` | 1.0.0 | 1.0.0 |
+| `GET` | `/api/v1/admin/allowed-devices/{id}` | 1.0.0 | 1.0.0 |
+| `PATCH` | `/api/v1/admin/allowed-devices/{id}/serial` | 1.0.0 | 1.0.0 |
+| `POST` | `/api/v1/admin/allowed-devices/{id}/unclaim` | 1.0.0 | 1.0.0 |
+| `GET` | `/api/v1/devices` | 1.0.0 | 1.0.0 |
+| `POST` | `/api/v1/devices` | 1.0.0 | 1.0.0 |
+| `GET` | `/api/v1/devices/firmware` | 1.0.0 | 1.0.0 |
+| `POST` | `/api/v1/devices/firmware` | 1.0.0 | 1.0.0 |
+| `GET` | `/api/v1/devices/firmware/upgrade` | 1.0.0 | 1.0.0 |
+| `DELETE` | `/api/v1/devices/firmware/{id}` | 1.0.0 | 1.0.0 |
+| `GET` | `/api/v1/devices/firmware/{id}` | 1.0.0 | 1.0.0 |
+| `PATCH` | `/api/v1/devices/firmware/{id}/promote` | 1.0.0 | 1.0.0 |
+| `POST` | `/api/v1/devices/validate` | 1.0.0 | 1.0.0 |
+| `DELETE` | `/api/v1/devices/{id}` | 1.0.0 | 1.0.0 |
+| `GET` | `/api/v1/devices/{id}` | 1.0.0 | 1.0.0 |
+| `PATCH` | `/api/v1/devices/{id}/status` | 1.0.0 | 1.0.0 |
+
+---
+
 ## 4. Device API
 
 ### 4.1 `POST` /api/v1/devices

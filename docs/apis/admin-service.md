@@ -20,6 +20,17 @@ Spring Boot Admin Server (v4.0.0) wrapper exposing a public REST view of current
 
 ---
 
+## API 버전 (endpoint별)
+
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| GET | /api/v1/instances | 1.0.0, 2025-06-24 | 2025-06-24 |
+| GET | /api/v1/instances/{instanceId} | 0.0.1, 2025-06-24 | 2025-06-24 |
+
+---
+
 ## `GET` /api/v1/instances
 
 **Operation ID** &nbsp;`listInstances`
