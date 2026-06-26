@@ -88,8 +88,8 @@ Updated: 2026-06-23
 | POST | /api/v2/auth/verify-email | 1.0.0 | 1.0.0 |
 | GET | /api/v2/availability | 1.0.0 | 1.0.0 |
 | GET | /api/v2/exists | 1.0.0 | 1.0.0 |
-| GET | /api/v2/users/{userId} | 1.0.0 | 1.0.0 |
-| PATCH | /api/v2/users/{userId} | 1.0.0 | 1.0.0 |
+| GET | /api/v2/users/{userId} | 1.0.0, 1.1.0 | 1.1.0 |
+| PATCH | /api/v2/users/{userId} | 1.0.0, 1.1.0 | 1.1.0 |
 | DELETE | /api/v2/users/{userId} | 1.0.0 | 1.0.0 |
 | GET | /api/v2/users/{userId}/b2b-centers/{organizationId}/license-detail | 1.0.0 | 1.0.0 |
 | GET | /api/v2/users/{userId}/login-history | 1.0.0 | 1.0.0 |
