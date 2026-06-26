@@ -21,10 +21,10 @@
 | Measurement     | 3           | OWNER · ADMIN · TRAINER | [2.34 ~ 2.36](#234-get-apiv2b2borganizationsorgidmembersmemberidmeasurements) |
 | Feedback        | 5           | Auth · OWNER · ADMIN · TRAINER · Author only | [2.37 ~ 2.41](#237-post-apiv2b2bfeedbacksmembershipsid) |
 | License         | 2           | Auth           | [2.42 ~ 2.43](#242-get-apiv2b2blicense-summary) |
-| Billing         | 3           | OWNER · ADMIN  | [2.44 ~ 2.46](#244-post-apiv2b2bbillingcheckout-init) |
-| B2C / 가용성     | 2           | Public         | [2.47 ~ 2.48](#247-get-apiv2b2bavailability) |
+| Billing         | 11          | OWNER · ADMIN  | [2.44 ~ 2.54](#244-post-apiv2b2bbillingcheckout-init) |
+| B2C / 가용성     | 2           | Public         | [2.55 ~ 2.56](#255-get-apiv2b2bavailability) |
 
-총 48 endpoint. 번호 결번 (2.4 `GET /auth/me`, 2.17 `GET /organizations/mine`) 은 코드에서 제거된 슬롯 — 추적 편의상 유지.
+총 56 endpoint. 번호 결번 (2.4 `GET /auth/me`, 2.17 `GET /organizations/mine`) 은 코드에서 제거된 슬롯 — 추적 편의상 유지.
 
 ---
 
@@ -2995,7 +2995,252 @@ BillingController.listTransactions → BillingService.listTransactions
 
 ---
 
-### 2.47 `GET /api/v2/b2b/availability`
+### 2.47 `GET /api/v2/b2b/billing/organizations/{organizationId}/subscription`
+
+OWNER 의 organization 구독 상세 조회. payment 가 internal-only 로 전환됨에 따라 외부는 이 프록시 경유로만 구독을 조회한다. license gRPC 로 subscriptionId 해소 후 payment REST 위임.
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/subscription | OWNER | yes | no |
+
+**Response — 200** — `PaymentSubscriptionView` echo
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `id` | string | payment subscription PK |
+| `paddleSubscriptionId` | string | Paddle subscription id |
+| `customerId` | string | payment customer PK |
+| `organizationId` | string | 시설 PK |
+| `priceId` | string \| null | 현재 Paddle price id |
+| `quantity` | integer \| null | 수량 |
+| `planSeats` | integer \| null | 좌석 수 |
+| `planCode` | string \| null | plan code |
+| `status` | string | `ACTIVE` / `TRIALING` / `PAST_DUE` / `PAUSED` / `CANCELED` |
+| `nextBilledAt` | string (date-time) \| null | 다음 청구 시각 |
+| `currentPeriodStart` | string (date-time) \| null | 현재 청구 주기 시작 |
+| `currentPeriodEnd` | string (date-time) \| null | 현재 청구 주기 종료 |
+| `canceledAt` | string (date-time) \| null | 취소 예약/확정 시각 |
+| `scheduledChangeAction` | string \| null | 예약 변경 `cancel`/`pause`/`resume` |
+| `scheduledChangeEffectiveAt` | string (date-time) \| null | 예약 변경 적용 시점 |
+| `scheduledChangeResumeAt` | string (date-time) \| null | pause 후 resume 예약 시점 |
+| `createdAt` | string (date-time) | 생성 시각 |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "id": "sub-1",
+    "paddleSubscriptionId": "sub_01h5xxx",
+    "customerId": "cus-1",
+    "organizationId": "org-A",
+    "priceId": "pri_01h5xxx",
+    "quantity": 1,
+    "planSeats": 50,
+    "planCode": "PILATES_BASIC",
+    "status": "ACTIVE",
+    "nextBilledAt": "2026-07-01T00:00:00Z",
+    "currentPeriodStart": "2026-06-01T00:00:00Z",
+    "currentPeriodEnd": "2026-07-01T00:00:00Z",
+    "canceledAt": null,
+    "scheduledChangeAction": null,
+    "scheduledChangeEffectiveAt": null,
+    "scheduledChangeResumeAt": null,
+    "createdAt": "2026-06-01T00:00:00Z"
+  }
+}
+```
+
+**Errors** (`BillingError`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 404 | `CMN-404-001` | OrganizationNotFound |
+| 403 | `AUTH-403-002` | NotOwner |
+| 404 | `CMN-404-001` | NoActiveSubscription (license 에 구독 없음) |
+| 502 | `CMN-502-001` | PaymentServiceUnavailable |
+
+**연쇄 호출**
+
+```
+BillingController.getSubscription → BillingService.getSubscription
+  ├─ OrganizationRepository.findById + owner 검증
+  ├─ LicenseClient.getLicense → subscriptionId 해소
+  └─ PaymentClient.getSubscription (HTTP → payment-service, X-Caller-Service: b2b-service)
+```
+
+---
+
+### 2.48 `POST /api/v2/b2b/billing/organizations/{organizationId}/subscription/cancel`
+
+OWNER 의 구독 취소. payment 가 Paddle 취소 호출 후 상태 반영. 응답은 [`PaymentSubscriptionView`](#247-get-apiv2b2bbillingorganizationsorganizationidsubscription) (status=`CANCELED`).
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/cancel | OWNER | no | no |
+
+요청 body 없음. 응답 200 — `PaymentSubscriptionView`.
+
+**Errors** (`BillingError`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 404 | `CMN-404-001` | OrganizationNotFound / NoActiveSubscription |
+| 403 | `AUTH-403-002` | NotOwner |
+| 409 | `CMN-409-001` | PaymentRejected — 상태 전이 불가 (payment 4xx 패스스루) |
+| 502 | `CMN-502-001` | PaymentServiceUnavailable |
+
+---
+
+### 2.49 `POST /api/v2/b2b/billing/organizations/{organizationId}/subscription/pause`
+
+OWNER 의 구독 일시정지. 응답은 [`PaymentSubscriptionView`](#247-get-apiv2b2bbillingorganizationsorganizationidsubscription) (status=`PAUSED`).
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/pause | OWNER | no | no |
+
+요청 body 없음. Errors 는 [2.48](#248-post-apiv2b2bbillingorganizationsorganizationidsubscriptioncancel) 과 동일.
+
+---
+
+### 2.50 `POST /api/v2/b2b/billing/organizations/{organizationId}/subscription/resume`
+
+OWNER 의 구독 재개 (PAUSED → ACTIVE). 응답은 [`PaymentSubscriptionView`](#247-get-apiv2b2bbillingorganizationsorganizationidsubscription) (status=`ACTIVE`).
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/resume | OWNER | no | no |
+
+요청 body 없음. Errors 는 [2.48](#248-post-apiv2b2bbillingorganizationsorganizationidsubscriptioncancel) 과 동일.
+
+---
+
+### 2.51 `POST /api/v2/b2b/billing/organizations/{organizationId}/portal-session`
+
+OWNER 의 Paddle 호스팅 고객 포털 세션 생성 (overview / 인보이스 / 결제수단 deep link). organization 이 소유한 구독에서 customerId 를 도출해 호출 — frontend 의 customerId 위조 차단.
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/portal-session | OWNER | no | no |
+
+**Response — 200** — `PaymentCustomerPortalView`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `overviewUrl` | string \| null | 결제 내역 / 인보이스 / 셀프서비스 메인 |
+| `subscriptions` | array<object> | 구독별 deep link |
+| `subscriptions[].subscriptionId` | string | Paddle subscription id |
+| `subscriptions[].cancelUrl` | string | 취소 deep link |
+| `subscriptions[].updatePaymentMethodUrl` | string | 결제수단 변경 deep link |
+
+```json
+{
+  "success": true, "code": "200", "message": "OK",
+  "data": {
+    "overviewUrl": "https://customer-portal.paddle.com/...",
+    "subscriptions": [
+      {
+        "subscriptionId": "sub_01h5xxx",
+        "cancelUrl": "https://customer-portal.paddle.com/.../cancel",
+        "updatePaymentMethodUrl": "https://customer-portal.paddle.com/.../payment-method"
+      }
+    ]
+  }
+}
+```
+
+**Errors** (`BillingError`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 404 | `CMN-404-001` | OrganizationNotFound / NoActiveSubscription |
+| 403 | `AUTH-403-002` | NotOwner |
+| 502 | `CMN-502-001` | PaymentServiceUnavailable |
+
+---
+
+### 2.52 `POST /api/v2/b2b/billing/organizations/{organizationId}/refunds`
+
+OWNER 가 organization 의 거래에 대해 환불 생성. b2b 가 OWNER + 거래 소유(해당 구독의 거래인지) 검증 후 payment 위임.
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/refunds | OWNER | no | no |
+
+**Request Body** — `RefundRequest`
+
+| 필드 | 타입 | 필수 | 검증 / 설명 |
+|---|---|---|---|
+| `transactionId` | string | yes | NotBlank, 환불 대상 거래 PK |
+| `reason` | string | yes | NotBlank, 환불 사유 |
+| `items` | array<object> \| null | no | null/빈 배열 → 전체 환불, 값 있으면 부분 환불 |
+| `items[].paddleItemId` | string | yes | 거래 항목 id |
+| `items[].amount` | string \| null | no | null → 항목 전체, 값 → 부분 금액(센트 문자열) |
+
+```json
+{ "transactionId": "txn-1", "reason": "고객 요청 전액 환불" }
+```
+
+**Response — 200** — `PaymentRefundView`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `id` | string | refund PK |
+| `paddleAdjustmentId` | string | Paddle adjustment id |
+| `transactionId` | string | 대상 거래 PK |
+| `reason` | string | 사유 |
+| `status` | string | `PENDING_APPROVAL` / `APPROVED` / `REJECTED` |
+| `currencyCode` | string | ISO 4217 |
+| `amount` | integer \| null | 환불액 (최소 단위) |
+| `createdAt` | string (date-time) | 생성 시각 |
+
+**Errors** (`BillingError`)
+
+| HTTP | 코드 | 케이스 |
+|---|---|---|
+| 404 | `CMN-404-001` | OrganizationNotFound / NoActiveSubscription |
+| 403 | `AUTH-403-002` | NotOwner |
+| 403 | `AUTH-403-002` | RefundTransactionNotOwned — 거래가 organization 구독 소속 아님 |
+| 400/409 | `CMN-400-xxx` | PaymentRejected — 환불 검증 실패(금액 초과/중복/상태) payment 패스스루 |
+| 502 | `CMN-502-001` | PaymentServiceUnavailable |
+
+---
+
+### 2.53 `GET /api/v2/b2b/billing/organizations/{organizationId}/refunds`
+
+거래의 환불 목록 조회. 대상 거래가 organization 구독 소속일 때만.
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/refunds | OWNER | yes | no |
+
+**Query Parameters**
+
+| 이름 | 타입 | 필수 | 비고 |
+|---|---|---|---|
+| `transactionId` | string | yes | 환불 목록을 조회할 거래 PK |
+
+**Response — 200** — `PaymentRefundView[]` (스키마는 [2.52](#252-post-apiv2b2bbillingorganizationsorganizationidrefunds)). 없으면 `data: []`.
+
+**Errors** — OrganizationNotFound(404) / NotOwner(403) / RefundTransactionNotOwned(403) / PaymentServiceUnavailable(502).
+
+---
+
+### 2.54 `GET /api/v2/b2b/billing/organizations/{organizationId}/refunds/{refundId}`
+
+환불 단건 조회. 조회 후 환불의 거래가 organization 소유인지 검증.
+
+| Method | Path | 권한 | Idempotent | Versioned |
+|---|---|---|---|---|
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/refunds/{refundId} | OWNER | yes | no |
+
+**Response — 200** — `PaymentRefundView` (스키마는 [2.52](#252-post-apiv2b2bbillingorganizationsorganizationidrefunds)).
+
+**Errors** — OrganizationNotFound / NotOwner / RefundTransactionNotOwned(403) / PaymentRejected(404 refund 없음) / PaymentServiceUnavailable.
+
+---
+
+### 2.55 `GET /api/v2/b2b/availability`
 
 b2b user 가입 전 email 가용성 검사. user-service `/api/v2/availability` 와 같은 shape, b2b namespace.
 
@@ -3034,7 +3279,7 @@ b2b user 가입 전 email 가용성 검사. user-service `/api/v2/availability` 
 
 ---
 
-### 2.48 `GET /api/v2/b2b/b2c-members/{carencoUserId}/organizations`
+### 2.56 `GET /api/v2/b2b/b2c-members/{carencoUserId}/organizations`
 
 B2C (carenco) 회원이 가입한 b2b 시설 목록. b2c app 이 user-service jwt 로 호출 (gateway 검증 가정).
 

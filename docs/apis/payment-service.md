@@ -3,7 +3,7 @@
 > OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
 
 Source: `/Users/jonghak/GitHub/Care&Co/payment-service`
-Updated: 2026-06-08
+Updated: 2026-06-26
 
 Payment integration service backed by **Paddle Billing API v2** (sandbox). Hookdeck relays webhooks for local development. Persists customers, subscriptions, transactions, refunds, and webhook events to PostgreSQL. Exposes a gRPC read-only license query for `b2b-service`.
 
@@ -11,7 +11,7 @@ Payment integration service backed by **Paddle Billing API v2** (sandbox). Hookd
 - `https://api.example.com`
 
 **Versioning** &nbsp;none — single deployed version.
-**Security** &nbsp;none on REST endpoints (gate at the platform edge); webhook authenticated via `Paddle-Signature` HMAC-SHA256; cross-service calls authenticated via `X-Caller-Service` header (allowlist).
+**Security** &nbsp;**internal-only by default.** `/api/subscriptions/**`, `/api/transactions/**`, `/api/refunds/**`, `/api/customer-portal/**` 는 `InternalCallerInterceptor` 가 `X-Caller-Service` allowlist (`b2b-service` / `admin-service` / `payment-ops`) 를 검증하며, gateway 라우팅에서도 제거되어 외부 직접 호출 불가 — 외부는 **b2b-service `/api/v2/b2b/billing/**` 프록시(JWT 인증)** 를 경유한다. 동작 사용자는 `X-Acting-User-Id` 헤더로 감사 로그에 전파(권한 판단은 호출 측 책임). 공개(외부 직접 호출 가능) 는 plan catalog (`GET /api/payment/plans`) 와 webhook(`/webhooks/paddle`, Paddle-Signature HMAC-SHA256) 뿐. `/api/payment/**` 내부 endpoint(checkout-links / plan-change 등) 는 인라인 `X-Caller-Service` 가드.
 **Money** &nbsp;all monetary fields are integer minor-units (`Long`). `currencyCode` is ISO 4217. Pricing (currency / amount / country override) is owned by Paddle — not stored in our DB.
 
 **Errors** &nbsp;RFC 9457 `ProblemDetail`.
@@ -289,6 +289,8 @@ No external REST API. Customer rows are created/updated by two internal flows on
 
 ## Subscriptions
 
+> **Internal-only** — `X-Caller-Service` allowlist 필수 (`InternalCallerInterceptor`), gateway 외부 라우팅 제거됨. 외부는 b2b `/api/v2/b2b/billing/organizations/{orgId}/subscription[...]` 프록시 경유.
+
 ### `GET` /api/subscriptions/{id}
 
 **Operation ID** &nbsp;`getSubscription`  &nbsp;**Tags** &nbsp;`subscription`
@@ -384,6 +386,8 @@ Force-sync from Paddle (ops use). Webhook is the normal path.
 
 ## Transactions
 
+> **Internal-only** — `X-Caller-Service` allowlist 필수, gateway 외부 라우팅 제거됨. 외부는 b2b `/api/v2/b2b/billing/organizations/{orgId}/transactions` 프록시 경유.
+
 ### `GET` /api/transactions/{id}
 
 **Operation ID** &nbsp;`getTransaction`  &nbsp;**Tags** &nbsp;`transaction`
@@ -467,6 +471,8 @@ Force-sync from Paddle.
 
 ## Refunds
 
+> **Internal-only** — `X-Caller-Service` allowlist 필수, gateway 외부 라우팅 제거됨. 외부는 b2b `/api/v2/b2b/billing/organizations/{orgId}/refunds[...]` 프록시 경유 (거래 소유 검증 포함).
+
 ### `POST` /api/refunds
 
 **Operation ID** &nbsp;`createRefund`  &nbsp;**Tags** &nbsp;`refund`
@@ -527,11 +533,13 @@ Create refund (full or partial).
 
 활성화 조건. `@Profile("dev-k3s")` + `payment.test-api.enabled=true` 둘 다 충족해야 노출. 운영 / staging 에서는 컴파일은 되지만 bean 자체가 등록되지 않아 호출 시 404. integration-tests 진입점 — Paddle webhook 우회로 license `ACTIVE` 시드.
 
+> **Fake Paddle (test-api 활성 시)** — 시드된 구독/거래의 paddle id 는 `test_sub_*` / `test_txn_*` prefix. `PaddleApiClient` 가 이 prefix 를 만나면 cancel / pause / resume / createAdjustment(환불) 에서 실제 Paddle 호출을 우회하고 canonical stub 을 반환한다 → 실 Paddle 샌드박스 없이 b2b billing 프록시의 정방향 WRITE(상태전이·환불) e2e 자동화 가능. 실 paddle id(`sub_*`/`txn_*`) 는 그대로 Paddle 로 전송되어 dev 실 체크아웃/webhook 무영향. prod 는 `test-api.enabled=false` 라 항상 실 Paddle.
+
 ### `POST` /api/v1/test/payment/seed-active-subscription
 
 **Operation ID** &nbsp;`seedActiveSubscription`  &nbsp;**Tags** &nbsp;`test-api`
 
-Paddle webhook 없이 customer + subscription 행을 직접 INSERT 해 `LICENSE_STATE_ACTIVE` 상태를 만든다. e2e flow (b2b-service 가 license 를 ACTIVE 로 인지) 검증용.
+Paddle webhook 없이 customer + subscription 행을 직접 INSERT 해 license `ACTIVE` 상태를 만든다. e2e flow (b2b-service 가 license 를 ACTIVE 로 인지) 검증용. `withTransaction=true` 면 환불 정방향 테스트용 `PAID` 거래 1건(+항목) 도 함께 시드한다.
 
 #### Request body
 
@@ -542,7 +550,8 @@ Paddle webhook 없이 customer + subscription 행을 직접 INSERT 해 `LICENSE_
   "organizationId": "01HXORG...",
   "userId": "01HXOWNER...",
   "planCode": "pro",
-  "planSeats": 20
+  "planSeats": 20,
+  "withTransaction": true
 }
 ```
 
@@ -561,10 +570,14 @@ Paddle webhook 없이 customer + subscription 행을 직접 INSERT 해 `LICENSE_
   "subscriptionId": "...",
   "customerId": "...",
   "organizationId": "01HXORG...",
-  "paddleSubscriptionId": "sub_test_...",
-  "licenseState": "LICENSE_STATE_ACTIVE"
+  "paddleSubscriptionId": "test_sub_...",
+  "licenseState": "ACTIVE",
+  "transactionId": "...",
+  "paddleItemId": "test_txnitm_..."
 }
 ```
+
+`transactionId` / `paddleItemId` 는 `withTransaction=true` 일 때만 채워지고, 아니면 `null`.
 
 ---
 
@@ -876,6 +889,7 @@ dev-only test API payload.
 | `userId` | string | yes | `@NotBlank` |
 | `planCode` | string | yes | `@NotBlank` |
 | `planSeats` | integer | yes | `@Min(1)` |
+| `withTransaction` | boolean | no | true 면 `PAID` 거래 1건(+항목) 도 시드. 기본 false |
 
 ### `SeedSubscriptionResponse`
 
@@ -884,8 +898,10 @@ dev-only test API payload.
 | `subscriptionId` | string | local pk of seeded `subscriptions` row |
 | `customerId` | string | local pk of seeded `customers` row |
 | `organizationId` | string | echo of request |
-| `paddleSubscriptionId` | string | synthetic `sub_test_...` id (Paddle 미호출) |
-| `licenseState` | string | `LICENSE_STATE_ACTIVE` 확인용 (b2b-service gRPC 와 매칭) |
+| `paddleSubscriptionId` | string | synthetic `test_sub_...` id (Paddle 미호출) |
+| `licenseState` | string | `ACTIVE` (b2b-service gRPC license 와 매칭) |
+| `transactionId` | string \| null | `withTransaction=true` 일 때 시드된 거래 pk, 아니면 null |
+| `paddleItemId` | string \| null | 시드된 거래 항목 id (`test_txnitm_...`), 아니면 null |
 
 ### `ProblemDetail`
 
