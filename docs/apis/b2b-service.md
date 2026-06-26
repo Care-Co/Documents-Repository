@@ -28,6 +28,71 @@
 
 ---
 
+## API 버전 (endpoint별)
+
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| POST | /api/v2/b2b/auth/login | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/auth/logout | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/auth/oauth2/apple | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/auth/oauth2/google | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/auth/token | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/availability | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/b2c-members/{carencoUserId}/organizations | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/billing/checkout-init | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/portal-session | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/refunds | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/refunds | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/refunds/{refundId} | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/subscription | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/cancel | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/pause | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/resume | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/transactions | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/billing/plan-change | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/feedbacks/measurements/{recordId} | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/feedbacks/memberships/{membershipId} | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/feedbacks/memberships/{membershipId} | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/b2b/feedbacks/{feedbackId} | 1.0.0 | 1.0.0 |
+| PATCH | /api/v2/b2b/feedbacks/{feedbackId} | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/invite-codes/redeem | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/invite-codes/{inviteCodeId}/revoke | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/license-summary | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/license-summary/{organizationId} | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/memberships/{membershipId}/approve | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/memberships/{membershipId}/leave | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/memberships/{membershipId}/reject | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/memberships/{membershipId}/suspend | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/organizations | 1.0.0, 1.0.1, 1.0.2 | 1.0.2 |
+| GET | /api/v2/b2b/organizations/search | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/b2b/organizations/{id} | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{id} | 1.0.0, 1.0.1, 1.0.2 | 1.0.2 |
+| PATCH | /api/v2/b2b/organizations/{id} | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/devices | 1.0.0, 1.0.1 | 1.0.1 |
+| POST | /api/v2/b2b/organizations/{organizationId}/devices | 1.0.0, 1.0.1 | 1.0.1 |
+| GET | /api/v2/b2b/organizations/{organizationId}/devices/preview | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId} | 1.0.0, 1.0.1 | 1.0.1 |
+| GET | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId} | 1.0.0, 1.0.1 | 1.0.1 |
+| PATCH | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId} | 1.0.0, 1.0.1 | 1.0.1 |
+| POST | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId}/deactivate | 1.0.0, 1.0.1 | 1.0.1 |
+| GET | /api/v2/b2b/organizations/{organizationId}/invite-codes | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/organizations/{organizationId}/invite-codes | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/organizations/{organizationId}/join-requests | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/members | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/members/{memberId}/measurements | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/members/{memberId}/measurements/summary | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/members/{memberId}/measurements/{recordId} | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/organizations/{organizationId}/staff | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/users | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/b2b/users/{b2bUserId} | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/users/{b2bUserId} | 1.0.0 | 1.0.0 |
+| PATCH | /api/v2/b2b/users/{b2bUserId} | 1.0.0 | 1.0.0 |
+| POST | /api/v2/b2b/users/{b2bUserId}/password | 1.0.0 | 1.0.0 |
+
+---
+
 ## 2. Endpoint Detail
 
 ### 2.1 `POST /api/v2/b2b/auth/login`

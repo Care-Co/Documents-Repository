@@ -23,6 +23,17 @@ Chat requests are rate-limited per user (15 requests / day, Asia/Seoul calendar 
 
 ---
 
+## API 버전 (endpoint별)
+
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| POST | /llm/chat | 1.0.0 | 1.0.0 |
+| POST | /llm/chat/greeting | 1.0.0 | 1.0.0 |
+
+---
+
 ## `POST` /llm/chat
 
 **Operation ID** &nbsp;`generateChat`

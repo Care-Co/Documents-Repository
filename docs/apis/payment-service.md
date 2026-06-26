@@ -26,6 +26,43 @@ Payment integration service backed by **Paddle Billing API v2** (sandbox). Hookd
 
 ---
 
+## API 버전 (endpoint별)
+
+> payment-service 는 헤더 기반 API versioning 미사용 — 모든 REST endpoint 가 unversioned(`—`). 경로의 `/api/v1` 등은 path prefix 일 뿐. 내부 전용 endpoint 는 Security 섹션 참고.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| POST | /api/customer-portal/sessions | — | unversioned |
+| POST | /api/internal/plan-variants/{newPriceId}/swap | — | unversioned |
+| POST | /api/internal/plan-variants/{priceId}/promote | — | unversioned |
+| GET | /api/internal/subscriptions/expiring | — | unversioned |
+| POST | /api/internal/subscriptions/migrate-price | — | unversioned |
+| POST | /api/payment/checkout-links | — | unversioned |
+| POST | /api/payment/plan-change | — | unversioned |
+| GET | /api/payment/plans | — | unversioned |
+| POST | /api/payment/plans | — | unversioned |
+| PATCH | /api/payment/plans/{planCode} | — | unversioned |
+| POST | /api/payment/plans/{planCode}/variants | — | unversioned |
+| PATCH | /api/payment/plans/{planCode}/variants/{priceId} | — | unversioned |
+| POST | /api/payment/subscriptions/{paddleSubscriptionId}/link-organization | — | unversioned |
+| GET | /api/refunds | — | unversioned |
+| POST | /api/refunds | — | unversioned |
+| GET | /api/refunds/{id} | — | unversioned |
+| GET | /api/subscriptions | — | unversioned |
+| GET | /api/subscriptions/{id} | — | unversioned |
+| POST | /api/subscriptions/{id}/cancel | — | unversioned |
+| POST | /api/subscriptions/{id}/pause | — | unversioned |
+| POST | /api/subscriptions/{id}/resume | — | unversioned |
+| POST | /api/subscriptions/{paddleSubscriptionId}/sync | — | unversioned |
+| GET | /api/transactions | — | unversioned |
+| GET | /api/transactions/subscription/{subscriptionId} | — | unversioned |
+| GET | /api/transactions/{id} | — | unversioned |
+| POST | /api/transactions/{paddleTransactionId}/sync | — | unversioned |
+| POST | /api/v1/test/payment/seed-active-subscription | — | unversioned |
+| POST | /webhooks/paddle | — | unversioned |
+
+---
+
 ## Plan catalog
 
 ### `GET` /api/payment/plans

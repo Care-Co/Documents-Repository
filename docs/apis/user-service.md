@@ -57,6 +57,52 @@ Updated: 2026-06-23
 
 ---
 
+## API 버전 (endpoint별)
+
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned(헤더 무시).
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| GET | /api/admin/audit/users/{userId} | — | unversioned |
+| GET | /api/admin/audit?action= | — | unversioned |
+| GET | /api/admin/audit?actorId= | — | unversioned |
+| GET | /api/admin/users | — | unversioned |
+| GET | /api/admin/users/{userId} | — | unversioned |
+| PATCH | /api/admin/users/{userId}/status | — | unversioned |
+| POST | /api/admin/users/{username}/unlock | — | unversioned |
+| GET | /api/public/users/{userId} | 1.0.0 | 1.0.0 |
+| DELETE | /api/public/users/{userId} | 1.0.0 | 1.0.0 |
+| POST | /api/public/users/{userId}/revoke-tokens | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/apple | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/google | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/login | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/logout | 1.0.0 | 1.0.0 |
+| GET | /api/v2/auth/oauth2/failure | — | unversioned |
+| GET | /api/v2/auth/oauth2/register | — | unversioned |
+| GET | /api/v2/auth/oauth2/success | — | unversioned |
+| POST | /api/v2/auth/register | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/resend-email | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/send-account-recovery | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/send-password-reset | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/token | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/verify-email | 1.0.0 | 1.0.0 |
+| GET | /api/v2/availability | 1.0.0 | 1.0.0 |
+| GET | /api/v2/exists | 1.0.0 | 1.0.0 |
+| GET | /api/v2/users/{userId} | 1.0.0 | 1.0.0 |
+| PATCH | /api/v2/users/{userId} | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/users/{userId} | 1.0.0 | 1.0.0 |
+| GET | /api/v2/users/{userId}/b2b-centers/{organizationId}/license-detail | 1.0.0 | 1.0.0 |
+| GET | /api/v2/users/{userId}/login-history | 1.0.0 | 1.0.0 |
+| PATCH | /api/v2/users/{userId}/password | 1.0.0 | 1.0.0 |
+| POST | /api/v2/users/{userId}/password | 1.0.0 | 1.0.0 |
+| GET | /api/v2/users/{userId}/sessions | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/users/{userId}/sessions | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/users/{userId}/sessions/{tokenId} | 1.0.0 | 1.0.0 |
+| GET | /api/v2/users/{userId}/terms-consents | 1.0.0 | 1.0.0 |
+| POST | /api/v2/users/{userId}/terms-consents | 1.0.0 | 1.0.0 |
+
+---
+
 ## Auth (REST)
 
 All endpoints below: **base** `/api/v2/auth`, `api-version: 1.0.0`, **security** `permitAll`.

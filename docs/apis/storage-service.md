@@ -23,6 +23,24 @@ Updated: 2026-04-27
 
 ---
 
+## API 버전 (endpoint별)
+
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| DELETE | /api/v1/delete | 1.0.0 | 1.0.0 |
+| GET | /api/v1/download | 1.0.0 | 1.0.0 |
+| POST | /api/v1/upload | 1.0.0 | 1.0.0 |
+| POST | /api/v2/confirm-upload | 1.0.0 | 1.0.0 |
+| DELETE | /api/v2/delete | 1.0.0 | 1.0.0 |
+| GET | /api/v2/download | 1.0.0 | 1.0.0 |
+| GET | /api/v2/pre-sign/download | 1.0.0 | 1.0.0 |
+| POST | /api/v2/pre-sign/upload | 1.0.0 | 1.0.0 |
+| POST | /api/v2/upload | 1.0.0 | 1.0.0 |
+
+---
+
 ## v1 (deprecated)
 
 ### `POST` /api/v1/upload

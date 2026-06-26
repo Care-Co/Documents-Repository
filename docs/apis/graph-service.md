@@ -19,6 +19,22 @@ In-memory running-shoe recommendation and catalog service backed by `src/main/re
 
 ---
 
+## API 버전 (endpoint별)
+
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
+
+| Method | Path | 제공 버전 | 최신 |
+|---|---|---|---|
+| GET | /api/recommendation/catalog/brands | 1.0.0 | 1.0.0 |
+| GET | /api/recommendation/catalog/shoes | 1.0.0 | 1.0.0 |
+| GET | /api/recommendation/catalog/shoes/{productId} | 1.0.0 | 1.0.0 |
+| GET | /api/recommendation/shoes | 1.0.0 | 1.0.0 |
+| POST | /api/recommendation/shoes/stateless | 1.0.0 | 1.0.0 |
+| POST | /api/recommendation/shoes/stateless/full | 1.0.0 | 1.0.0 |
+| POST | /api/recommendation/shoes/{productId}/match | 1.0.0 | 1.0.0 |
+
+---
+
 ## `GET` /api/recommendation/shoes
 
 **Operation ID** &nbsp;`recommendShoes`
