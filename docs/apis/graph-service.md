@@ -28,7 +28,7 @@ In-memory running-shoe recommendation and catalog service backed by `src/main/re
 | GET | /api/recommendation/catalog/brands | 1.0.0 | 1.0.0 |
 | GET | /api/recommendation/catalog/shoes | 1.0.0 | 1.0.0 |
 | GET | /api/recommendation/catalog/shoes/{productId} | 1.0.0 | 1.0.0 |
-| GET | /api/recommendation/shoes | 1.0.0 | 1.0.0 |
+| GET | /api/recommendation/shoes | 1.0.0, 1.0.1 | 1.0.1 |
 | POST | /api/recommendation/shoes/stateless | 1.0.0 | 1.0.0 |
 | POST | /api/recommendation/shoes/stateless/full | 1.0.0 | 1.0.0 |
 | POST | /api/recommendation/shoes/{productId}/match | 1.0.0 | 1.0.0 |
