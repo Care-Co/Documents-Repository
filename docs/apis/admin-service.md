@@ -1,5 +1,7 @@
 # admin-service
 
+> **DEPRECATED — 미사용 서비스 (2026-06 기준).** 더 이상 운영/배포하지 않는다. 아래 내용은 과거 기록이며, 버전 표는 코드 대조 없이 기존 OpenAPI 기반이라 현행과 다를 수 있다.
+
 > OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
 
 Source: `/Users/jonghak/GitHub/Care&Co/admin-service`

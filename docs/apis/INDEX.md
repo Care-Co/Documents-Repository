@@ -23,7 +23,7 @@ Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 | [measure-service](./measure-service.md) | 8 endpoints (record + activity + internal sync) | `api-version: 1.0.0` / `1.0.1` (POST records) | record DTO `2026-01-13` (V9: `deviceId` / `deviceSerial` / `source` / `appVersion` 노출), activity DTO `2026-02-02` |
 | [noti-service](./noti-service.md) | 12 endpoints (FCM + device + topic + history) | `api-version: 1.0.0` | async job pattern |
 | [storage-service](./storage-service.md) | 9 endpoints (v1 deprecated + v2 current) | `api-version: 1.0.0` | v1 sunset 2026-12-31 |
-| [admin-service](./admin-service.md) | 4 endpoints (Spring Boot Admin instance view) | `api-version` `1.0.0`, `2025-06-24`, `0.0.1` | wraps SBA |
+| [admin-service](./admin-service.md) **(deprecated)** | 4 endpoints (Spring Boot Admin instance view) | `api-version` `1.0.0`, `2025-06-24`, `0.0.1` | **미사용 서비스** — wraps SBA |
 | [agent-service](./agent-service.md) | 2 endpoints (LLM chat + greeting) | `api-version: 1.0.0` | proxies Física Agent |
 | [graph-service](./graph-service.md) | 7 endpoints (shoe recommendation + catalog) | `api-version: 1.0.0` | in-memory `shoes.json` |
 | [payment-service](./payment-service.md) | 17 REST + 1 webhook | unversioned | Paddle Billing v2 |
