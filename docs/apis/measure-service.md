@@ -28,7 +28,6 @@ DTO calendar versions: `2026-01-13` (record DTO — V9 부터 `deviceId` / `devi
 
 | Method | Path | 제공 버전 | 최신 |
 |---|---|---|---|
-| POST | /api/internal/sync-user-info | 1.0.0 | 1.0.0 |
 | DELETE | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
 | GET | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
 | POST | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
@@ -36,42 +35,6 @@ DTO calendar versions: `2026-01-13` (record DTO — V9 부터 `deviceId` / `devi
 | GET | /api/v2/users/{userId}/records | 1.0.0, 1.0.1 | 1.0.1 |
 | POST | /api/v2/users/{userId}/records | 1.0.0, 1.0.1 | 1.0.1 |
 | GET | /api/v2/users/{userId}/records/{recordId} | 1.0.0, 1.0.1 | 1.0.1 |
-
----
-
-## `POST` /api/internal/sync-user-info
-
-**Operation ID** &nbsp;`syncUserInfo`
-**Tags** &nbsp;`internal`
-**Security** &nbsp;internal-only (gateway)
-
-One-shot sync of records/activities `user_id` against Auth Service; backfills UTC. Used pre-deployment of UTC migration.
-
-### Parameters
-
-| In | Name | Type | Required |
-|---|---|---|---|
-| header | `api-version` | string (enum: `1.0.0`) | yes |
-
-요청 body 없음.
-
-### Responses
-
-| Status | Content-Type | Schema |
-|---|---|---|
-| **200** | `application/json` | `Envelope` with `data: { syncedCount: integer, utcBackfillCount: integer }` |
-
-#### 200 — example
-
-```json
-{ "success": true, "data": { "syncedCount": 10, "utcBackfillCount": 7 } }
-```
-
-**Errors**
-
-| HTTP | 코드 | 케이스 |
-|---|---|---|
-| 5xx | `CMN-500-*` | Auth Service 조회 실패 / DB IO 실패 (글로벌 핸들러) |
 
 ---
 
