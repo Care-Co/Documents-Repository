@@ -97,6 +97,30 @@ DTO calendar versions: `2026-01-13` (record DTO — V9 부터 `deviceId` / `devi
 | **200** | `CncResponse` with `data: CaptureSettingsResponse` (저장된 값) |
 | **400** | enum·범위 위반 (`CMN-400-*`) |
 
+#### 200 — example
+
+```json
+{
+  "success": true,
+  "data": {
+    "captureMode": "ASSISTED",
+    "shutterMode": "MOTION",
+    "countdownSeconds": 3,
+    "rememberSettings": false
+  }
+}
+```
+
+#### 400 — example (enum 위반)
+
+```json
+{
+  "success": false,
+  "code": "CMN-400-001",
+  "message": "Invalid request parameter. Field: captureMode, Value: FOO"
+}
+```
+
 ```bash
 curl -X PUT https://api.example.com/api/v2/users/{userId}/capture-settings \
   -H "api-version: 1.0.0" -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" \

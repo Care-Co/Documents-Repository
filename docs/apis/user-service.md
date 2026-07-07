@@ -129,10 +129,57 @@ Create account and immediately issue tokens.
 | **400** | [`ErrorResponse`](#errorresponse) |
 | **409** | [`ErrorResponse`](#errorresponse) |
 
+#### Request — example (1.1.1)
+
+```json
+{
+  "username": "u@example.com",
+  "password": "P@ssw0rd!",
+  "firstName": "김철수2",
+  "lastName": "박",
+  "nickname": "철수",
+  "gender": "MALE",
+  "birthdate": "1995-04-27",
+  "height": 175.5,
+  "countryCode": "KR",
+  "languageCode": "KR",
+  "timeZone": "KOREA",
+  "weightUnit": "LB"
+}
+```
+
+`1.0.0` 은 위에서 `weightUnit` 만 제외 (보내도 무시됨).
+
+#### 201 — example
+
+```json
+{
+  "success": true,
+  "token": {
+    "userId": "uuid",
+    "accessToken": "eyJ...",
+    "refreshToken": "eyJ...",
+    "accessTokenExpiresIn": 900
+  },
+  "timestamp": "2026-07-07T08:00:00Z"
+}
+```
+
+#### 400 — example (이름 정규화 실패)
+
+```json
+{
+  "success": false,
+  "code": "CMN-400-001",
+  "message": "Invalid request parameter. Field: firstName, Value: (masked)",
+  "error": "firstName is invalid after normalization."
+}
+```
+
 ```bash
 curl -X POST https://api.example.com/api/v2/auth/register \
-  -H "api-version: 1.0.0" -H "Content-Type: application/json" \
-  -d '{"username":"u@example.com","password":"P@ssw0rd!"}'
+  -H "api-version: 1.1.1" -H "Content-Type: application/json" \
+  -d '{"username":"u@example.com","password":"P@ssw0rd!","firstName":"김철수2","lastName":"박","weightUnit":"LB"}'
 ```
 
 ### `POST` /api/v2/auth/login
@@ -401,13 +448,48 @@ Partial update. Every field is `JsonNullable<T>` so the client can distinguish "
 
 #### Request body
 
-`application/json` — [`UserUpdateRequest`](#userupdaterequest)
+`application/json` — [`UserUpdateRequest`](#userupdaterequest) (+ `1.1.1`: `weightUnit`)
+
+#### Request — example (1.1.1, 부분 수정)
+
+```json
+{
+  "firstName": "John🔥",
+  "weightUnit": "KG"
+}
+```
 
 #### Responses
 
 | Status | Schema |
 |---|---|
 | **200** | `CncResponse` with `data:` [`UserResponse`](#userresponse) |
+
+#### 200 — example (정규화된 저장값 반환)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "firstName": "John",
+    "lastName": "박",
+    "weightUnit": "KG",
+    "countryCode": "KR", "languageCode": "ko-KR"
+  }
+}
+```
+
+#### 400 — example (null clear 거부)
+
+```json
+{
+  "success": false,
+  "code": "CMN-400-002",
+  "message": "Validation failed",
+  "error": "weightUnit cannot be null."
+}
+```
 
 ### `PATCH` /api/v2/users/{userId}/password
 
