@@ -3,7 +3,7 @@
 > OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
 
 Source: `/Users/jonghak/GitHub/Care&Co/user-service`
-Updated: 2026-06-23
+Updated: 2026-07-07
 
 **Servers**
 - `https://api.example.com`
@@ -80,7 +80,7 @@ Updated: 2026-06-23
 | GET | /api/v2/auth/oauth2/failure | — | unversioned |
 | GET | /api/v2/auth/oauth2/register | — | unversioned |
 | GET | /api/v2/auth/oauth2/success | — | unversioned |
-| POST | /api/v2/auth/register | 1.0.0 | 1.0.0 |
+| POST | /api/v2/auth/register | 1.0.0, 1.1.1 | 1.1.1 |
 | POST | /api/v2/auth/resend-email | 1.0.0 | 1.0.0 |
 | POST | /api/v2/auth/send-account-recovery | 1.0.0 | 1.0.0 |
 | POST | /api/v2/auth/send-password-reset | 1.0.0 | 1.0.0 |
@@ -88,8 +88,8 @@ Updated: 2026-06-23
 | POST | /api/v2/auth/verify-email | 1.0.0 | 1.0.0 |
 | GET | /api/v2/availability | 1.0.0 | 1.0.0 |
 | GET | /api/v2/exists | 1.0.0 | 1.0.0 |
-| GET | /api/v2/users/{userId} | 1.0.0, 1.1.0 | 1.1.0 |
-| PATCH | /api/v2/users/{userId} | 1.0.0, 1.1.0 | 1.1.0 |
+| GET | /api/v2/users/{userId} | 1.0.0, 1.1.0, 1.1.1 | 1.1.1 |
+| PATCH | /api/v2/users/{userId} | 1.0.0, 1.1.0, 1.1.1 | 1.1.1 |
 | DELETE | /api/v2/users/{userId} | 1.0.0 | 1.0.0 |
 | GET | /api/v2/users/{userId}/b2b-centers/{organizationId}/license-detail | 1.0.0 | 1.0.0 |
 | GET | /api/v2/users/{userId}/login-history | 1.0.0 | 1.0.0 |
@@ -112,6 +112,10 @@ All endpoints below: **base** `/api/v2/auth`, `api-version: 1.0.0`, **security**
 **Operation ID** &nbsp;`registerUser`  &nbsp;**Tags** &nbsp;`auth`
 
 Create account and immediately issue tokens.
+
+**Versions** — `1.1.1` 은 `1.0.0` 요청 + `weightUnit`(선택, `KG`|`LB`, 미제공 시 `KG`). 응답 shape 은 동일.
+
+**이름 처리 (2026-07-07, B안)** — `firstName`/`lastName` 은 형식 거부 대신 서버가 `NamePolicy.normalizeName` 으로 정규화해 수용한다 (숫자 허용, 이모지·기호 제거, 50 UTF-8 bytes 절단). 정규화 후 빈 값이 되는 입력만 `400 CMN-400-001` + 서버 WARN 로그(마스킹).
 
 #### Request body
 
@@ -349,6 +353,8 @@ All endpoints below: **base** `/api/v2`, `api-version: 1.0.0`, **security** `adm
 
 **Operation ID** &nbsp;`getUser`  &nbsp;**Tags** &nbsp;`user`
 
+**Versions** — `1.1.1` 응답은 `1.1.0` shape + `weightUnit` (`KG`|`LB`). `1.0.0`/`1.1.0` 응답에는 노출되지 않는다.
+
 #### Parameters
 
 | In | Name | Type | Required | Validation |
@@ -376,6 +382,7 @@ All endpoints below: **base** `/api/v2`, `api-version: 1.0.0`, **security** `adm
     "photoUrl": "...",
     "gender": "MALE", "birthdate": "1995-04-27", "height": 175.5,
     "countryCode": "KR", "languageCode": "ko",
+    "weightUnit": "KG",
     "timeZone": "ASIA_SEOUL", "zoneId": "Asia/Seoul",
     "authorities": [{ "role": "USER" }]
   }
@@ -387,6 +394,10 @@ All endpoints below: **base** `/api/v2`, `api-version: 1.0.0`, **security** `adm
 **Operation ID** &nbsp;`updateUser`  &nbsp;**Tags** &nbsp;`user`
 
 Partial update. Every field is `JsonNullable<T>` so the client can distinguish "absent" from "explicitly null".
+
+**Versions** — `1.1.1` 요청·응답에 `weightUnit` (`KG`|`LB`, null clear 는 400). `1.0.0`/`1.1.0` 은 불변.
+
+**이름 처리 (2026-07-07, B안)** — `firstName`/`lastName` 은 정규화 수용 (register 와 동일 규칙, 임시 readonly 해제로 다시 수정 가능). 정규화 후 빈 값·null clear 는 `400`.
 
 #### Request body
 

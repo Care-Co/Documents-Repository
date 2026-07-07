@@ -3,7 +3,7 @@
 > OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
 
 Source: `/Users/jonghak/GitHub/Care&Co/measure-service`
-Updated: 2026-06-08 (Errors 표 / api-version metadata 보강 audit)
+Updated: 2026-07-07 (Errors 표 / api-version metadata 보강 audit)
 
 **Servers**
 - `https://api.example.com`
@@ -29,12 +29,81 @@ DTO calendar versions: `2026-01-13` (record DTO — V9 부터 `deviceId` / `devi
 | Method | Path | 제공 버전 | 최신 |
 |---|---|---|---|
 | DELETE | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
+| GET | /api/v2/users/{userId}/capture-settings | 1.0.0 | 1.0.0 |
+| PUT | /api/v2/users/{userId}/capture-settings | 1.0.0 | 1.0.0 |
 | GET | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
 | POST | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
 | DELETE | /api/v2/users/{userId}/records | 1.0.0 | 1.0.0 |
 | GET | /api/v2/users/{userId}/records | 1.0.0, 1.0.1 | 1.0.1 |
 | POST | /api/v2/users/{userId}/records | 1.0.0, 1.0.1 | 1.0.1 |
 | GET | /api/v2/users/{userId}/records/{recordId} | 1.0.0, 1.0.1 | 1.0.1 |
+
+---
+
+## `GET` /api/v2/users/{userId}/capture-settings
+
+**Operation ID** &nbsp;`getCaptureSettings`  &nbsp;**Tags** &nbsp;`capture-settings`
+
+측정 촬영 설정 조회 — 기기 간 동기화용. 저장된 행이 없으면 404 가 아니라 **기본값으로 200** 을 반환한다 (앱 분기 제거).
+
+### Parameters
+
+| In | Name | Type | Required |
+|---|---|---|---|
+| path | `userId` | string (uuid) | yes |
+| header | `api-version` | `1.0.0` | yes |
+
+### Responses
+
+| Status | Schema |
+|---|---|
+| **200** | `CncResponse` with `data: CaptureSettingsResponse` |
+
+#### 200 — example (기본값)
+
+```json
+{
+  "success": true,
+  "data": {
+    "captureMode": "SELF",
+    "shutterMode": "COUNTDOWN",
+    "countdownSeconds": 5,
+    "rememberSettings": true
+  }
+}
+```
+
+---
+
+## `PUT` /api/v2/users/{userId}/capture-settings
+
+**Operation ID** &nbsp;`upsertCaptureSettings`  &nbsp;**Tags** &nbsp;`capture-settings`
+
+전체 upsert (사용자당 1행). `rememberSettings=false` 여도 나머지 값은 저장된다 — 다음 선택 픽커의 기본값으로 쓰인다.
+
+### Request body
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `captureMode` | string | yes | `SELF`(혼자 촬영) / `ASSISTED`(다른 사람이 촬영) |
+| `shutterMode` | string | yes | `COUNTDOWN`(타이머) / `MOTION`(동작인식 자동촬영) |
+| `countdownSeconds` | integer | yes | 1~10 |
+| `rememberSettings` | boolean | yes | false = 측정마다 선택 UI 노출 |
+
+### Responses
+
+| Status | Schema |
+|---|---|
+| **200** | `CncResponse` with `data: CaptureSettingsResponse` (저장된 값) |
+| **400** | enum·범위 위반 (`CMN-400-*`) |
+
+```bash
+curl -X PUT https://api.example.com/api/v2/users/{userId}/capture-settings \
+  -H "api-version: 1.0.0" -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" \
+  -d '{"captureMode":"ASSISTED","shutterMode":"MOTION","countdownSeconds":3,"rememberSettings":false}'
+```
+
+> 게이트웨이 라우팅 — `/api/{v}/users/*/capture-settings` 는 measure-service 로 라우팅된다 (GatewayConstants.Measure.CAPTURE_SETTINGS). `/users/**` 하위 신규 리소스는 라우트 추가가 없으면 user-service 로 흘러간다.
 
 ---
 
