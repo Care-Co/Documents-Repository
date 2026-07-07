@@ -154,7 +154,7 @@ curl -X POST https://api.example.com/api/v2/auth/register \
 
 - 버전 — `1.0.0`(기존) / `1.1.1` = +`weightUnit`(선택, `KG`|`LB`, 미제공 시 `KG`). 응답 shape 동일.
 - 이름 처리(B안, 2026-07-07) — `firstName`/`lastName` 은 거부 대신 정규화 수용: 숫자 허용, 이모지·기호 제거, 50 UTF-8 bytes 절단. 빈 결과만 400 + 서버 WARN 로그(마스킹).
-- 전체 필드 정의 — [`UserRegisterRequest`](#userregisterrequest)
+- 전체 필드 정의 — [profile-settings-fields.md §1](profile-settings-fields.md#1-post-apiv2authregister--요청-필드)
 
 ### `POST` /api/v2/auth/login
 
@@ -403,7 +403,7 @@ curl https://api.example.com/api/v2/users/{userId} \
 **규칙**
 
 - 버전 — `1.0.0`(legacy enum 표기) / `1.1.0`(country alpha-3·language BCP-47) / `1.1.1` = 1.1.0 + `weightUnit`. 하위 버전 응답에 `weightUnit` 은 노출되지 않는다.
-- 응답 스키마 — [`UserResponse`](#userresponse)
+- 응답 필드 정의 — [profile-settings-fields.md §3](profile-settings-fields.md#3-get-apiv2usersuserid--응답-필드-111)
 
 ### `PATCH` /api/v2/users/{userId}
 
@@ -442,7 +442,7 @@ curl -X PATCH https://api.example.com/api/v2/users/{userId} \
 - 버전 — `1.0.0`/`1.1.0`(불변) / `1.1.1` = 요청·응답에 `weightUnit`.
 - 이름 처리(B안) — register 와 동일 규칙으로 정규화 수용. 임시 readonly(394b040) 해제 — 다시 수정 가능.
 - NOT NULL 필드(gender·weightUnit 등)의 null clear 는 400.
-- 전체 필드 정의 — [`UserUpdateRequest`](#userupdaterequest)
+- 전체 필드 정의 — [profile-settings-fields.md §2](profile-settings-fields.md#2-patch-apiv2usersuserid--요청-필드)
 
 ### `PATCH` /api/v2/users/{userId}/password
 

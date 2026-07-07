@@ -42,3 +42,4 @@ Style: **OpenAPI 3.1 / Swagger** (markdown rendering of `openapi.yaml`)
 ## Samples
 
 `_samples/` contains the original style-comparison drafts (`user-register_style-B-github.md`, `user-register_style-E-openapi.md`) used to choose this style. Style E (OpenAPI) was adopted.
+- [profile-settings-fields.md](profile-settings-fields.md) — 2026-07 프로필·측정 설정 API 필드 전정의 (register/PATCH/GET users · capture-settings)

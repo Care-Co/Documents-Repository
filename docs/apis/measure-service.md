@@ -106,6 +106,8 @@ curl -X PUT https://api.example.com/api/v2/users/{userId}/capture-settings \
 | `countdownSeconds` | integer | yes | 1~10 |
 | `rememberSettings` | boolean | yes | false = 측정마다 선택 UI 노출 |
 
+필드 상세 — [profile-settings-fields.md §4](profile-settings-fields.md#4-getput-apiv2usersuseridcapture-settings--필드)
+
 > 게이트웨이 — `/api/{v}/users/*/capture-settings` 는 measure-service 라우팅 (GatewayConstants.Measure.CAPTURE_SETTINGS). `/users/**` 하위 신규 리소스는 라우트 추가 없으면 user-service 로 흘러간다.
 
 ---
