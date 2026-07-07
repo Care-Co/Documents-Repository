@@ -42,24 +42,14 @@ DTO calendar versions: `2026-01-13` (record DTO — V9 부터 `deviceId` / `devi
 
 ## `GET` /api/v2/users/{userId}/capture-settings
 
-**Operation ID** &nbsp;`getCaptureSettings`  &nbsp;**Tags** &nbsp;`capture-settings`
+측정 촬영 설정 조회 (기기 간 동기화). **저장된 행이 없어도 404 가 아니라 기본값으로 200.**
 
-측정 촬영 설정 조회 — 기기 간 동기화용. 저장된 행이 없으면 404 가 아니라 **기본값으로 200** 을 반환한다 (앱 분기 제거).
+```bash
+curl https://api.example.com/api/v2/users/{userId}/capture-settings \
+  -H "api-version: 1.0.0" -H "Authorization: Bearer <jwt>"
+```
 
-### Parameters
-
-| In | Name | Type | Required |
-|---|---|---|---|
-| path | `userId` | string (uuid) | yes |
-| header | `api-version` | `1.0.0` | yes |
-
-### Responses
-
-| Status | Schema |
-|---|---|
-| **200** | `CncResponse` with `data: CaptureSettingsResponse` |
-
-#### 200 — example (기본값)
+**→ 200** (미설정 시 기본값)
 
 ```json
 {
@@ -77,27 +67,15 @@ DTO calendar versions: `2026-01-13` (record DTO — V9 부터 `deviceId` / `devi
 
 ## `PUT` /api/v2/users/{userId}/capture-settings
 
-**Operation ID** &nbsp;`upsertCaptureSettings`  &nbsp;**Tags** &nbsp;`capture-settings`
+전체 upsert (사용자당 1행). `rememberSettings=false` 여도 나머지 값은 저장 — 다음 선택 픽커의 기본값으로 쓰인다.
 
-전체 upsert (사용자당 1행). `rememberSettings=false` 여도 나머지 값은 저장된다 — 다음 선택 픽커의 기본값으로 쓰인다.
+```bash
+curl -X PUT https://api.example.com/api/v2/users/{userId}/capture-settings \
+  -H "api-version: 1.0.0" -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" \
+  -d '{"captureMode":"ASSISTED","shutterMode":"MOTION","countdownSeconds":3,"rememberSettings":false}'
+```
 
-### Request body
-
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `captureMode` | string | yes | `SELF`(혼자 촬영) / `ASSISTED`(다른 사람이 촬영) |
-| `shutterMode` | string | yes | `COUNTDOWN`(타이머) / `MOTION`(동작인식 자동촬영) |
-| `countdownSeconds` | integer | yes | 1~10 |
-| `rememberSettings` | boolean | yes | false = 측정마다 선택 UI 노출 |
-
-### Responses
-
-| Status | Schema |
-|---|---|
-| **200** | `CncResponse` with `data: CaptureSettingsResponse` (저장된 값) |
-| **400** | enum·범위 위반 (`CMN-400-*`) |
-
-#### 200 — example
+**→ 200** — 저장된 값 반환
 
 ```json
 {
@@ -111,23 +89,24 @@ DTO calendar versions: `2026-01-13` (record DTO — V9 부터 `deviceId` / `devi
 }
 ```
 
-#### 400 — example (enum 위반)
+**→ 400** — enum·범위 위반
 
 ```json
-{
-  "success": false,
-  "code": "CMN-400-001",
-  "message": "Invalid request parameter. Field: captureMode, Value: FOO"
-}
+{ "success": false, "code": "CMN-400-001", "message": "Invalid request parameter. Field: captureMode, Value: FOO" }
 ```
 
-```bash
-curl -X PUT https://api.example.com/api/v2/users/{userId}/capture-settings \
-  -H "api-version: 1.0.0" -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" \
-  -d '{"captureMode":"ASSISTED","shutterMode":"MOTION","countdownSeconds":3,"rememberSettings":false}'
-```
+---
 
-> 게이트웨이 라우팅 — `/api/{v}/users/*/capture-settings` 는 measure-service 로 라우팅된다 (GatewayConstants.Measure.CAPTURE_SETTINGS). `/users/**` 하위 신규 리소스는 라우트 추가가 없으면 user-service 로 흘러간다.
+**규칙**
+
+| 필드 | 타입 | 필수 | 규칙 |
+|---|---|---|---|
+| `captureMode` | string | yes | `SELF`(혼자 촬영) / `ASSISTED`(다른 사람이 촬영) |
+| `shutterMode` | string | yes | `COUNTDOWN`(타이머) / `MOTION`(동작인식 자동촬영) |
+| `countdownSeconds` | integer | yes | 1~10 |
+| `rememberSettings` | boolean | yes | false = 측정마다 선택 UI 노출 |
+
+> 게이트웨이 — `/api/{v}/users/*/capture-settings` 는 measure-service 라우팅 (GatewayConstants.Measure.CAPTURE_SETTINGS). `/users/**` 하위 신규 리소스는 라우트 추가 없으면 user-service 로 흘러간다.
 
 ---
 

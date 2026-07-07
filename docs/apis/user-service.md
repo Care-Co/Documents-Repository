@@ -109,48 +109,24 @@ All endpoints below: **base** `/api/v2/auth`, `api-version: 1.0.0`, **security**
 
 ### `POST` /api/v2/auth/register
 
-**Operation ID** &nbsp;`registerUser`  &nbsp;**Tags** &nbsp;`auth`
+계정 생성 + 즉시 토큰 발급.
 
-Create account and immediately issue tokens.
-
-**Versions** — `1.1.1` 은 `1.0.0` 요청 + `weightUnit`(선택, `KG`|`LB`, 미제공 시 `KG`). 응답 shape 은 동일.
-
-**이름 처리 (2026-07-07, B안)** — `firstName`/`lastName` 은 형식 거부 대신 서버가 `NamePolicy.normalizeName` 으로 정규화해 수용한다 (숫자 허용, 이모지·기호 제거, 50 UTF-8 bytes 절단). 정규화 후 빈 값이 되는 입력만 `400 CMN-400-001` + 서버 WARN 로그(마스킹).
-
-#### Request body
-
-`application/json` — [`UserRegisterRequest`](#userregisterrequest)
-
-#### Responses
-
-| Status | Schema |
-|---|---|
-| **201** | [`CncResponse_CncTokenDto`](#cncresponse_cnctokendto) |
-| **400** | [`ErrorResponse`](#errorresponse) |
-| **409** | [`ErrorResponse`](#errorresponse) |
-
-#### Request — example (1.1.1)
-
-```json
-{
-  "username": "u@example.com",
-  "password": "P@ssw0rd!",
-  "firstName": "김철수2",
-  "lastName": "박",
-  "nickname": "철수",
-  "gender": "MALE",
-  "birthdate": "1995-04-27",
-  "height": 175.5,
-  "countryCode": "KR",
-  "languageCode": "KR",
-  "timeZone": "KOREA",
-  "weightUnit": "LB"
-}
+```bash
+curl -X POST https://api.example.com/api/v2/auth/register \
+  -H "api-version: 1.1.1" -H "Content-Type: application/json" \
+  -d '{
+    "username": "u@example.com",
+    "password": "P@ssw0rd!",
+    "firstName": "김철수2",
+    "lastName": "박",
+    "gender": "MALE",
+    "birthdate": "1995-04-27",
+    "countryCode": "KR",
+    "weightUnit": "LB"
+  }'
 ```
 
-`1.0.0` 은 위에서 `weightUnit` 만 제외 (보내도 무시됨).
-
-#### 201 — example
+**→ 201**
 
 ```json
 {
@@ -160,27 +136,25 @@ Create account and immediately issue tokens.
     "accessToken": "eyJ...",
     "refreshToken": "eyJ...",
     "accessTokenExpiresIn": 900
-  },
-  "timestamp": "2026-07-07T08:00:00Z"
+  }
 }
 ```
 
-#### 400 — example (이름 정규화 실패)
+**→ 400** — 이름 정규화 실패(전부 이모지·기호) · 필드 형식 위반
 
 ```json
-{
-  "success": false,
-  "code": "CMN-400-001",
-  "message": "Invalid request parameter. Field: firstName, Value: (masked)",
-  "error": "firstName is invalid after normalization."
-}
+{ "success": false, "code": "CMN-400-001", "error": "firstName is invalid after normalization." }
 ```
 
-```bash
-curl -X POST https://api.example.com/api/v2/auth/register \
-  -H "api-version: 1.1.1" -H "Content-Type: application/json" \
-  -d '{"username":"u@example.com","password":"P@ssw0rd!","firstName":"김철수2","lastName":"박","weightUnit":"LB"}'
-```
+**→ 409** — username(이메일)·전화번호 중복
+
+---
+
+**규칙**
+
+- 버전 — `1.0.0`(기존) / `1.1.1` = +`weightUnit`(선택, `KG`|`LB`, 미제공 시 `KG`). 응답 shape 동일.
+- 이름 처리(B안, 2026-07-07) — `firstName`/`lastName` 은 거부 대신 정규화 수용: 숫자 허용, 이모지·기호 제거, 50 UTF-8 bytes 절단. 빈 결과만 400 + 서버 WARN 로그(마스킹).
+- 전체 필드 정의 — [`UserRegisterRequest`](#userregisterrequest)
 
 ### `POST` /api/v2/auth/login
 
@@ -398,74 +372,50 @@ All endpoints below: **base** `/api/v2`, `api-version: 1.0.0`, **security** `adm
 
 ### `GET` /api/v2/users/{userId}
 
-**Operation ID** &nbsp;`getUser`  &nbsp;**Tags** &nbsp;`user`
+```bash
+curl https://api.example.com/api/v2/users/{userId} \
+  -H "api-version: 1.1.1" -H "Authorization: Bearer <jwt>"
+```
 
-**Versions** — `1.1.1` 응답은 `1.1.0` shape + `weightUnit` (`KG`|`LB`). `1.0.0`/`1.1.0` 응답에는 노출되지 않는다.
-
-#### Parameters
-
-| In | Name | Type | Required | Validation |
-|---|---|---|---|---|
-| path | `userId` | string (uuid) | yes | `@ValidUuid` |
-
-#### Responses
-
-| Status | Schema |
-|---|---|
-| **200** | `CncResponse` with `data:` [`UserResponse`](#userresponse) |
-| **403** / **404** | [`ErrorResponse`](#errorresponse) |
-
-#### 200 — example
+**→ 200**
 
 ```json
 {
   "success": true,
   "data": {
     "id": "uuid",
-    "userProviders": [{ "provider": "GOOGLE", "providerId": "..." }],
-    "userEmail": { "emailFull": "u@x.com", "verified": true, "verifiedAt": "..." },
     "firstName": "Jonghak", "lastName": "Lee", "nickname": "JH",
-    "phone": { "e164": "+82...", "countryCode": "KR", "national": "...", "formatted": "..." },
-    "photoUrl": "...",
     "gender": "MALE", "birthdate": "1995-04-27", "height": 175.5,
-    "countryCode": "KR", "languageCode": "ko",
+    "countryCode": "KOR", "languageCode": "ko-KR",
     "weightUnit": "KG",
     "timeZone": "ASIA_SEOUL", "zoneId": "Asia/Seoul",
+    "userEmail": { "emailFull": "u@x.com", "verified": true },
+    "userProviders": [{ "provider": "GOOGLE" }],
     "authorities": [{ "role": "USER" }]
   }
 }
 ```
 
+**→ 403 / 404** — 타인 리소스 · 미존재/삭제 대기 계정
+
+---
+
+**규칙**
+
+- 버전 — `1.0.0`(legacy enum 표기) / `1.1.0`(country alpha-3·language BCP-47) / `1.1.1` = 1.1.0 + `weightUnit`. 하위 버전 응답에 `weightUnit` 은 노출되지 않는다.
+- 응답 스키마 — [`UserResponse`](#userresponse)
+
 ### `PATCH` /api/v2/users/{userId}
 
-**Operation ID** &nbsp;`updateUser`  &nbsp;**Tags** &nbsp;`user`
+부분 수정 — 모든 필드가 `JsonNullable<T>` 라 "안 보냄(absent)"과 "명시적 null" 을 구분한다.
 
-Partial update. Every field is `JsonNullable<T>` so the client can distinguish "absent" from "explicitly null".
-
-**Versions** — `1.1.1` 요청·응답에 `weightUnit` (`KG`|`LB`, null clear 는 400). `1.0.0`/`1.1.0` 은 불변.
-
-**이름 처리 (2026-07-07, B안)** — `firstName`/`lastName` 은 정규화 수용 (register 와 동일 규칙, 임시 readonly 해제로 다시 수정 가능). 정규화 후 빈 값·null clear 는 `400`.
-
-#### Request body
-
-`application/json` — [`UserUpdateRequest`](#userupdaterequest) (+ `1.1.1`: `weightUnit`)
-
-#### Request — example (1.1.1, 부분 수정)
-
-```json
-{
-  "firstName": "John🔥",
-  "weightUnit": "KG"
-}
+```bash
+curl -X PATCH https://api.example.com/api/v2/users/{userId} \
+  -H "api-version: 1.1.1" -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" \
+  -d '{"firstName":"John🔥","weightUnit":"KG"}'
 ```
 
-#### Responses
-
-| Status | Schema |
-|---|---|
-| **200** | `CncResponse` with `data:` [`UserResponse`](#userresponse) |
-
-#### 200 — example (정규화된 저장값 반환)
+**→ 200** — 정규화된 저장값이 그대로 반환된다
 
 ```json
 {
@@ -473,23 +423,26 @@ Partial update. Every field is `JsonNullable<T>` so the client can distinguish "
   "data": {
     "id": "uuid",
     "firstName": "John",
-    "lastName": "박",
     "weightUnit": "KG",
-    "countryCode": "KR", "languageCode": "ko-KR"
+    "countryCode": "KOR", "languageCode": "ko-KR"
   }
 }
 ```
 
-#### 400 — example (null clear 거부)
+**→ 400** — null clear 시도 · 정규화 후 빈 이름
 
 ```json
-{
-  "success": false,
-  "code": "CMN-400-002",
-  "message": "Validation failed",
-  "error": "weightUnit cannot be null."
-}
+{ "success": false, "code": "CMN-400-002", "error": "weightUnit cannot be null." }
 ```
+
+---
+
+**규칙**
+
+- 버전 — `1.0.0`/`1.1.0`(불변) / `1.1.1` = 요청·응답에 `weightUnit`.
+- 이름 처리(B안) — register 와 동일 규칙으로 정규화 수용. 임시 readonly(394b040) 해제 — 다시 수정 가능.
+- NOT NULL 필드(gender·weightUnit 등)의 null clear 는 400.
+- 전체 필드 정의 — [`UserUpdateRequest`](#userupdaterequest)
 
 ### `PATCH` /api/v2/users/{userId}/password
 
