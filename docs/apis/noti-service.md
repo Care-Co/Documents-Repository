@@ -1,379 +1,328 @@
 # noti-service
 
-> OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
+> 엔드포인트별 Header · Request · Response 정의 — 전 엔드포인트 `1.0.0` 단일 버전. 소스는 실제 컨트롤러/DTO.
+> 표기 — **굵은 필드 = 필수**.
 
 Source: `/Users/jonghak/GitHub/Care&Co/noti-service`
-Updated: 2026-04-27
+Updated: 2026-07-09
+
+> **내부 전용 (2026-07 기준)** — 게이트웨이가 noti 라우팅을 의도적으로 비활성 상태로 유지한다 (`/api/v1/devices/**` 가 device-service 경로와 충돌 + 외부 노출 설계 미결). 외부(app.carencoinc.com)에서 호출 불가, **k3s 클러스터 내부에서만** 호출 가능하다.
 
 **Servers**
-- `https://api.example.com`
+- `http://noti.carenco.svc.cluster.local:8080` (클러스터 내부)
 
 **Common headers**
 
-| Header | Value |
-|---|---|
-| `api-version` | `1.0.0` |
-| `Content-Type` | `application/json` |
-
-**Security** &nbsp;No `@PreAuthorize` annotations — admin endpoints (`/admin/topics/*`, `/devices/cleanup`) must be guarded at the gateway.
-
----
-
-## API 버전 (endpoint별)
-
-> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
-
-| Method | Path | 제공 버전 | 최신 |
-|---|---|---|---|
-| POST | `/api/v1/admin/topics` | 1.0.0 | 1.0.0 |
-| DELETE | `/api/v1/admin/topics/{id}` | 1.0.0 | 1.0.0 |
-| PUT | `/api/v1/devices` | 1.0.0 | 1.0.0 |
-| POST | `/api/v1/devices/cleanup` | 1.0.0 | 1.0.0 |
-| PATCH | `/api/v1/devices/deactivate` | 1.0.0 | 1.0.0 |
-| GET | `/api/v1/histories` | 1.0.0 | 1.0.0 |
-| GET | `/api/v1/histories/status/{status}` | 1.0.0 | 1.0.0 |
-| GET | `/api/v1/histories/target/{targetType}` | 1.0.0 | 1.0.0 |
-| GET | `/api/v1/histories/{historyId}` | 1.0.0 | 1.0.0 |
-| POST | `/api/v1/jobs` | 1.0.0 | 1.0.0 |
-| GET | `/api/v1/jobs/{jobId}` | 1.0.0 | 1.0.0 |
-| GET | `/api/v1/users/{userId}/histories` | 1.0.0 | 1.0.0 |
-| DELETE | `/api/v1/users/{userId}/topics/{topicCode}` | 1.0.0 | 1.0.0 |
-| POST | `/api/v1/users/{userId}/topics/{topicCode}` | 1.0.0 | 1.0.0 |
-
----
-
-## `POST` /api/v1/jobs
-
-**Operation ID** &nbsp;`createFcmJob`  &nbsp;**Tags** &nbsp;`fcm-job`
-
-Enqueue an async FCM send job.
-
-### Request body
-
-`application/json` &nbsp;**Required** — [`FcmJobCreateRequest`](#fcmjobcreaterequest)
-
-```json
-{ "type": "SEND_USER", "payload": { "userId": "...", "title": "hi", "body": "..." } }
-```
-
-### Responses
-
-| Status | Content-Type | Schema |
+| Header | Value | Notes |
 |---|---|---|
-| **202** | `application/json` | [`FcmJobEnqueueResponse`](#fcmjobenqueueresponse) |
-| **400** | `application/json` | [`ErrorResponse`](#errorresponse) |
+| `api-version` | `1.0.0` | 전 엔드포인트 단일 버전 |
+| `Content-Type` | `application/json` | 바디 있는 요청 |
 
-#### 202 — example
-
-```json
-{ "jobId": "..." }
-```
-
-```bash
-curl -X POST https://api.example.com/api/v1/jobs \
-  -H "api-version: 1.0.0" -H "Content-Type: application/json" \
-  -d '{"type":"SEND_USER","payload":{"userId":"...","title":"hi","body":"..."}}'
-```
+**Response envelope** — 없음. `CncResponse` 를 쓰지 않고 DTO 를 최상위로 직접 반환한다. 검증 실패는 400.
 
 ---
 
-## `GET` /api/v1/jobs/{jobId}
+## 1. `PUT` /api/v1/devices
 
-**Operation ID** &nbsp;`getFcmJob`  &nbsp;**Tags** &nbsp;`fcm-job`
+FCM 디바이스 토큰 upsert — 같은 토큰이면 갱신, 없으면 등록.
 
-### Parameters
+### Header
 
-| In | Name | Type | Required |
-|---|---|---|---|
-| path | `jobId` | string | yes |
-
-### Responses
-
-| Status | Content-Type | Schema |
+| 헤더 | 값 | 필수 |
 |---|---|---|
-| **200** | `application/json` | [`FcmJobResponse`](#fcmjobresponse) |
-| **404** | `application/json` | [`ErrorResponse`](#errorresponse) |
+| `api-version` | `1.0.0` | yes |
+| `Content-Type` | `application/json` | yes |
 
-#### 200 — example
+### `1.0.0` — Request
 
 ```json
 {
-  "id": "...", "jobType": "SEND_USER",
-  "status": "PROCESSING",
-  "successCount": 3, "failureCount": 1,
-  "lastError": null, "nextRunAt": null,
-  "deferredReason": null,
-  "startedAt": "...", "finishedAt": null,
-  "createdAt": "...", "updatedAt": "..."
+  "userId": "3f2a...uuid",
+  "platform": "ANDROID",
+  "fcmToken": "fcm-token...",
+  "pushEnabled": true,
+  "appVersion": "1.4.0",
+  "osVersion": "14",
+  "deviceModel": "SM-S926N",
+  "locale": "ko-KR"
+}
+```
+
+| 필드 | 값 | 규칙 |
+|---|---|---|
+| **`userId`** | uuid | |
+| **`platform`** | `ANDROID` \| `IOS` | |
+| **`fcmToken`** | string | upsert 키 |
+| `pushEnabled` | boolean | 기본 true |
+| `appVersion` `osVersion` `deviceModel` `locale` | string | 선택 메타 |
+
+### `1.0.0` — Response
+
+**200 OK** — 저장된 디바이스
+
+```json
+{
+  "id": "device-pk",
+  "userId": "3f2a...uuid",
+  "platform": "ANDROID",
+  "pushEnabled": true,
+  "appVersion": "1.4.0",
+  "osVersion": "14",
+  "deviceModel": "SM-S926N",
+  "locale": "ko-KR"
+}
+```
+
+<details>
+<summary><b>400 Bad Request</b> — 필수 필드 누락 · enum 위반</summary>
+
+(Bean Validation 400 — envelope 없음)
+
+</details>
+
+---
+
+## 2. `PATCH` /api/v1/devices/deactivate
+
+푸시 비활성화 (토큰 기준).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` | yes |
+
+### `1.0.0` — Request
+
+바디 없음. 쿼리 파라미터:
+
+| 파라미터 | 타입 | 필수 |
+|---|---|---|
+| **`fcmToken`** | string | yes |
+
+### `1.0.0` — Response
+
+**200 OK** — 바디 없음.
+
+---
+
+## 3. `POST` /api/v1/users/{userId}/topics/{topicCode} · `DELETE` 동일 경로
+
+토픽 구독(POST) / 구독 해제(DELETE).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` | yes |
+
+### `1.0.0` — Request
+
+바디 없음 — path 의 `userId` (uuid), `topicCode` (string).
+
+### `1.0.0` — Response
+
+**200 OK** — 바디 없음.
+
+---
+
+## 4. `POST` /api/v1/jobs
+
+FCM 발송 잡 등록 (비동기 — 워커가 1초 폴링으로 처리).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` | yes |
+| `Content-Type` | `application/json` | yes |
+
+### `1.0.0` — Request
+
+```json
+{
+  "type": "SEND_USER",
+  "payload": { "userId": "3f2a...uuid", "title": "제목", "body": "내용", "imageUrl": null }
+}
+```
+
+| 필드 | 값 | 규칙 |
+|---|---|---|
+| **`type`** | `SEND_TOKEN` \| `SEND_USER` \| `SEND_TOPIC` | |
+| **`payload`** | object | type 별 요청 shape — SEND_TOKEN: `{tokens[], title, body, imageUrl}` / SEND_USER: `{userId, title, body, imageUrl}` / SEND_TOPIC: `{topic, title, body, imageUrl}` |
+
+### `1.0.0` — Response
+
+**202 Accepted** — 잡 ID 발급 (처리는 비동기)
+
+```json
+{ "jobId": "job-uuid" }
+```
+
+---
+
+## 5. `GET` /api/v1/jobs/{jobId}
+
+잡 상태 조회.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` | yes |
+
+### `1.0.0` — Request
+
+바디 없음 — path 의 `jobId`.
+
+### `1.0.0` — Response
+
+**200 OK**
+
+```json
+{
+  "id": "job-uuid",
+  "jobType": "SEND_USER",
+  "status": "SUCCESS",
+  "successCount": 2,
+  "failureCount": 0,
+  "lastError": null,
+  "nextRunAt": null,
+  "deferredReason": null
+}
+```
+
+| 필드 | 값 |
+|---|---|
+| `status` | `PENDING` \| `DEFERRED` \| `PROCESSING` \| `SUCCESS` \| `PARTIAL_SUCCESS` \| `FAILED` |
+| `successCount` / `failureCount` | 대상 디바이스별 발송 결과 수 |
+| `deferredReason` `nextRunAt` | DEFERRED 시 사유·재시도 시각 |
+
+---
+
+## 6. `GET` /api/v1/histories/{historyId} · `/users/{userId}/histories` · `/histories/status/{status}` · `/histories/target/{targetType}` · `/histories`
+
+발송 이력 조회 5종 — 단건 / 사용자별 / 상태별(`SUCCESS`·`FAILED`) / 대상타입별(`TOKEN`·`TOPIC`) / 전체. 응답은 단건 또는 배열.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` | yes |
+
+### `1.0.0` — Request
+
+바디 없음 — path 파라미터만 (전체 조회는 파라미터 없음, 페이징 없음).
+
+### `1.0.0` — Response
+
+**200 OK** — `PushSendHistoryResponse` (배열 엔드포인트는 `[...]`)
+
+```json
+{
+  "id": "history-uuid",
+  "targetType": "TOKEN",
+  "targetValue": "fcm-token...",
+  "userId": "3f2a...uuid",
+  "devicePk": "device-pk",
+  "topicPk": null,
+  "title": "제목",
+  "body": "내용"
 }
 ```
 
 ---
 
-## `PUT` /api/v1/devices
+## 7. `POST` /api/v1/admin/topics
 
-**Operation ID** &nbsp;`upsertDevice`  &nbsp;**Tags** &nbsp;`device`
+알림 토픽 생성 (admin).
 
-Upsert a device (matches on `userId + platform + fcmToken`).
+### Header
 
-### Request body
-
-`application/json` &nbsp;**Required** — [`RegisterDeviceRequest`](#registerdevicerequest)
-
-### Responses
-
-| Status | Content-Type | Schema |
+| 헤더 | 값 | 필수 |
 |---|---|---|
-| **200** | `application/json` | [`Device`](#device) |
-| **400** | `application/json` | [`ErrorResponse`](#errorresponse) |
+| `api-version` | `1.0.0` | yes |
+| `Content-Type` | `application/json` | yes |
 
-#### 200 — example
+### `1.0.0` — Request
 
 ```json
 {
-  "id": "...", "userId": "...",
-  "platform": "ANDROID", "pushEnabled": true,
-  "appVersion": "...", "osVersion": "...", "deviceModel": "...",
-  "locale": "ko-KR", "timezone": "Asia/Seoul",
-  "status": "ACTIVE",
-  "tokenUpdatedAt": "...", "lastSeenAt": "...",
-  "createdAt": "...", "updatedAt": "..."
+  "topicCode": "MARKETING",
+  "topicName": "marketing",
+  "displayName": "마케팅 알림",
+  "description": "이벤트·혜택 소식",
+  "enabled": true,
+  "subscribable": true,
+  "allowUserUnsubscribe": true,
+  "defaultEnabled": false
+}
+```
+
+| 필드 | 값 | 규칙 |
+|---|---|---|
+| **`topicCode`** | string | 구독 API 의 path 키 |
+| **`topicName`** | string | FCM 토픽명 |
+| `displayName` `description` | string | 표시용 |
+| `enabled` `subscribable` `allowUserUnsubscribe` `defaultEnabled` | boolean | 정책 플래그 |
+
+### `1.0.0` — Response
+
+**201 Created** — 생성된 토픽 (`NotificationTopicResponse` — 요청 필드 + `id`)
+
+```json
+{
+  "id": "topic-pk",
+  "topicCode": "MARKETING",
+  "topicName": "marketing",
+  "displayName": "마케팅 알림",
+  "description": "이벤트·혜택 소식",
+  "enabled": true,
+  "subscribable": true,
+  "allowUserUnsubscribe": true
 }
 ```
 
 ---
 
-## `PATCH` /api/v1/devices/deactivate
+## 8. `DELETE` /api/v1/admin/topics/{id}
 
-**Operation ID** &nbsp;`deactivateDevice`  &nbsp;**Tags** &nbsp;`device`
+토픽 삭제 (admin).
 
-Logout (deactivate) device by FCM token.
+### Header
 
-### Parameters
-
-| In | Name | Type | Required | Validation |
-|---|---|---|---|---|
-| query | `fcmToken` | string | yes | `@NotBlank` |
-
-### Responses
-
-| Status | Body |
-|---|---|
-| **204** | (empty) |
-
----
-
-## `POST` /api/v1/users/{userId}/topics/{topicCode}
-
-**Operation ID** &nbsp;`subscribeTopic`  &nbsp;**Tags** &nbsp;`topic`
-
-Subscribe user to a notification topic.
-
-### Parameters
-
-| In | Name | Type | Required | Validation |
-|---|---|---|---|---|
-| path | `userId` | string | yes | `@NotBlank` |
-| path | `topicCode` | string | yes | `@NotBlank` |
-
-### Responses
-
-| Status | Body |
-|---|---|
-| **200** | (empty) |
-
----
-
-## `DELETE` /api/v1/users/{userId}/topics/{topicCode}
-
-**Operation ID** &nbsp;`unsubscribeTopic`  &nbsp;**Tags** &nbsp;`topic`
-
-Unsubscribe user from a notification topic. Same parameters/response as subscribe.
-
----
-
-## `POST` /api/v1/admin/topics
-
-**Operation ID** &nbsp;`createTopic`  &nbsp;**Tags** &nbsp;`topic-admin`
-**Security** &nbsp;admin (gateway)
-
-Create topic. `sortOrder` is auto-assigned to `max + 1`.
-
-### Request body
-
-`application/json` &nbsp;**Required** — [`NotificationTopicCreateRequest`](#notificationtopiccreaterequest)
-
-### Responses
-
-| Status | Content-Type | Schema |
+| 헤더 | 값 | 필수 |
 |---|---|---|
-| **201** | `application/json` | [`NotificationTopic`](#notificationtopic) |
+| `api-version` | `1.0.0` | yes |
+
+### `1.0.0` — Request
+
+바디 없음 — path 의 `id` (topic PK).
+
+### `1.0.0` — Response
+
+**200 OK** — 바디 없음.
 
 ---
 
-## `DELETE` /api/v1/admin/topics/{id}
+## 9. `POST` /api/v1/devices/cleanup
 
-**Operation ID** &nbsp;`deleteTopic`  &nbsp;**Tags** &nbsp;`topic-admin`
-**Security** &nbsp;admin (gateway)
+비활성/무효 디바이스 수동 정리 (admin — 자동 정리는 매일 03:00 cron).
 
-Delete and renumber `sortOrder` for remaining rows.
+### Header
 
-### Parameters
-
-| In | Name | Type | Required |
-|---|---|---|---|
-| path | `id` | string | yes |
-
-### Responses
-
-| Status | Body |
-|---|---|
-| **204** | (empty) |
-
----
-
-## `POST` /api/v1/devices/cleanup
-
-**Operation ID** &nbsp;`cleanupDevices`  &nbsp;**Tags** &nbsp;`device-admin`
-**Security** &nbsp;admin / internal (gateway)
-
-Manually delete `INACTIVE` / `INVALID_TOKEN` devices past retention.
-
-### Responses
-
-| Status | Content-Type | Schema |
+| 헤더 | 값 | 필수 |
 |---|---|---|
-| **200** | `application/json` | `{ deletedCount: integer }` |
+| `api-version` | `1.0.0` | yes |
 
----
+### `1.0.0` — Request
 
-## Push History (`FcmHistoryController`)
+바디 없음.
 
-| Method | Path | Operation ID | Description |
-|---|---|---|---|
-| GET | `/api/v1/histories/{historyId}` | `getHistory` | Single record (404 if missing) |
-| GET | `/api/v1/users/{userId}/histories` | `listHistoriesByUser` | All for a user |
-| GET | `/api/v1/histories/status/{status}` | `listHistoriesByStatus` | `status` ∈ `SUCCESS` `FAIL` |
-| GET | `/api/v1/histories/target/{targetType}` | `listHistoriesByTarget` | `targetType` ∈ `TOKEN` `TOPIC` `USER` |
-| GET | `/api/v1/histories` | `listHistories` | All histories (no pagination) |
+### `1.0.0` — Response
 
-### Responses
-
-`200 application/json` → [`PushSendHistory`](#pushsendhistory) (single) or array.
-
-#### example item
+**200 OK**
 
 ```json
-{
-  "id": "...", "targetType": "USER", "targetValue": "userId-or-masked-token",
-  "userId": "...", "devicePk": "...", "topicPk": null,
-  "title": "...", "body": "...",
-  "sendStatus": "SUCCESS",
-  "firebaseMessageId": "projects/.../messages/...",
-  "errorCode": null,
-  "sentAt": "..."
-}
+{ "deletedCount": 12 }
 ```
-
----
-
-## Schemas
-
-### `FcmJobCreateRequest`
-
-| Field | Type | Required | Validation | Description |
-|---|---|---|---|---|
-| `type` | string (enum: `SEND_TOKEN` `SEND_USER` `SEND_TOPIC` `SEND_BULK`) | yes | `@NotNull` | — |
-| `payload` | object | yes | `@NotNull` | shape matches `SendTo*Request` for the chosen `type` |
-
-### `FcmJobEnqueueResponse`
-
-| Field | Type | Required |
-|---|---|---|
-| `jobId` | string | yes |
-
-### `FcmJobResponse`
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | — |
-| `jobType` | string (enum `FcmJobType`) | — |
-| `status` | string (enum: `PENDING` `DEFERRED` `PROCESSING` `SUCCESS` `PARTIAL_SUCCESS` `FAIL`) | — |
-| `successCount` | integer | — |
-| `failureCount` | integer | — |
-| `lastError` | string | — |
-| `nextRunAt` | string (date-time, UTC) | — |
-| `deferredReason` | string | — |
-| `startedAt` | string (date-time, UTC) | — |
-| `finishedAt` | string (date-time, UTC) | — |
-| `createdAt` | string (date-time, UTC) | — |
-| `updatedAt` | string (date-time, UTC) | — |
-
-### `RegisterDeviceRequest`
-
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `userId` | string | no | anonymous if omitted |
-| `platform` | string (enum: `ANDROID` `IOS` `WEB`) | yes | `@NotNull` |
-| `fcmToken` | string | yes | `@NotBlank` |
-| `pushEnabled` | boolean | yes | `@NotNull` |
-| `appVersion` | string | no | — |
-| `osVersion` | string | no | — |
-| `deviceModel` | string | no | — |
-| `locale` | string | no | `@ValidLocale` |
-| `timezone` | string | no | `@ValidTimezone` |
-
-### `Device`
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | — |
-| `userId` | string | — |
-| `platform` | string (enum) | — |
-| `pushEnabled` | boolean | — |
-| `appVersion` `osVersion` `deviceModel` `locale` `timezone` | string | — |
-| `status` | string (enum: `ACTIVE` `INACTIVE` `INVALID_TOKEN`) | — |
-| `tokenUpdatedAt` `lastSeenAt` `createdAt` `updatedAt` | string (date-time, UTC) | — |
-
-### `NotificationTopicCreateRequest`
-
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `topicCode` | string | yes | `@NotBlank` (unique) |
-| `topicName` | string | yes | `@NotBlank` |
-| `displayName` | string | yes | `@NotBlank` |
-| `description` | string | no | — |
-| `enabled` | boolean | yes | `@NotNull` |
-| `subscribable` | boolean | yes | `@NotNull` |
-| `allowUserUnsubscribe` | boolean | yes | `@NotNull` |
-| `defaultEnabled` | boolean | yes | `@NotNull` |
-
-### `NotificationTopic`
-
-`NotificationTopicCreateRequest` fields plus `id`, `sortOrder` (integer), `createdAt`, `updatedAt`.
-
-### `PushSendHistory`
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | — |
-| `targetType` | string (enum: `TOKEN` `TOPIC` `USER`) | — |
-| `targetValue` | string | userId or masked token |
-| `userId` | string | — |
-| `devicePk` | string | — |
-| `topicPk` | string | — |
-| `title` | string | — |
-| `body` | string | — |
-| `sendStatus` | string (enum: `SUCCESS` `FAIL`) | — |
-| `firebaseMessageId` | string | populated on success |
-| `errorCode` | string | populated on failure |
-| `sentAt` | string (date-time, UTC) | — |
-
-### `ErrorResponse`
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | boolean | yes |
-| `code` | string | yes |
-| `message` | string | yes |
-| `timestamp` | string (date-time, UTC) | yes |
