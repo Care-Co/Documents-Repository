@@ -92,6 +92,7 @@ Updated: 2026-07-09
 | POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/resume | 1.0.0 | 1.0.0 |
 | GET | /api/v2/b2b/billing/organizations/{organizationId}/transactions | 1.0.0 | 1.0.0 |
 | POST | /api/v2/b2b/billing/plan-change | 1.0.0 | 1.0.0 |
+| GET | /api/v2/b2b/billing/plans | 1.0.0 | 1.0.0 |
 | GET | /api/v2/b2b/feedbacks/measurements/{recordId} | 1.0.0 | 1.0.0 |
 | GET | /api/v2/b2b/feedbacks/memberships/{membershipId} | 1.0.0 | 1.0.0 |
 | POST | /api/v2/b2b/feedbacks/memberships/{membershipId} | 1.0.0 | 1.0.0 |
@@ -4671,6 +4672,75 @@ Paddle 호스팅 고객 포털 세션 생성 (overview / 송장 / 결제수단 d
 ```
 
 </details>
+
+---
+
+## 57. `GET` /api/v2/b2b/billing/plans
+
+B2B plan 카탈로그 (planCode × variants). audience 는 서버가 `B2B` 로 고정 — 프론트는 파라미터 없이 호출. 단일 버전 (`1.0.0`).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` (단일 버전) | yes |
+| `Authorization` | `Bearer <jwt>` | yes |
+
+### Security
+
+**인증된 b2b 유저**면 조회 가능 — OWNER / organization 불필요 (카탈로그 read). payment-service `GET /api/payment/plans?audience=B2B` 프록시. 이전엔 프론트가 payment-service 를 직접 호출했으나 결제 라인 일원화로 b2b 경유로 전환.
+
+### `1.0.0` — Request
+
+바디·쿼리 파라미터 없음. audience 는 서버가 `B2B` 로 고정한다.
+
+### `1.0.0` — Response
+
+**200 OK** — `PaymentPlanView[]` (payment-service echo). 활성 plan 없으면 `[]`. 활성 variant 없는 plan 은 `variants: []`.
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "planCode": "pro",
+      "displayName": "Fisica_B2B_Pro",
+      "planSeats": 20,
+      "enabled": true,
+      "variants": [
+        { "priceId": "pri_01kvf67a25pv2f211vypfexc8r", "billingInterval": "MONTHLY", "enabled": true },
+        { "priceId": "pri_01kvf6a87dpvh61vzfjhb8xvpe", "billingInterval": "YEARLY", "enabled": true }
+      ]
+    }
+  ]
+}
+```
+
+<details>
+<summary><b>4xx / 502</b> — payment-service propagate</summary>
+
+5xx/network 는 `PaymentServiceUnavailable` → `CMN-502-001` (502).
+
+```json
+{ "success": false, "code": "CMN-502-001", "message": "External service error", "error": "Payment service unavailable: ..." }
+```
+
+</details>
+
+### Response 필드 정의 — `PaymentPlanView`
+
+| 필드 | 타입 | 출처 |
+|---|---|---|
+| `planCode` | string | 비즈니스 plan 식별자 (예: `pro`) |
+| `displayName` | string | 표시명 (예: `Fisica_B2B_Pro`) |
+| `planSeats` | number | plan 좌석 수 |
+| `enabled` | boolean | plan 활성 여부 (활성만 조회되므로 항상 `true`) |
+| `variants` | array | 활성 가격 변형 (priceId × billingInterval) |
+| `variants[].priceId` | string | Paddle priceId — checkout / plan-change 요청에 사용 |
+| `variants[].billingInterval` | string | `MONTHLY` / `YEARLY` |
+| `variants[].enabled` | boolean | variant 활성 여부 |
+
+> 가격(금액)은 응답에 없다 — 프론트가 Paddle.js 로 국가별 가격을 직접 수신하고, `priceId` 만 checkout 에 전달한다.
 
 ---
 
