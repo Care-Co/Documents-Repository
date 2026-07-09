@@ -1,11 +1,12 @@
 # graph-service
 
-> OpenAPI 3.1 style markdown. Field tables, request bodies, and response schemas mirror the current Spring controllers and DTO records.
+> 엔드포인트별 Header · Request · Response 정의 — **버전별 전량 전개**. 소스는 실제 컨트롤러/DTO.
+> 표기 — **굵은 필드 = 필수**, 스키마는 사용처마다 인라인으로 중복 전개. 버전 매칭은 정확 일치 (미등록/누락 버전 → common-core 의 API version 처리, 4xx).
 
-Source: `/Users/ijunseong/carenco/repos/graph-service`
-Updated: 2026-06-08
+Source: `/Users/jonghak/GitHub/Care&Co/graph-service`
+Updated: 2026-07-09
 
-In-memory running-shoe recommendation and catalog service backed by `src/main/resources/shoes.json`. The legacy Neo4j graph dependency is no longer part of the current runtime path. Recommendation APIs rank shoes from footprint/pressure/class input; catalog APIs expose searchable shoe and brand data.
+`src/main/resources/shoes.json` 을 인메모리로 적재하는 러닝화 추천·카탈로그 서비스. 레거시 Neo4j 그래프 의존은 현재 런타임 경로에서 제거됐다. recommendation API 는 footprint/pressure/class 입력으로 신발을 랭킹하고, catalog API 는 검색 가능한 신발·브랜드 데이터를 노출한다. 컨트롤러는 3개 — `GraphSyncController`(v1.0.0), `GraphSyncV101Controller`(v1.0.1, GET shoes 전용), `ShoeQueryController`(catalog, v1.0.0).
 
 **Servers**
 - `https://dev.carencoinc.com` — dev gateway
@@ -15,51 +16,70 @@ In-memory running-shoe recommendation and catalog service backed by `src/main/re
 
 | Header | Value |
 |---|---|
-| `api-version` | `1.0.0` |
+| `api-version` | `1.0.0` \| `1.0.1` — 엔드포인트별 Header 표 참조 |
+| `Content-Type` | `application/json` (요청 바디가 있을 때) |
+
+**Security** &nbsp;서비스에 `SecurityConfig` · 메서드 시큐리티 애너테이션(`@PreAuthorize`/`@Secured`) 이 없다. 모든 엔드포인트가 사실상 permitAll 이며 인증은 gateway 에 위임된다. 서비스는 `userId` 를 검증 없이 그대로 recommendation 조회 키로 사용한다.
+
+**Success 응답 틀** — 성공 응답은 두 종류다.
+- catalog · stateless 계열은 common-core `CncResponse` 빌더를 직접 쓰되 `success` + `data` 만 세팅한다 (`timestamp` 미포함). → `{ "success": true, "data": ... }`
+- `GET /api/recommendation/shoes` 는 **`CncResponse` 가 아니라 raw `LinkedHashMap`** 을 반환한다. 1.0.0 은 `{ success, data }`, 1.0.1 은 `{ success, data, full }`.
+
+**Error 틀** — graph-service 는 common-core **0.0.30** (`carenco-platform 0.0.30`) 을 쓴다. 에러 코드 체계가 `CMN-XXX-XXX` 가 아니라 `E001`/`E002`… (`ErrorCodeV2`) 다.
+
+| 원인 | 핸들러 | 바디 shape |
+|---|---|---|
+| 파라미터 타입 불일치 (`minPrice=abc` 등) | `RequestExceptionHandler` (HIGHEST_PRECEDENCE) | `{ success:false, error:{ message, error }, timestamp }` |
+| 잘못된 JSON 바디 | `RequestExceptionHandler` | `{ success:false, error:{ message, error }, timestamp }` |
+| 필수 쿼리 파라미터 누락 | `RequestExceptionHandler` | `{ success:false, error:{ message, error }, timestamp }` |
+| 잘못된 `metric` 형식 (name 비어있음) | `MetricFilter.parse` → `CncException(E001)` → GlobalExceptionHandler | `{ success:false, code:"E001", message }` |
+| 신발 미존재 (`match`, `getShoe`) | 컨트롤러 inline 404 | `{ success:false, message:"shoe not found: <id>" }` |
+
+> `CncResponse` 는 `NON_NULL` 직렬화라 세팅한 필드만 나온다. 필드 집합 — `code` · `success` · `message` · `data` · `token` · `error` · `timestamp` · `userVerified` · `emailVerified`.
 
 ---
 
 ## API 버전 (endpoint별)
 
-> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. `—` 는 unversioned.
+> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. graph-service 는 unversioned 엔드포인트가 없다 (전부 `1.0.0`, GET shoes 만 `1.0.1` 추가).
 
 | Method | Path | 제공 버전 | 최신 |
 |---|---|---|---|
-| GET | /api/recommendation/catalog/brands | 1.0.0 | 1.0.0 |
-| GET | /api/recommendation/catalog/shoes | 1.0.0 | 1.0.0 |
-| GET | /api/recommendation/catalog/shoes/{productId} | 1.0.0 | 1.0.0 |
 | GET | /api/recommendation/shoes | 1.0.0, 1.0.1 | 1.0.1 |
 | POST | /api/recommendation/shoes/stateless | 1.0.0 | 1.0.0 |
 | POST | /api/recommendation/shoes/stateless/full | 1.0.0 | 1.0.0 |
 | POST | /api/recommendation/shoes/{productId}/match | 1.0.0 | 1.0.0 |
+| GET | /api/recommendation/catalog/brands | 1.0.0 | 1.0.0 |
+| GET | /api/recommendation/catalog/shoes | 1.0.0 | 1.0.0 |
+| GET | /api/recommendation/catalog/shoes/{productId} | 1.0.0 | 1.0.0 |
 
 ---
 
-## `GET` /api/recommendation/shoes
+## 1. `GET` /api/recommendation/shoes
 
-**Operation ID** &nbsp;`recommendShoes`
-**Tags** &nbsp;`recommendation`
-**Security** &nbsp;`permitAll` (no authentication)
+`userId` (+선택 `recordId`) 로 프로필/측정 데이터를 조회해 개인화 추천을 생성한다. `CncResponse` 가 아니라 raw map 을 반환한다. **버전에 따라 응답 shape 이 다르다** — `1.0.0` 은 컴팩트 추천 리스트만(`data`), `1.0.1` 은 여기에 상세 매칭 payload(`full`) 를 더한다.
 
-Personalized recommendation using `userId` and optionally a specific `recordId`. The current response is not wrapped by `CncResponse`; it returns the compact recommendation list in `data` and the detailed match payload in `full`.
+### Header
 
-### Parameters
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` \| `1.0.1` | yes |
 
-| In | Name | Type | Required | Description |
+### Parameters (전 버전 공통)
+
+| In | Name | Type | 필수 | 규칙 / 기본값 |
 |---|---|---|---|---|
-| header | `api-version` | string (enum: `1.0.0`) | yes | Header-based API version selector. |
-| query | `userId` | string | no | User id used to fetch profile/measurement data. |
-| query | `recordId` | string | no | Measurement record id. If absent, service uses the latest available record. |
-| query | `limit` | integer (`@Min(1) @Max(50)`) | no | Default `5`. |
+| query | `userId` | string | no | 프로필/측정 조회 키. 미전송 가능 |
+| query | `recordId` | string | no | 측정 record id. 미전송 시 최신 record 사용 |
+| query | `limit` | integer | no | 기본값 `5`, `@Min(1) @Max(50)` |
 
-### Responses
+### `1.0.0` — Request
 
-| Status | Description | Content-Type | Schema |
-|---|---|---|---|
-| **200** | OK | `application/json` | [`RecommendationGetResponse`](#recommendationgetresponse) |
-| **400** | Invalid query parameter | `application/json` | [`ErrorResponse`](#errorresponse) |
+바디 없음 — 위 쿼리 파라미터만.
 
-#### 200 — example
+### `1.0.0` — Response
+
+**200 OK** — `{ success, data }`. `data` 는 컴팩트 추천 리스트(`RecommendedShoeDto[]`). `full` 필드 **없음**.
 
 ```json
 {
@@ -79,23 +99,50 @@ Personalized recommendation using `userId` and optionally a specific `recordId`.
       "brandMatch": 0,
       "attrMatchCount": 3,
       "matchedAttrs": [
-        {
-          "metric": "shock_absorption_raw",
-          "weight": 0.82,
-          "rawValue": 75.0
-        }
+        { "metric": "shock_absorption_raw", "weight": 0.82, "rawValue": 75.0 }
+      ]
+    }
+  ]
+}
+```
+
+### `1.0.1` — Request
+
+바디 없음 — 위 쿼리 파라미터만 (1.0.0 과 동일).
+
+### `1.0.1` — Response
+
+**200 OK** — `{ success, data, full }`. `data` 는 1.0.0 과 동일한 컴팩트 리스트, `full` 은 needs + 상세 매칭(`RecommendationGetFullResponse`). `userId`/record 데이터가 없거나 유효하지 않으면 `full` 은 `{ needs:null, requirementsText:null, recommendations:[] }`.
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "productId": "101",
+      "shoeName": "Example Runner",
+      "brand": "Example",
+      "category": "Daily running",
+      "price": "139.99",
+      "year": 2026,
+      "size": "270",
+      "productUrl": "https://example.com/shoes/101",
+      "imageUrl": "https://example.com/shoes/101.png",
+      "score": 87.4,
+      "brandMatch": 0,
+      "attrMatchCount": 3,
+      "matchedAttrs": [
+        { "metric": "shock_absorption_raw", "weight": 0.82, "rawValue": 75.0 }
       ]
     }
   ],
   "full": {
     "needs": {
-      "cushioning": 0.8,
-      "stability": 0.6,
-      "support": 0.7,
-      "flexibility": 0.4,
-      "responsiveness": 0.5
+      "cushioning": 0.8, "stability": 0.6, "support": 0.7,
+      "flexibility": 0.4, "responsiveness": 0.5
     },
     "requirementsText": {
+      "ko": "쿠셔닝과 지지력을 중시합니다.",
       "en": "Looks for cushioning and support."
     },
     "recommendations": [
@@ -111,11 +158,7 @@ Personalized recommendation using `userId` and optionally a specific `recordId`.
         "flexibilityScore": 0.43,
         "responsivenessScore": 0.54,
         "matchedAttrs": [
-          {
-            "metric": "shock_absorption_raw",
-            "weight": 0.82,
-            "rawValue": 75.0
-          }
+          { "metric": "shock_absorption_raw", "weight": 0.82, "rawValue": 75.0 }
         ]
       }
     ]
@@ -123,135 +166,639 @@ Personalized recommendation using `userId` and optionally a specific `recordId`.
 }
 ```
 
----
+<details>
+<summary><b>400 Bad Request</b> — <code>limit</code> 범위 위반 · <code>limit</code> 타입 불일치</summary>
 
-## `POST` /api/recommendation/shoes/stateless
+```json
+{
+  "success": false,
+  "error": { "message": "Invalid parameter type", "error": "Parameter 'limit' has invalid value 'abc' (expected int)" },
+  "timestamp": "2026-04-27T08:00:00Z"
+}
+```
 
-**Operation ID** &nbsp;`recommendShoesStateless`
-**Tags** &nbsp;`recommendation`
-**Security** &nbsp;`permitAll` (no authentication)
+</details>
 
-Returns compact shoe recommendations directly from the provided footprint-aligned measurement payload.
+### Response 필드 정의 — `data[]` (`RecommendedShoeDto`, 전 버전 공통)
 
-### Request Body
-
-| Content-Type | Schema |
-|---|---|
-| `application/json` | [`StatelessRecommendRequest`](#statelessrecommendrequest) |
-
-### Responses
-
-| Status | Description | Content-Type | Schema |
+| 필드 | 타입 | 필수 | 설명 |
 |---|---|---|---|
-| **200** | OK | `application/json` | [`CncResponse_RecommendedShoeList`](#cncresponse_recommendedshoelist) |
-| **400** | Invalid request body or `limit` out of range | `application/json` | [`ErrorResponse`](#errorresponse) |
+| **`productId`** | string | yes | 신발 id |
+| **`shoeName`** | string | yes | 제품명 |
+| `brand` | string | no | 브랜드명 |
+| `category` | string | no | 카테고리 |
+| `price` | string | no | 추천 DTO 에서 가격은 문자열 |
+| `year` | integer | no | 출시 연도 |
+| `size` | string | no | 추천 사이즈 문자열 |
+| `productUrl` | string | no | 제품 URL |
+| `imageUrl` | string | no | 제품 이미지 URL |
+| **`score`** | number (double) | yes | 추천 점수 |
+| **`brandMatch`** | integer | yes | 브랜드 매치 플래그 |
+| **`attrMatchCount`** | integer | yes | 매치된 속성 수 |
+| **`matchedAttrs`** | `MatchedAttr[]` | yes | 매치 메트릭 요약 (아래) |
 
----
+**`MatchedAttr`**
 
-## `POST` /api/recommendation/shoes/stateless/full
-
-**Operation ID** &nbsp;`recommendShoesStatelessFull`
-**Tags** &nbsp;`recommendation`
-**Security** &nbsp;`permitAll` (no authentication)
-
-Returns detailed needs and full shoe detail objects from the provided footprint-aligned measurement payload.
-
-### Request Body
-
-| Content-Type | Schema |
-|---|---|
-| `application/json` | [`StatelessRecommendRequest`](#statelessrecommendrequest) |
-
-### Responses
-
-| Status | Description | Content-Type | Schema |
+| 필드 | 타입 | 필수 | 설명 |
 |---|---|---|---|
-| **200** | OK | `application/json` | [`CncResponse_RecommendationFull`](#cncresponse_recommendationfull) |
-| **400** | Invalid request body or `limit` out of range | `application/json` | [`ErrorResponse`](#errorresponse) |
+| **`metric`** | string | yes | 메트릭 이름 |
+| `weight` | number (double) | no | 메트릭 가중치 |
+| `rawValue` | number (double) | no | 신발의 raw 메트릭 값 |
+
+### Response 필드 정의 — `full` (**1.0.1만**, `RecommendationGetFullResponse`)
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `needs` | `Needs` | no | 측정 데이터에서 추론한 need 점수. 데이터 없으면 null |
+| `requirementsText` | `LocalizedText` | no | class 기반 요구사항 요약. class 신호 없으면 null |
+| **`recommendations`** | `RecommendedShoeMatch[]` | yes | 상세 매칭 데이터 (`productId` 기준). 데이터 없으면 빈 배열 |
+
+**`Needs`**
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `cushioning` `stability` `support` `flexibility` `responsiveness` | number (double) | no | need 점수 5종 |
+
+**`LocalizedText`** — 로케일별 텍스트. 세팅된 로케일만 직렬화.
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `ko` `ja` `en` `it` `fr` `de` `cs` | string | no | 로케일별 텍스트 |
+| `zh-hans` | string | no | JSON 키 `zh-hans` (`@JsonProperty`) |
+| `zh-hant` | string | no | JSON 키 `zh-hant` (`@JsonProperty`) |
+
+**`RecommendedShoeMatch`** — `full.recommendations[]` 항목. 전체 `shoe` 객체 대신 `productId` 만 담는다.
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| **`productId`** | string | yes | 신발 id |
+| **`matchScore`** | number (double) | yes | 매치 점수 |
+| **`matchReasons`** | string[] | yes | 매치 사유 |
+| `recommendedSize` | integer | no | 추천 사이즈 |
+| `sizeFit` | string | no | 사이즈 핏 라벨 |
+| `cushioningScore` `stabilityScore` `supportScore` `flexibilityScore` `responsivenessScore` | number (double) | no | 차원별 점수 |
+| **`matchedAttrs`** | `MatchedAttr[]` | yes | 매치 메트릭 요약 |
 
 ---
 
-## `POST` /api/recommendation/shoes/{productId}/match
+## 2. `POST` /api/recommendation/shoes/stateless
 
-**Operation ID** &nbsp;`matchSingleShoe`
-**Tags** &nbsp;`recommendation`
-**Security** &nbsp;`permitAll` (no authentication)
+전달된 footprint-정렬 측정 payload 로부터 컴팩트 추천 리스트를 바로 반환한다. `CncResponse{ success, data }` 로 감싼다.
 
-Scores one catalog shoe against the provided footprint-aligned measurement payload.
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` (단일 버전) | yes |
+| `Content-Type` | `application/json` | yes |
+
+### `1.0.0` — Request
+
+`StatelessRecommendRequest` (`@Valid`). 모든 필드 선택. `limit` 만 `@Min(1) @Max(50)`.
+
+```json
+{
+  "firstClassType": 3,
+  "firstAccuracy": 82.5,
+  "leftFootLengthCm": 26.8,
+  "rightFootLengthCm": 26.9,
+  "leftFootWidthCm": 10.2,
+  "rightFootWidthCm": 10.1,
+  "leftTopPct": 30.0, "leftMidPct": 35.0, "leftBotPct": 35.0,
+  "rightTopPct": 31.0, "rightMidPct": 34.0, "rightBotPct": 35.0,
+  "leftTotalPct": 49.0, "rightTotalPct": 51.0,
+  "cogX": 0.51, "cogY": 0.48,
+  "limit": 5
+}
+```
+
+### `1.0.0` — Response
+
+**200 OK** — `data` 는 컴팩트 추천 리스트(`RecommendedShoeDto[]`).
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "productId": "101",
+      "shoeName": "Example Runner",
+      "brand": "Example",
+      "category": "Daily running",
+      "price": "139.99",
+      "year": 2026,
+      "size": "270",
+      "productUrl": "https://example.com/shoes/101",
+      "imageUrl": "https://example.com/shoes/101.png",
+      "score": 87.4,
+      "brandMatch": 0,
+      "attrMatchCount": 3,
+      "matchedAttrs": [
+        { "metric": "shock_absorption_raw", "weight": 0.82, "rawValue": 75.0 }
+      ]
+    }
+  ]
+}
+```
+
+<details>
+<summary><b>400 Bad Request</b> — 잘못된 JSON 바디 · <code>limit</code> 범위 위반</summary>
+
+```json
+{
+  "success": false,
+  "error": { "message": "Malformed JSON or incompatible payload", "error": "..." },
+  "timestamp": "2026-04-27T08:00:00Z"
+}
+```
+
+</details>
+
+### Request 필드 정의 — `StatelessRecommendRequest` (공통)
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `firstClassType` | integer | no | 1차 발/척추 class 코드 |
+| `firstAccuracy` | number (double) | no | 1차 class 정확도 % |
+| `secondClassType` | integer | no | 2차 class 코드 |
+| `secondAccuracy` | number (double) | no | 2차 class 정확도 % |
+| `thirdClassType` | integer | no | 3차 class 코드 |
+| `thirdAccuracy` | number (double) | no | 3차 class 정확도 % |
+| `leftFootLengthCm` `rightFootLengthCm` | number (double) | no | 발 길이(cm). 둘 다 있으면 평균으로 추천 사이즈 산출 |
+| `leftFootWidthCm` `rightFootWidthCm` | number (double) | no | 발 너비(cm). width 체크는 넓은 발 기준 |
+| `leftTopPct` `leftMidPct` `leftBotPct` | number (double) | no | 왼발 부위별 압력 % |
+| `rightTopPct` `rightMidPct` `rightBotPct` | number (double) | no | 오른발 부위별 압력 % |
+| `leftTotalPct` `rightTotalPct` | number (double) | no | 발별 총 압력 점유 % (좌+우 ≈ 100) |
+| `cogX` `cogY` | number (double) | no | 무게중심 (0..1 정규화 좌표) |
+| `gender` | string | no | 예약 필드 — 현재 추천에 영향 없음 |
+| `limit` | integer | no | `@Min(1) @Max(50)` |
+
+### Response 필드 정의 — `data[]` (`RecommendedShoeDto`)
+
+§1 의 `RecommendedShoeDto` 와 동일.
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| **`productId`** | string | yes | 신발 id |
+| **`shoeName`** | string | yes | 제품명 |
+| `brand` | string | no | 브랜드명 |
+| `category` | string | no | 카테고리 |
+| `price` | string | no | 가격 문자열 |
+| `year` | integer | no | 출시 연도 |
+| `size` | string | no | 추천 사이즈 문자열 |
+| `productUrl` | string | no | 제품 URL |
+| `imageUrl` | string | no | 제품 이미지 URL |
+| **`score`** | number (double) | yes | 추천 점수 |
+| **`brandMatch`** | integer | yes | 브랜드 매치 플래그 |
+| **`attrMatchCount`** | integer | yes | 매치된 속성 수 |
+| **`matchedAttrs`** | `MatchedAttr[]` | yes | `{ metric(필수), weight, rawValue }` |
+
+---
+
+## 3. `POST` /api/recommendation/shoes/stateless/full
+
+전달된 footprint-정렬 측정 payload 로부터 needs + **전체 신발 상세(`ShoeDetail`)** 를 포함한 추천을 반환한다. `CncResponse{ success, data }` 로 감싼다.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` (단일 버전) | yes |
+| `Content-Type` | `application/json` | yes |
+
+### `1.0.0` — Request
+
+`StatelessRecommendRequest` (`@Valid`) — §2 와 동일 (모든 필드 선택, `limit` 만 `@Min(1) @Max(50)`).
+
+```json
+{
+  "firstClassType": 3,
+  "firstAccuracy": 82.5,
+  "leftFootLengthCm": 26.8,
+  "rightFootLengthCm": 26.9,
+  "leftTotalPct": 49.0, "rightTotalPct": 51.0,
+  "cogX": 0.51, "cogY": 0.48,
+  "limit": 3
+}
+```
+
+### `1.0.0` — Response
+
+**200 OK** — `data` 는 `RecommendationFullResponse` (`needs` + `requirementsText` + `recommendations[]`). `recommendations[]` 항목은 전체 `shoe` 상세를 담는 `RecommendedShoeFullDto`.
+
+```json
+{
+  "success": true,
+  "data": {
+    "needs": {
+      "cushioning": 0.8, "stability": 0.6, "support": 0.7,
+      "flexibility": 0.4, "responsiveness": 0.5
+    },
+    "requirementsText": {
+      "ko": "쿠셔닝과 지지력을 중시합니다.",
+      "en": "Looks for cushioning and support."
+    },
+    "recommendations": [
+      {
+        "shoe": {
+          "productId": "101",
+          "name": "Example Runner",
+          "slug": "example-runner",
+          "brand": "Example",
+          "category": "Daily running",
+          "price": 139.99,
+          "imageUrl": "https://example.com/shoes/101.png",
+          "archSupport": "Neutral",
+          "weightG": 238.0,
+          "shockAbsorptionRaw": 75.0,
+          "bestFor": ["daily", "long-run"]
+        },
+        "matchScore": 87.4,
+        "matchReasons": ["High cushioning match"],
+        "recommendedSize": 270,
+        "sizeFit": "Standard Fit",
+        "cushioningScore": 0.86,
+        "stabilityScore": 0.61,
+        "supportScore": 0.72,
+        "flexibilityScore": 0.43,
+        "responsivenessScore": 0.54,
+        "matchedAttrs": [
+          { "metric": "shock_absorption_raw", "weight": 0.82, "rawValue": 75.0 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+<details>
+<summary><b>400 Bad Request</b> — 잘못된 JSON 바디 · <code>limit</code> 범위 위반</summary>
+
+```json
+{
+  "success": false,
+  "error": { "message": "Malformed JSON or incompatible payload", "error": "..." },
+  "timestamp": "2026-04-27T08:00:00Z"
+}
+```
+
+</details>
+
+### Request 필드 정의 — `StatelessRecommendRequest`
+
+§2 와 동일.
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `firstClassType` `secondClassType` `thirdClassType` | integer | no | 발/척추 class 코드 3종 |
+| `firstAccuracy` `secondAccuracy` `thirdAccuracy` | number (double) | no | class 정확도 % 3종 |
+| `leftFootLengthCm` `rightFootLengthCm` | number (double) | no | 발 길이(cm) |
+| `leftFootWidthCm` `rightFootWidthCm` | number (double) | no | 발 너비(cm) |
+| `leftTopPct` `leftMidPct` `leftBotPct` | number (double) | no | 왼발 부위별 압력 % |
+| `rightTopPct` `rightMidPct` `rightBotPct` | number (double) | no | 오른발 부위별 압력 % |
+| `leftTotalPct` `rightTotalPct` | number (double) | no | 발별 총 압력 % |
+| `cogX` `cogY` | number (double) | no | 무게중심 (0..1) |
+| `gender` | string | no | 예약 필드 |
+| `limit` | integer | no | `@Min(1) @Max(50)` |
+
+### Response 필드 정의 — `data` (`RecommendationFullResponse`)
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `needs` | `Needs` | no | need 점수 |
+| `requirementsText` | `LocalizedText` | no | class 기반 요약. 없으면 null |
+| **`recommendations`** | `RecommendedShoeFull[]` | yes | 전체 신발 상세 추천 객체 |
+
+**`Needs`** — `cushioning` `stability` `support` `flexibility` `responsiveness` (number, no).
+
+**`LocalizedText`** — `ko` `ja` `en` `it` `fr` `de` `cs` `zh-hans`(`@JsonProperty`) `zh-hant`(`@JsonProperty`), 전부 string/no. 세팅된 로케일만 직렬화.
+
+**`RecommendedShoeFull`** — `recommendations[]` 항목.
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| **`shoe`** | `ShoeDetail` | yes | 전체 카탈로그 신발 상세 (아래) |
+| **`matchScore`** | number (double) | yes | 매치 점수 |
+| **`matchReasons`** | string[] | yes | 매치 사유 |
+| `recommendedSize` | integer | no | 추천 사이즈 |
+| `sizeFit` | string | no | 사이즈 핏 라벨 |
+| `cushioningScore` `stabilityScore` `supportScore` `flexibilityScore` `responsivenessScore` | number (double) | no | 차원별 점수 |
+| **`matchedAttrs`** | `MatchedAttr[]` | yes | `{ metric(필수), weight, rawValue }` |
+
+**`ShoeDetail`** (`shoe`)
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| **`productId`** | string | yes | 신발 id |
+| **`name`** | string | yes | 제품명 |
+| `slug` | string | no | 제품 slug |
+| `brand` | string | no | 브랜드명 |
+| `category` | string | no | 카테고리 |
+| `price` | number (double) | no | 카탈로그 숫자 가격 |
+| `imageUrl` | string | no | 제품 이미지 URL |
+| `archSupport` | string | no | 아치 서포트 라벨 |
+| `weightG` | number (double) | no | 무게(g) |
+| `dropLabMm` | number (double) | no | 랩 측정 드롭(mm) |
+| `heelStackLabMm` | number (double) | no | 힐 스택(mm) |
+| `forefootStackLabMm` | number (double) | no | 전족 스택(mm) |
+| `midsoleSoftnessLabel` | string | no | 미드솔 소프트니스 라벨 |
+| `midsoleSoftnessNew` | number (double) | no | 미드솔 소프트니스 값 |
+| `shockAbsorptionLabel` | string | no | 충격 흡수 라벨 |
+| `shockAbsorptionRaw` | number (double) | no | 충격 흡수 raw 값 |
+| `energyReturnLabel` | string | no | 에너지 리턴 라벨 |
+| `energyReturnRaw` | number (double) | no | 에너지 리턴 raw 값 |
+| `torsionalRigidityRaw` | number (double) | no | 비틀림 강성 raw 값 |
+| `heelCounterStiffnessRaw` | number (double) | no | 힐 카운터 강성 raw 값 |
+| `stiffnessLabel` | string | no | 강성 라벨 |
+| `stiffnessNNew` | number (double) | no | 강성 값 |
+| `breathabilityLabel` | string | no | 통기성 라벨 |
+| `breathabilityRaw` | number (double) | no | 통기성 raw 값 |
+| `tractionRaw` | number (double) | no | 접지력 raw 값 |
+| `sizeRatingLabel` | string | no | 사이즈 평가 라벨 |
+| `sizeRatingRaw` | number (double) | no | 사이즈 평가 raw 값 |
+| `forefootWidthMm` | number (double) | no | 전족 너비(mm) |
+| `outsoleDurabilityMm` | number (double) | no | 아웃솔 내구도 값 |
+| `toeboxDurabilityRaw` | number (double) | no | 토박스 내구도 raw 값 |
+| `overallScore` | number (double) | no | 종합 점수 |
+| `expertScore` | number (double) | no | 전문가 점수 |
+| `userScore` | number (double) | no | 사용자 점수 |
+| `terrain` | string | no | 지형 라벨 |
+| `strikePattern` | string | no | 착지 패턴 라벨 |
+| `description` | string | no | 제품 설명 |
+| `orthoticFriendly` | boolean | no | 교정기 호환 플래그 |
+| `removableInsole` | boolean | no | 탈착 인솔 플래그 |
+| `isLightweight` | boolean | no | 경량 플래그 |
+| `hasPlate` | boolean | no | 플레이트 플래그 |
+| `hasRocker` | boolean | no | 로커 플래그 |
+| `bestFor` | string[] | no | 용도 태그 |
+
+---
+
+## 4. `POST` /api/recommendation/shoes/{productId}/match
+
+카탈로그의 신발 1개를 전달된 footprint-정렬 측정 payload 로 채점한다. 미존재 시 404. `CncResponse{ success, data }` 로 감싼다.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` (단일 버전) | yes |
+| `Content-Type` | `application/json` | yes |
 
 ### Parameters
 
-| In | Name | Type | Required | Description |
+| In | Name | Type | 필수 | 설명 |
 |---|---|---|---|---|
-| path | `productId` | string | yes | Numeric shoe id from `shoes.json`. |
+| path | `productId` | string | yes | `shoes.json` 의 숫자 신발 id (숫자 파싱 실패 시 404) |
 
-### Request Body
+### `1.0.0` — Request
 
-| Content-Type | Schema |
-|---|---|
-| `application/json` | [`StatelessRecommendRequest`](#statelessrecommendrequest) |
+`StatelessRecommendRequest` (`@Valid`) — §2 와 동일.
 
-### Responses
+```json
+{
+  "firstClassType": 3,
+  "firstAccuracy": 82.5,
+  "leftFootLengthCm": 26.8,
+  "rightFootLengthCm": 26.9,
+  "cogX": 0.51, "cogY": 0.48
+}
+```
 
-| Status | Description | Content-Type | Schema |
+### `1.0.0` — Response
+
+**200 OK** — `data` 는 `SingleShoeMatchResponse` (`needs` + `requirementsText` + 단건 `recommendation`). `recommendation` 은 전체 `shoe` 상세를 담는 `RecommendedShoeFullDto`.
+
+```json
+{
+  "success": true,
+  "data": {
+    "needs": {
+      "cushioning": 0.8, "stability": 0.6, "support": 0.7,
+      "flexibility": 0.4, "responsiveness": 0.5
+    },
+    "requirementsText": {
+      "ko": "쿠셔닝과 지지력을 중시합니다.",
+      "en": "Looks for cushioning and support."
+    },
+    "recommendation": {
+      "shoe": {
+        "productId": "101",
+        "name": "Example Runner",
+        "slug": "example-runner",
+        "brand": "Example",
+        "category": "Daily running",
+        "price": 139.99,
+        "imageUrl": "https://example.com/shoes/101.png",
+        "archSupport": "Neutral",
+        "weightG": 238.0,
+        "shockAbsorptionRaw": 75.0,
+        "bestFor": ["daily", "long-run"]
+      },
+      "matchScore": 87.4,
+      "matchReasons": ["High cushioning match"],
+      "recommendedSize": 270,
+      "sizeFit": "Standard Fit",
+      "cushioningScore": 0.86,
+      "stabilityScore": 0.61,
+      "supportScore": 0.72,
+      "flexibilityScore": 0.43,
+      "responsivenessScore": 0.54,
+      "matchedAttrs": [
+        { "metric": "shock_absorption_raw", "weight": 0.82, "rawValue": 75.0 }
+      ]
+    }
+  }
+}
+```
+
+<details>
+<summary><b>404 Not Found</b> — 신발 미존재</summary>
+
+```json
+{ "success": false, "message": "shoe not found: 999" }
+```
+
+컨트롤러가 `ResponseEntity.status(404)` 로 직접 반환. `code`·`timestamp` 없음.
+
+</details>
+
+<details>
+<summary><b>400 Bad Request</b> — 잘못된 JSON 바디 · <code>limit</code> 범위 위반</summary>
+
+```json
+{
+  "success": false,
+  "error": { "message": "Malformed JSON or incompatible payload", "error": "..." },
+  "timestamp": "2026-04-27T08:00:00Z"
+}
+```
+
+</details>
+
+### Request 필드 정의 — `StatelessRecommendRequest`
+
+§2 와 동일.
+
+| 필드 | 타입 | 필수 | 설명 |
 |---|---|---|---|
-| **200** | OK | `application/json` | [`CncResponse_SingleShoeMatch`](#cncresponse_singleshoematch) |
-| **400** | Invalid request body or `limit` out of range | `application/json` | [`ErrorResponse`](#errorresponse) |
-| **404** | Shoe not found | `application/json` | [`CncResponse_ErrorMessage`](#cncresponse_errormessage) |
+| `firstClassType` `secondClassType` `thirdClassType` | integer | no | class 코드 3종 |
+| `firstAccuracy` `secondAccuracy` `thirdAccuracy` | number (double) | no | class 정확도 % |
+| `leftFootLengthCm` `rightFootLengthCm` | number (double) | no | 발 길이(cm) |
+| `leftFootWidthCm` `rightFootWidthCm` | number (double) | no | 발 너비(cm) |
+| `leftTopPct` `leftMidPct` `leftBotPct` | number (double) | no | 왼발 부위별 압력 % |
+| `rightTopPct` `rightMidPct` `rightBotPct` | number (double) | no | 오른발 부위별 압력 % |
+| `leftTotalPct` `rightTotalPct` | number (double) | no | 발별 총 압력 % |
+| `cogX` `cogY` | number (double) | no | 무게중심 (0..1) |
+| `gender` | string | no | 예약 필드 |
+| `limit` | integer | no | `@Min(1) @Max(50)` |
+
+### Response 필드 정의 — `data` (`SingleShoeMatchResponse`)
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `needs` | `Needs` | no | need 점수 |
+| `requirementsText` | `LocalizedText` | no | class 기반 요약. 없으면 null |
+| **`recommendation`** | `RecommendedShoeFull` | yes | 단건 신발 매치 결과 |
+
+**`Needs`** — `cushioning` `stability` `support` `flexibility` `responsiveness` (number, no).
+
+**`LocalizedText`** — `ko` `ja` `en` `it` `fr` `de` `cs` `zh-hans`(`@JsonProperty`) `zh-hant`(`@JsonProperty`), 전부 string/no.
+
+**`RecommendedShoeFull`** (`recommendation`)
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| **`shoe`** | `ShoeDetail` | yes | 전체 카탈로그 신발 상세 (아래) |
+| **`matchScore`** | number (double) | yes | 매치 점수 |
+| **`matchReasons`** | string[] | yes | 매치 사유 |
+| `recommendedSize` | integer | no | 추천 사이즈 |
+| `sizeFit` | string | no | 사이즈 핏 라벨 |
+| `cushioningScore` `stabilityScore` `supportScore` `flexibilityScore` `responsivenessScore` | number (double) | no | 차원별 점수 |
+| **`matchedAttrs`** | `MatchedAttr[]` | yes | `{ metric(필수), weight, rawValue }` |
+
+**`ShoeDetail`** (`shoe`)
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| **`productId`** | string | yes | 신발 id |
+| **`name`** | string | yes | 제품명 |
+| `slug` | string | no | 제품 slug |
+| `brand` | string | no | 브랜드명 |
+| `category` | string | no | 카테고리 |
+| `price` | number (double) | no | 카탈로그 숫자 가격 |
+| `imageUrl` | string | no | 제품 이미지 URL |
+| `archSupport` | string | no | 아치 서포트 라벨 |
+| `weightG` | number (double) | no | 무게(g) |
+| `dropLabMm` | number (double) | no | 랩 측정 드롭(mm) |
+| `heelStackLabMm` | number (double) | no | 힐 스택(mm) |
+| `forefootStackLabMm` | number (double) | no | 전족 스택(mm) |
+| `midsoleSoftnessLabel` | string | no | 미드솔 소프트니스 라벨 |
+| `midsoleSoftnessNew` | number (double) | no | 미드솔 소프트니스 값 |
+| `shockAbsorptionLabel` | string | no | 충격 흡수 라벨 |
+| `shockAbsorptionRaw` | number (double) | no | 충격 흡수 raw 값 |
+| `energyReturnLabel` | string | no | 에너지 리턴 라벨 |
+| `energyReturnRaw` | number (double) | no | 에너지 리턴 raw 값 |
+| `torsionalRigidityRaw` | number (double) | no | 비틀림 강성 raw 값 |
+| `heelCounterStiffnessRaw` | number (double) | no | 힐 카운터 강성 raw 값 |
+| `stiffnessLabel` | string | no | 강성 라벨 |
+| `stiffnessNNew` | number (double) | no | 강성 값 |
+| `breathabilityLabel` | string | no | 통기성 라벨 |
+| `breathabilityRaw` | number (double) | no | 통기성 raw 값 |
+| `tractionRaw` | number (double) | no | 접지력 raw 값 |
+| `sizeRatingLabel` | string | no | 사이즈 평가 라벨 |
+| `sizeRatingRaw` | number (double) | no | 사이즈 평가 raw 값 |
+| `forefootWidthMm` | number (double) | no | 전족 너비(mm) |
+| `outsoleDurabilityMm` | number (double) | no | 아웃솔 내구도 값 |
+| `toeboxDurabilityRaw` | number (double) | no | 토박스 내구도 raw 값 |
+| `overallScore` | number (double) | no | 종합 점수 |
+| `expertScore` | number (double) | no | 전문가 점수 |
+| `userScore` | number (double) | no | 사용자 점수 |
+| `terrain` | string | no | 지형 라벨 |
+| `strikePattern` | string | no | 착지 패턴 라벨 |
+| `description` | string | no | 제품 설명 |
+| `orthoticFriendly` | boolean | no | 교정기 호환 플래그 |
+| `removableInsole` | boolean | no | 탈착 인솔 플래그 |
+| `isLightweight` | boolean | no | 경량 플래그 |
+| `hasPlate` | boolean | no | 플레이트 플래그 |
+| `hasRocker` | boolean | no | 로커 플래그 |
+| `bestFor` | string[] | no | 용도 태그 |
 
 ---
 
-## `GET` /api/recommendation/catalog/brands
+## 5. `GET` /api/recommendation/catalog/brands
 
-**Operation ID** &nbsp;`listBrands`
-**Tags** &nbsp;`catalog`
-**Security** &nbsp;`permitAll` (no authentication)
+로드된 신발 카탈로그에서 브랜드명과 제품 수를 반환한다. 브랜드명 오름차순(`TreeMap`) 정렬.
 
-Returns brand names and product counts from the loaded shoe catalog.
+### Header
 
-### Responses
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` (단일 버전) | yes |
 
-| Status | Description | Content-Type | Schema |
+### `1.0.0` — Request
+
+바디·파라미터 없음.
+
+### `1.0.0` — Response
+
+**200 OK** — `data` 는 `Brand[]`.
+
+```json
+{
+  "success": true,
+  "data": [
+    { "brandName": "Example", "productCount": 12 },
+    { "brandName": "Sample", "productCount": 8 }
+  ]
+}
+```
+
+### Response 필드 정의 — `data[]` (`BrandDto`)
+
+| 필드 | 타입 | 필수 | 설명 |
 |---|---|---|---|
-| **200** | OK | `application/json` | [`CncResponse_BrandList`](#cncresponse_brandlist) |
+| **`brandName`** | string | yes | 브랜드명 |
+| **`productCount`** | integer (int64) | yes | 해당 브랜드 신발 수 |
 
 ---
 
-## `GET` /api/recommendation/catalog/shoes
+## 6. `GET` /api/recommendation/catalog/shoes
 
-**Operation ID** &nbsp;`listShoes`
-**Tags** &nbsp;`catalog`
-**Security** &nbsp;`permitAll` (no authentication)
+브랜드/카테고리/이름/가격 및 메트릭 필터로 카탈로그를 검색한다. 요청은 `size` 를 최대 `100` 까지 받지만 **서비스가 반환 페이지 크기를 `3` 으로 캡한다** (`MAX_SHOE_RESULTS=3`). 응답의 `size` 는 이 effective size(=min(size,3)) 다.
 
-Searches catalog shoes with optional brand/category/name/price filters and metric filters. Although the request accepts `size` up to `100`, the service currently caps returned page size to `3`.
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` (단일 버전) | yes |
 
 ### Parameters
 
-| In | Name | Type | Required | Description |
+| In | Name | Type | 필수 | 규칙 / 기본값 |
 |---|---|---|---|---|
-| query | `brand` | string | no | Exact case-insensitive brand match. |
-| query | `category` | string | no | Exact case-insensitive category match. |
-| query | `minPrice` | number (double) | no | Inclusive lower price bound. |
-| query | `maxPrice` | number (double) | no | Exclusive upper price bound. |
-| query | `name` | string | no | Case-insensitive substring match against shoe name. |
-| query | `metric` | string[] | no | Repeatable metric filter in `name:min:max` format. Empty min/max are allowed, e.g. `weight_g::250`. |
-| query | `sortBy` | string | no | Metric name to sort by. Sorting only applies when the same metric also appears in `metric`. |
-| query | `direction` | string | no | `asc` for ascending; any other value defaults to descending when metric sorting applies. |
-| query | `page` | integer (`@Min(0)`) | no | Default `0`. |
-| query | `size` | integer (`@Min(1) @Max(100)`) | no | Default `20`; effective response size is capped to `3`. |
+| query | `brand` | string | no | 대소문자 무시 정확 일치 |
+| query | `category` | string | no | 대소문자 무시 정확 일치 |
+| query | `minPrice` | number (double) | no | 하한 포함 (inclusive) |
+| query | `maxPrice` | number (double) | no | 상한 제외 (exclusive) |
+| query | `name` | string | no | 신발명 대소문자 무시 부분 일치 |
+| query | `metric` | string[] | no | 반복 가능. `name:min:max` 형식. min/max 생략 가능 (예: `weight_g::250`) |
+| query | `sortBy` | string | no | 정렬 기준 메트릭명. 같은 메트릭이 `metric` 에도 있어야 정렬 적용 |
+| query | `direction` | string | no | **`LOW`(대소문자 무시) → 오름차순. 그 외 값(미전송 포함) → 내림차순** (메트릭 정렬이 적용될 때) |
+| query | `page` | integer | no | 기본값 `0`, `@Min(0)` |
+| query | `size` | integer | no | 기본값 `20`, `@Min(1) @Max(100)`. 실제 반환은 `3` 으로 캡 |
 
-### Supported Metric Names
+### 지원 메트릭 이름 (`metric` · `sortBy`)
 
 `weight_g`, `drop_lab_mm`, `heel_stack_lab_mm`, `forefoot_stack_lab_mm`, `midsole_softness_new`, `shock_absorption_raw`, `energy_return_raw`, `torsional_rigidity_raw`, `heel_counter_stiffness_raw`, `stiffness_n_new`, `breathability_raw`, `traction_raw`, `size_rating_raw`, `forefoot_width_mm`
 
-### Responses
+### `1.0.0` — Request
 
-| Status | Description | Content-Type | Schema |
-|---|---|---|---|
-| **200** | OK | `application/json` | [`CncResponse_ShoePage`](#cncresponse_shoepage) |
-| **400** | Invalid parameter type, malformed `metric`, or invalid page/size | `application/json` | [`ErrorResponse`](#errorresponse) |
+바디 없음 — 위 쿼리 파라미터만.
 
-#### 200 — example
+### `1.0.0` — Response
+
+**200 OK** — `data` 는 `PagedResponse<Shoe>`. `metrics` 는 `metric` 쿼리에 요청된 이름만 매핑되며, `metric` 미전송 시 `null`.
 
 ```json
 {
@@ -267,10 +814,7 @@ Searches catalog shoes with optional brand/category/name/price filters and metri
         "price": 139.99,
         "imageUrl": "https://example.com/shoes/101.png",
         "archSupport": "Neutral",
-        "metrics": {
-          "weight_g": 238.0,
-          "shock_absorption_raw": 75.0
-        }
+        "metrics": { "weight_g": 238.0, "shock_absorption_raw": 75.0 }
       }
     ],
     "page": 0,
@@ -280,305 +824,183 @@ Searches catalog shoes with optional brand/category/name/price filters and metri
 }
 ```
 
+<details>
+<summary><b>400 Bad Request</b> — 잘못된 <code>metric</code> 형식 (name 비어있음, 예 <code>:250</code>)</summary>
+
+```json
+{ "success": false, "code": "E001", "message": "..." }
+```
+
+`MetricFilter.parse` 가 `CncException(ErrorCodeV2.CHECK_PARAMETER)` 를 던지고 common-core GlobalExceptionHandler 가 `E001`/400 으로 매핑.
+
+</details>
+
+<details>
+<summary><b>400 Bad Request</b> — <code>minPrice</code>/<code>maxPrice</code>/<code>page</code>/<code>size</code> 타입 불일치</summary>
+
+```json
+{
+  "success": false,
+  "error": { "message": "Invalid parameter type", "error": "Parameter 'minPrice' has invalid value 'abc' (expected Double)" },
+  "timestamp": "2026-04-27T08:00:00Z"
+}
+```
+
+</details>
+
+### Response 필드 정의 — `data` (`PagedResponse<Shoe>`)
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| **`content`** | `Shoe[]` | yes | 현재 페이지 내용 |
+| **`page`** | integer | yes | 요청 페이지 번호 |
+| **`size`** | integer | yes | effective 페이지 크기 (min(size,3)) |
+| **`totalElements`** | integer (int64) | yes | 페이징 전 총 매치 건수 |
+
+**`Shoe`** (`content[]`)
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| **`productId`** | string | yes | 신발 id |
+| **`name`** | string | yes | 제품명 |
+| `slug` | string | no | 제품 slug |
+| `brand` | string | no | 브랜드명 |
+| `category` | string | no | 카테고리 |
+| `price` | number (double) | no | 카탈로그 숫자 가격 |
+| `imageUrl` | string | no | 제품 이미지 URL |
+| `archSupport` | string | no | 아치 서포트 라벨 |
+| `metrics` | object (map string→double) | no | 요청 메트릭명→값. `metric` 미전송 시 null |
+
 ---
 
-## `GET` /api/recommendation/catalog/shoes/{productId}
+## 7. `GET` /api/recommendation/catalog/shoes/{productId}
 
-**Operation ID** &nbsp;`getShoe`
-**Tags** &nbsp;`catalog`
-**Security** &nbsp;`permitAll` (no authentication)
+신발 1개의 전체 카탈로그 상세를 반환한다. `CncResponse{ success, data }` 로 감싼다.
 
-Returns the full catalog detail for one shoe.
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` (단일 버전) | yes |
 
 ### Parameters
 
-| In | Name | Type | Required | Description |
+| In | Name | Type | 필수 | 설명 |
 |---|---|---|---|---|
-| path | `productId` | string | yes | Numeric shoe id from `shoes.json`. |
+| path | `productId` | string | yes | `shoes.json` 의 숫자 신발 id (blank·숫자 파싱 실패 시 404) |
 
-### Responses
+### `1.0.0` — Request
 
-| Status | Description | Content-Type | Schema |
+바디 없음 — path 의 `productId` 만.
+
+### `1.0.0` — Response
+
+**200 OK** — `data` 는 `ShoeDetail` 전체.
+
+```json
+{
+  "success": true,
+  "data": {
+    "productId": "101",
+    "name": "Example Runner",
+    "slug": "example-runner",
+    "brand": "Example",
+    "category": "Daily running",
+    "price": 139.99,
+    "imageUrl": "https://example.com/shoes/101.png",
+    "archSupport": "Neutral",
+    "weightG": 238.0,
+    "dropLabMm": 8.0,
+    "heelStackLabMm": 38.0,
+    "forefootStackLabMm": 30.0,
+    "midsoleSoftnessLabel": "Balanced",
+    "midsoleSoftnessNew": 28.5,
+    "shockAbsorptionLabel": "High",
+    "shockAbsorptionRaw": 75.0,
+    "energyReturnLabel": "High",
+    "energyReturnRaw": 63.0,
+    "torsionalRigidityRaw": 4.0,
+    "heelCounterStiffnessRaw": 3.0,
+    "stiffnessLabel": "Moderate",
+    "stiffnessNNew": 18.0,
+    "breathabilityLabel": "Good",
+    "breathabilityRaw": 4.0,
+    "tractionRaw": 4.0,
+    "sizeRatingLabel": "True to size",
+    "sizeRatingRaw": 0.0,
+    "forefootWidthMm": 98.0,
+    "outsoleDurabilityMm": 1.2,
+    "toeboxDurabilityRaw": 4.0,
+    "overallScore": 88.0,
+    "expertScore": 90.0,
+    "userScore": 86.0,
+    "terrain": "Road",
+    "strikePattern": "Heel",
+    "description": "...",
+    "orthoticFriendly": true,
+    "removableInsole": true,
+    "isLightweight": false,
+    "hasPlate": false,
+    "hasRocker": true,
+    "bestFor": ["daily", "long-run"]
+  }
+}
+```
+
+<details>
+<summary><b>404 Not Found</b> — 신발 미존재</summary>
+
+```json
+{ "success": false, "message": "shoe not found: 999" }
+```
+
+컨트롤러가 `ResponseEntity.status(404)` 로 직접 반환. `code`·`timestamp` 없음.
+
+</details>
+
+### Response 필드 정의 — `data` (`ShoeDetail`)
+
+| 필드 | 타입 | 필수 | 설명 |
 |---|---|---|---|
-| **200** | OK | `application/json` | [`CncResponse_ShoeDetail`](#cncresponse_shoedetail) |
-| **404** | Shoe not found | `application/json` | [`CncResponse_ErrorMessage`](#cncresponse_errormessage) |
-
----
-
-## Schemas
-
-### `RecommendationGetResponse`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | Always `true` on success. |
-| `data` | [`RecommendedShoe`](#recommendedshoe)[] | yes | Compact ranked recommendations. |
-| `full` | [`RecommendationGetFull`](#recommendationgetfull) | yes | Detailed needs and per-shoe match data. |
-
-### `RecommendationGetFull`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `needs` | [`Needs`](#needs) | yes | User need scores inferred from measurement data. |
-| `requirementsText` | [`LocalizedText`](#localizedtext) | no | Class-based natural language summary of requirements. `null` when no class signal available. |
-| `recommendations` | [`RecommendedShoeMatch`](#recommendedshoematch)[] | yes | Detailed match data keyed by product id. |
-
-### `CncResponse_RecommendedShoeList`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | Always `true` on success. |
-| `data` | [`RecommendedShoe`](#recommendedshoe)[] | yes | Ranked recommendations. |
-| `timestamp` | string (date-time) | no | Included by common response wrapper. |
-
-### `CncResponse_RecommendationFull`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | Always `true` on success. |
-| `data` | [`RecommendationFull`](#recommendationfull) | yes | Detailed recommendation response. |
-| `timestamp` | string (date-time) | no | Included by common response wrapper. |
-
-### `CncResponse_SingleShoeMatch`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | Always `true` on success. |
-| `data` | [`SingleShoeMatch`](#singleshoematch) | yes | Single-shoe match result. |
-| `timestamp` | string (date-time) | no | Included by common response wrapper. |
-
-### `CncResponse_BrandList`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | Always `true` on success. |
-| `data` | [`Brand`](#brand)[] | yes | Brand counts. |
-| `timestamp` | string (date-time) | no | Included by common response wrapper. |
-
-### `CncResponse_ShoePage`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | Always `true` on success. |
-| `data` | [`PagedResponse_Shoe`](#pagedresponse_shoe) | yes | Paged catalog result. |
-| `timestamp` | string (date-time) | no | Included by common response wrapper. |
-
-### `CncResponse_ShoeDetail`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | Always `true` on success. |
-| `data` | [`ShoeDetail`](#shoedetail) | yes | Full shoe detail. |
-| `timestamp` | string (date-time) | no | Included by common response wrapper. |
-
-### `CncResponse_ErrorMessage`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | Always `false`. |
-| `message` | string | yes | Human-readable error message. |
-| `timestamp` | string (date-time) | no | Included by common response wrapper when applicable. |
-
-### `RecommendedShoe`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `productId` | string | yes | Shoe id. |
-| `shoeName` | string | yes | Product name. |
-| `brand` | string | no | Brand name. |
-| `category` | string | no | Category name. |
-| `price` | string | no | Price formatted as a string in recommendation DTO. |
-| `year` | integer | no | Release year when available. |
-| `size` | string | no | Recommended size string. |
-| `productUrl` | string | no | Product URL when available. |
-| `imageUrl` | string | no | Product image URL. |
-| `score` | number (double) | yes | Recommendation score. |
-| `brandMatch` | integer | yes | Brand match flag. |
-| `attrMatchCount` | integer | yes | Count of matched attributes. |
-| `matchedAttrs` | [`MatchedAttr`](#matchedattr)[] | yes | Matched metric summary. |
-
-### `MatchedAttr`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `metric` | string | yes | Metric name. |
-| `weight` | number (double) | no | Metric weight. |
-| `rawValue` | number (double) | no | Raw shoe metric value. |
-
-### `RecommendationFull`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `needs` | [`Needs`](#needs) | yes | User need scores. |
-| `requirementsText` | [`LocalizedText`](#localizedtext) | no | Class-based natural language summary of requirements. `null` when no class signal available. |
-| `recommendations` | [`RecommendedShoeFull`](#recommendedshoefull)[] | yes | Full shoe recommendation objects. |
-
-### `SingleShoeMatch`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `needs` | [`Needs`](#needs) | yes | User need scores. |
-| `requirementsText` | [`LocalizedText`](#localizedtext) | no | Class-based natural language summary of requirements. `null` when no class signal available. |
-| `recommendation` | [`RecommendedShoeFull`](#recommendedshoefull) | yes | Match result for one shoe. |
-
-### `LocalizedText`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `en` | string | no | English text. Other locales may be added later. |
-
-### `RecommendedShoeFull`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `shoe` | [`ShoeDetail`](#shoedetail) | yes | Full catalog shoe detail. |
-| `matchScore` | number (double) | yes | Match score. |
-| `matchReasons` | string[] | yes | Human-readable match reasons. |
-| `recommendedSize` | integer | no | Recommended shoe size. |
-| `sizeFit` | string | no | Size fit label. |
-| `cushioningScore` | number (double) | no | Per-dimension score. |
-| `stabilityScore` | number (double) | no | Per-dimension score. |
-| `supportScore` | number (double) | no | Per-dimension score. |
-| `flexibilityScore` | number (double) | no | Per-dimension score. |
-| `responsivenessScore` | number (double) | no | Per-dimension score. |
-| `matchedAttrs` | [`MatchedAttr`](#matchedattr)[] | yes | Matched metric summary. |
-
-### `RecommendedShoeMatch`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `productId` | string | yes | Shoe id. |
-| `matchScore` | number (double) | yes | Match score. |
-| `matchReasons` | string[] | yes | Human-readable match reasons. |
-| `recommendedSize` | integer | no | Recommended shoe size. |
-| `sizeFit` | string | no | Size fit label. |
-| `cushioningScore` | number (double) | no | Per-dimension score. |
-| `stabilityScore` | number (double) | no | Per-dimension score. |
-| `supportScore` | number (double) | no | Per-dimension score. |
-| `flexibilityScore` | number (double) | no | Per-dimension score. |
-| `responsivenessScore` | number (double) | no | Per-dimension score. |
-| `matchedAttrs` | [`MatchedAttr`](#matchedattr)[] | yes | Matched metric summary. |
-
-### `Needs`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `cushioning` | number (double) | no | Need score. |
-| `stability` | number (double) | no | Need score. |
-| `support` | number (double) | no | Need score. |
-| `flexibility` | number (double) | no | Need score. |
-| `responsiveness` | number (double) | no | Need score. |
-
-### `StatelessRecommendRequest`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `firstClassType` | integer | no | Primary foot/spine class code. |
-| `firstAccuracy` | number (double) | no | Primary class accuracy percent. |
-| `secondClassType` | integer | no | Secondary class code. |
-| `secondAccuracy` | number (double) | no | Secondary class accuracy percent. |
-| `thirdClassType` | integer | no | Third class code. |
-| `thirdAccuracy` | number (double) | no | Third class accuracy percent. |
-| `leftFootLengthCm` | number (double) | no | Left foot length in cm. |
-| `rightFootLengthCm` | number (double) | no | Right foot length in cm. |
-| `leftFootWidthCm` | number (double) | no | Left foot width in cm. |
-| `rightFootWidthCm` | number (double) | no | Right foot width in cm. |
-| `leftTopPct` | number (double) | no | Left top pressure percent. |
-| `leftMidPct` | number (double) | no | Left mid pressure percent. |
-| `leftBotPct` | number (double) | no | Left bottom pressure percent. |
-| `rightTopPct` | number (double) | no | Right top pressure percent. |
-| `rightMidPct` | number (double) | no | Right mid pressure percent. |
-| `rightBotPct` | number (double) | no | Right bottom pressure percent. |
-| `leftTotalPct` | number (double) | no | Total left foot pressure percent. |
-| `rightTotalPct` | number (double) | no | Total right foot pressure percent. |
-| `cogX` | number (double) | no | Center of gravity x coordinate, normalized 0..1. |
-| `cogY` | number (double) | no | Center of gravity y coordinate, normalized 0..1. |
-| `gender` | string | no | Reserved; no current recommendation effect. |
-| `limit` | integer (`@Min(1) @Max(50)`) | no | Recommendation limit. |
-
-### `Brand`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `brandName` | string | yes | Brand name. |
-| `productCount` | integer (int64) | yes | Number of shoes for that brand. |
-
-### `PagedResponse_Shoe`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `content` | [`Shoe`](#shoe)[] | yes | Current page content. |
-| `page` | integer | yes | Requested page number. |
-| `size` | integer | yes | Effective page size. |
-| `totalElements` | integer (int64) | yes | Total matched records before paging. |
-
-### `Shoe`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `productId` | string | yes | Shoe id. |
-| `name` | string | yes | Product name. |
-| `slug` | string | no | Product slug. |
-| `brand` | string | no | Brand name. |
-| `category` | string | no | Category. |
-| `price` | number (double) | no | Numeric price from catalog. |
-| `imageUrl` | string | no | Product image URL. |
-| `archSupport` | string | no | Arch support label. |
-| `metrics` | object | no | Requested metric names mapped to numeric values. `null` when no `metric` query is provided. |
-
-### `ShoeDetail`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `productId` | string | yes | Shoe id. |
-| `name` | string | yes | Product name. |
-| `slug` | string | no | Product slug. |
-| `brand` | string | no | Brand name. |
-| `category` | string | no | Category. |
-| `price` | number (double) | no | Numeric price from catalog. |
-| `imageUrl` | string | no | Product image URL. |
-| `archSupport` | string | no | Arch support label. |
-| `weightG` | number (double) | no | Weight in grams. |
-| `dropLabMm` | number (double) | no | Lab-measured drop in mm. |
-| `heelStackLabMm` | number (double) | no | Heel stack in mm. |
-| `forefootStackLabMm` | number (double) | no | Forefoot stack in mm. |
-| `midsoleSoftnessLabel` | string | no | Midsole softness label. |
-| `midsoleSoftnessNew` | number (double) | no | Midsole softness value. |
-| `shockAbsorptionLabel` | string | no | Shock absorption label. |
-| `shockAbsorptionRaw` | number (double) | no | Shock absorption raw value. |
-| `energyReturnLabel` | string | no | Energy return label. |
-| `energyReturnRaw` | number (double) | no | Energy return raw value. |
-| `torsionalRigidityRaw` | number (double) | no | Torsional rigidity raw value. |
-| `heelCounterStiffnessRaw` | number (double) | no | Heel counter stiffness raw value. |
-| `stiffnessLabel` | string | no | Stiffness label. |
-| `stiffnessNNew` | number (double) | no | Stiffness value. |
-| `breathabilityLabel` | string | no | Breathability label. |
-| `breathabilityRaw` | number (double) | no | Breathability raw value. |
-| `tractionRaw` | number (double) | no | Traction raw value. |
-| `sizeRatingLabel` | string | no | Size rating label. |
-| `sizeRatingRaw` | number (double) | no | Size rating raw value. |
-| `forefootWidthMm` | number (double) | no | Forefoot width in mm. |
-| `outsoleDurabilityMm` | number (double) | no | Outsole durability value. |
-| `toeboxDurabilityRaw` | number (double) | no | Toebox durability raw value. |
-| `overallScore` | number (double) | no | Overall score. |
-| `expertScore` | number (double) | no | Expert score. |
-| `userScore` | number (double) | no | User score. |
-| `terrain` | string | no | Terrain label. |
-| `strikePattern` | string | no | Strike pattern label. |
-| `description` | string | no | Product description. |
-| `orthoticFriendly` | boolean | no | Orthotic-friendly flag. |
-| `removableInsole` | boolean | no | Removable insole flag. |
-| `isLightweight` | boolean | no | Lightweight flag. |
-| `hasPlate` | boolean | no | Plate flag. |
-| `hasRocker` | boolean | no | Rocker flag. |
-| `bestFor` | string[] | no | Best-use tags. |
-
-### `ErrorResponse`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | Always `false`. |
-| `code` | string | no | Error code from common-core when available. |
-| `message` | string | yes | Human-readable message. |
-| `error` | string | no | Underlying detail. |
-| `timestamp` | string (date-time) | no | Error timestamp when supplied by common response handling. |
+| **`productId`** | string | yes | 신발 id |
+| **`name`** | string | yes | 제품명 |
+| `slug` | string | no | 제품 slug |
+| `brand` | string | no | 브랜드명 |
+| `category` | string | no | 카테고리 |
+| `price` | number (double) | no | 카탈로그 숫자 가격 |
+| `imageUrl` | string | no | 제품 이미지 URL |
+| `archSupport` | string | no | 아치 서포트 라벨 |
+| `weightG` | number (double) | no | 무게(g) |
+| `dropLabMm` | number (double) | no | 랩 측정 드롭(mm) |
+| `heelStackLabMm` | number (double) | no | 힐 스택(mm) |
+| `forefootStackLabMm` | number (double) | no | 전족 스택(mm) |
+| `midsoleSoftnessLabel` | string | no | 미드솔 소프트니스 라벨 |
+| `midsoleSoftnessNew` | number (double) | no | 미드솔 소프트니스 값 |
+| `shockAbsorptionLabel` | string | no | 충격 흡수 라벨 |
+| `shockAbsorptionRaw` | number (double) | no | 충격 흡수 raw 값 |
+| `energyReturnLabel` | string | no | 에너지 리턴 라벨 |
+| `energyReturnRaw` | number (double) | no | 에너지 리턴 raw 값 |
+| `torsionalRigidityRaw` | number (double) | no | 비틀림 강성 raw 값 |
+| `heelCounterStiffnessRaw` | number (double) | no | 힐 카운터 강성 raw 값 |
+| `stiffnessLabel` | string | no | 강성 라벨 |
+| `stiffnessNNew` | number (double) | no | 강성 값 |
+| `breathabilityLabel` | string | no | 통기성 라벨 |
+| `breathabilityRaw` | number (double) | no | 통기성 raw 값 |
+| `tractionRaw` | number (double) | no | 접지력 raw 값 |
+| `sizeRatingLabel` | string | no | 사이즈 평가 라벨 |
+| `sizeRatingRaw` | number (double) | no | 사이즈 평가 raw 값 |
+| `forefootWidthMm` | number (double) | no | 전족 너비(mm) |
+| `outsoleDurabilityMm` | number (double) | no | 아웃솔 내구도 값 |
+| `toeboxDurabilityRaw` | number (double) | no | 토박스 내구도 raw 값 |
+| `overallScore` | number (double) | no | 종합 점수 |
+| `expertScore` | number (double) | no | 전문가 점수 |
+| `userScore` | number (double) | no | 사용자 점수 |
+| `terrain` | string | no | 지형 라벨 |
+| `strikePattern` | string | no | 착지 패턴 라벨 |
+| `description` | string | no | 제품 설명 |
+| `orthoticFriendly` | boolean | no | 교정기 호환 플래그 |
+| `removableInsole` | boolean | no | 탈착 인솔 플래그 |
+| `isLightweight` | boolean | no | 경량 플래그 |
+| `hasPlate` | boolean | no | 플레이트 플래그 |
+| `hasRocker` | boolean | no | 로커 플래그 |
+| `bestFor` | string[] | no | 용도 태그 |
