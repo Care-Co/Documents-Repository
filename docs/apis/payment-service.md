@@ -1,26 +1,40 @@
 # payment-service
 
-> OpenAPI 3.1 — rendered from `openapi.yaml`. Field tables and schemas mirror `components/schemas`.
+> 엔드포인트별 Header · Request · Response 정의 — 소스는 실제 컨트롤러/DTO.
+> 표기 — **굵은 필드 = 필수**, 규칙은 키워드만.
 
 Source: `/Users/jonghak/GitHub/Care&Co/payment-service`
-Updated: 2026-06-26
+Updated: 2026-07-09
 
-Payment integration service backed by **Paddle Billing API v2** (sandbox). Hookdeck relays webhooks for local development. Persists customers, subscriptions, transactions, refunds, and webhook events to PostgreSQL. Exposes a gRPC read-only license query for `b2b-service`.
+Paddle Billing API v2(sandbox) 연동 결제 서비스. customer/subscription/transaction/refund/webhook 이벤트를 PostgreSQL 에 영속하고, `b2b-service` 용 gRPC read-only license 조회를 노출한다. 로컬 개발에서는 Hookdeck 이 webhook 을 릴레이한다.
+
+> **배포 상태** — payment-service 는 **dev 전용(prod 미배포)**. 아래 스펙은 현행 구현이며 운영 계약으로 확정된 것이 아니다.
 
 **Servers**
 - `https://api.example.com`
 
-**Versioning** &nbsp;none — single deployed version.
-**Security** &nbsp;**internal-only by default.** `/api/subscriptions/**`, `/api/transactions/**`, `/api/refunds/**`, `/api/customer-portal/**` 는 `InternalCallerInterceptor` 가 `X-Caller-Service` allowlist (`b2b-service` / `admin-service` / `payment-ops`) 를 검증하며, gateway 라우팅에서도 제거되어 외부 직접 호출 불가 — 외부는 **b2b-service `/api/v2/b2b/billing/**` 프록시(JWT 인증)** 를 경유한다. 동작 사용자는 `X-Acting-User-Id` 헤더로 감사 로그에 전파(권한 판단은 호출 측 책임). 공개(외부 직접 호출 가능) 는 plan catalog (`GET /api/payment/plans`) 와 webhook(`/webhooks/paddle`, Paddle-Signature HMAC-SHA256) 뿐. `/api/payment/**` 내부 endpoint(checkout-links / plan-change 등) 는 인라인 `X-Caller-Service` 가드.
-**Money** &nbsp;all monetary fields are integer minor-units (`Long`). `currencyCode` is ISO 4217. Pricing (currency / amount / country override) is owned by Paddle — not stored in our DB.
+**Versioning** &nbsp;헤더 기반 API versioning 미사용 — 모든 REST 엔드포인트가 unversioned. 경로의 `/api/v1` 등은 path prefix 일 뿐이다.
 
-**Errors** &nbsp;RFC 9457 `ProblemDetail`.
+**Security** &nbsp;**기본 internal-only.** 대부분의 엔드포인트는 `InternalCallerInterceptor` 가 `X-Caller-Service` allowlist(`b2b-service` / `admin-service` / `payment-ops`)를 검증하며 gateway 라우팅에서도 제거되어 외부 직접 호출이 불가하다 — 외부는 **b2b-service `/api/v2/b2b/billing/**` 프록시(JWT 인증)** 를 경유한다. 동작 사용자는 `X-Acting-User-Id` 헤더로 감사 로그에 전파된다(권한 판단은 호출 측 책임). 공개(외부 직접 호출 가능)는 plan catalog(`GET /api/payment/plans`)와 webhook(`/webhooks/paddle`, `Paddle-Signature` HMAC-SHA256)뿐이다.
 
-| HTTP | Cause |
+**Money** &nbsp;모든 금액 필드는 정수 minor-units(`Long`). `currencyCode` 는 ISO 4217. 가격(통화 / 금액 / 국가 오버라이드)은 Paddle 이 소유하며 우리 DB 에 저장하지 않는다.
+
+**Errors** &nbsp;RFC 9457 `ProblemDetail` (CncResponse envelope 아님). 성공 응답은 envelope 없이 DTO 를 직접 반환한다.
+
+```json
+{
+  "type": "about:blank",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "Refund not found: ref_01h..."
+}
+```
+
+| HTTP | 원인 |
 |---|---|
 | 400 | `MethodArgumentNotValidException` (request validation) |
-| 401 | webhook signature failure |
-| 403 | unknown `X-Caller-Service` (cross-service endpoints) |
+| 401 | webhook signature 실패 |
+| 403 | 알 수 없는 `X-Caller-Service` (cross-service 엔드포인트) |
 | 404 | `Subscription` / `Transaction` / `Refund` / `Plan` / `Variant` not found |
 | 409 | duplicate / state conflict (plan / variant / subscription) |
 
@@ -28,7 +42,7 @@ Payment integration service backed by **Paddle Billing API v2** (sandbox). Hookd
 
 ## API 버전 (endpoint별)
 
-> payment-service 는 헤더 기반 API versioning 미사용 — 모든 REST endpoint 가 unversioned(`—`). 경로의 `/api/v1` 등은 path prefix 일 뿐. 내부 전용 endpoint 는 Security 섹션 참고.
+> payment-service 는 헤더 기반 API versioning 미사용 — 모든 endpoint 가 unversioned(`—`). 경로의 `/api/v1` 등은 path prefix 일 뿐. 내부 전용 여부는 각 섹션 Security 참조.
 
 | Method | Path | 제공 버전 | 최신 |
 |---|---|---|---|
@@ -63,27 +77,31 @@ Payment integration service backed by **Paddle Billing API v2** (sandbox). Hookd
 
 ---
 
-## Plan catalog
+## 1. `GET` /api/payment/plans
 
-### `GET` /api/payment/plans
+audience 별 활성 plan 목록과 그 variants(priceId × billingInterval) 를 반환하는 공개 카탈로그. 가격은 포함되지 않음 — FE 가 Paddle.js `Paddle.PricePreview()` 로 country override 반영된 가격을 직접 받는다.
 
-**Operation ID** &nbsp;`listPlans`  &nbsp;**Tags** &nbsp;`plan`
+### Header
 
-Lists active plans (`enabled=true`) for the given audience, with their active variants. Prices (currency / amount / country override) are resolved on the frontend via Paddle.js `Paddle.PricePreview()` — this endpoint returns catalog metadata only.
-
-#### Parameters
-
-| In | Name | Type | Required |
-|---|---|---|---|
-| query | `audience` | enum `B2C` / `B2B` | yes |
-
-#### Responses
-
-| Status | Content-Type | Schema |
+| 헤더 | 값 | 필수 |
 |---|---|---|
-| **200** | `application/json` | [`PlanResponse`](#planresponse)[] |
+| `X-Caller-Service` | (allowlist 없음 — 공개 endpoint) | ❌ |
 
-#### 200 — example
+### Security
+
+공개(외부 직접 호출 가능). caller allowlist 없음. 가격/plan 메타만 노출하며 가격은 Paddle 소유라 DB 미저장.
+
+### Request
+
+바디 없음 — query 파라미터만.
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`audience`** | enum | ✅ | `B2C` / `B2B`. 미등록 값이면 400 |
+
+### Response
+
+**200 OK** — 활성 plan 배열 (각 plan 의 활성 variants 포함)
 
 ```json
 [
@@ -100,21 +118,34 @@ Lists active plans (`enabled=true`) for the given audience, with their active va
 ]
 ```
 
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `planCode` | string | — | plan PK |
+| `displayName` | string | — | 표시 이름 |
+| `planSeats` | integer | — | 좌석 수 |
+| `enabled` | boolean | — | 카탈로그 노출 여부 |
+| `variants[]` | array | — | `(planCode, billingInterval)` 당 1개 |
+| `variants[].priceId` | string | — | Paddle `pri_...` |
+| `variants[].billingInterval` | string | — | `MONTHLY` / `YEARLY` |
+| `variants[].enabled` | boolean | — | 노출 여부 |
+
 ---
 
-## Plan catalog management (Admin)
+## 2. `POST` /api/payment/plans
 
-Internal-only. No auth — trust cluster-internal routing. External exposure must add an auth layer.
+신규 plan 을 메타 + variants 와 함께 한 번에 등록하는 운영/내부 도구 endpoint.
 
-### `POST` /api/payment/plans
+### Header
 
-**Operation ID** &nbsp;`createPlan`  &nbsp;**Tags** &nbsp;`plan-admin`
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `Content-Type` | `application/json` | ✅ |
 
-Create a new plan with optional variants in one request.
+### Security
 
-#### Request body
+권한 검증 없음 — cluster-internal 라우팅 신뢰. `InternalCallerInterceptor` 대상 경로(`/api/subscriptions`·`/api/refunds`·`/api/transactions`·`/api/customer-portal`)에 `/api/payment/**` 는 포함되지 않아 caller 가드가 걸리지 않는다. 외부 노출 시 별도 인증 레이어 필요.
 
-`application/json` &nbsp;**Required** — [`CreatePlanRequest`](#createplanrequest)
+### Request
 
 ```json
 {
@@ -130,88 +161,209 @@ Create a new plan with optional variants in one request.
 }
 ```
 
-#### Responses
-
-| Status | Content-Type | Schema | Headers |
+| 필드 | 타입 | 필수 | 규칙/설명 |
 |---|---|---|---|
-| **201** | `application/json` | [`PlanResponse`](#planresponse) | `Location: /api/payment/plans/{planCode}` |
-| **409** | `application/problem+json` | [`ProblemDetail`](#problemdetail) | `PlanAlreadyExists` / `VariantAlreadyExists` / `DuplicateVariantInterval` |
+| **`planCode`** | string | ✅ | `@NotBlank` |
+| **`audience`** | enum | ✅ | `@NotNull` — `B2C` / `B2B` |
+| `displayName` | string | ❌ | — |
+| **`planSeats`** | integer | ✅ | `@NotNull @PositiveOrZero` |
+| `enabled` | boolean | ❌ | 미지정 시 서비스 기본값 |
+| `variants[]` | array | ❌ | `@Valid` — 아래 필드 |
+| **`variants[].priceId`** | string | ✅ | `@NotBlank` — Paddle `pri_...` |
+| **`variants[].billingInterval`** | enum | ✅ | `@NotNull` — `MONTHLY` / `YEARLY` |
+| `variants[].enabled` | boolean | ❌ | — |
 
-### `PATCH` /api/payment/plans/{planCode}
+### Response
 
-**Operation ID** &nbsp;`updatePlan`  &nbsp;**Tags** &nbsp;`plan-admin`
+**201 Created** — `Location: /api/payment/plans/{planCode}`. 바디는 `PlanResponse` (위 GET 과 동일 shape).
 
-Partial update. Fields: `displayName`, `planSeats`, `enabled`. `null` fields are kept.
+```json
+{
+  "planCode": "premium",
+  "displayName": "Premium",
+  "planSeats": 200,
+  "enabled": true,
+  "variants": [
+    { "priceId": "pri_premium_month", "billingInterval": "MONTHLY", "enabled": true },
+    { "priceId": "pri_premium_year",  "billingInterval": "YEARLY",  "enabled": true }
+  ]
+}
+```
 
-#### Request body
+<details><summary><b>409 Conflict</b> — plan/variant 중복 또는 interval 충돌</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "Plan already exists: premium" }
+```
+
+`PlanAlreadyExists` → `Plan already exists: {planCode}`. `VariantAlreadyExists` → `Variant already exists: priceId={priceId}`. `DuplicateVariantInterval` → `Plan {planCode} already has an active {interval} variant`. 응답 Content-Type `application/problem+json`.
+
+</details>
+
+---
+
+## 3. `PATCH` /api/payment/plans/{planCode}
+
+plan 메타(displayName / planSeats / enabled) 부분 수정 — `null` 필드는 기존 값 유지.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `Content-Type` | `application/json` | ✅ |
+
+### Security
+
+권한 검증 없음 — cluster-internal 라우팅 신뢰 (`/api/payment/**` 는 caller 가드 미적용).
+
+### Request
+
+바디 + path 의 `planCode`.
 
 ```json
 { "displayName": "Premium B2B", "planSeats": 250, "enabled": false }
 ```
 
-#### Responses
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `displayName` | string | ❌ | null 이면 유지 |
+| `planSeats` | integer | ❌ | `@PositiveOrZero`. null 이면 유지 |
+| `enabled` | boolean | ❌ | null 이면 유지 |
 
-| Status | Schema |
-|---|---|
-| **200** | [`PlanResponse`](#planresponse) |
-| **404** | [`ProblemDetail`](#problemdetail) (`PlanNotFound`) |
+path 파라미터. **`planCode`** (string) — 수정 대상 plan.
 
-### `POST` /api/payment/plans/{planCode}/variants
+### Response
 
-**Operation ID** &nbsp;`createVariant`  &nbsp;**Tags** &nbsp;`plan-admin`
+**200 OK** — 갱신된 `PlanResponse`.
 
-Add a variant to an existing plan. The new variant's `billingInterval` must not collide with an existing **enabled** variant.
-
-#### Request body
+<details><summary><b>404 Not Found</b> — plan 없음</summary>
 
 ```json
-{ "priceId": "pri_premium_quarter", "billingInterval": "QUARTERLY", "enabled": true }
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Plan not found: premium" }
 ```
 
-> `BillingInterval` enum currently allows `MONTHLY`, `YEARLY`. New values require enum + `plan_variants` CHECK constraint migration.
+`PlanNotFound` → `Plan not found: {planCode}`. 응답 Content-Type `application/problem+json`.
 
-#### Responses
+</details>
 
-| Status | Schema |
-|---|---|
-| **201** | [`PlanResponse`](#planresponse) |
-| **404** | [`ProblemDetail`](#problemdetail) (`PlanNotFound`) |
-| **409** | [`ProblemDetail`](#problemdetail) (`VariantAlreadyExists` / `DuplicateVariantInterval`) |
+---
 
-### `PATCH` /api/payment/plans/{planCode}/variants/{priceId}
+## 4. `POST` /api/payment/plans/{planCode}/variants
 
-**Operation ID** &nbsp;`updateVariant`  &nbsp;**Tags** &nbsp;`plan-admin`
+기존 plan 에 variant 추가 — 신규 variant 의 `billingInterval` 은 기존 **활성** variant 와 충돌 불가.
 
-Toggle variant `enabled`.
+### Header
 
-#### Request body
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `Content-Type` | `application/json` | ✅ |
+
+### Security
+
+권한 검증 없음 — cluster-internal 라우팅 신뢰.
+
+### Request
+
+바디 + path 의 `planCode`.
+
+```json
+{ "priceId": "pri_premium_quarter", "billingInterval": "MONTHLY", "enabled": true }
+```
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`priceId`** | string | ✅ | `@NotBlank` — Paddle `pri_...` |
+| **`billingInterval`** | enum | ✅ | `@NotNull` — `MONTHLY` / `YEARLY`. 신규 값은 enum + `plan_variants` CHECK 마이그레이션 필요 |
+| `enabled` | boolean | ❌ | — |
+
+path 파라미터. **`planCode`** (string).
+
+### Response
+
+**201 Created** — 갱신된 `PlanResponse`.
+
+<details><summary><b>404 Not Found</b> — plan 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Plan not found: premium" }
+```
+
+`PlanNotFound` → `Plan not found: {planCode}`.
+
+</details>
+
+<details><summary><b>409 Conflict</b> — variant 중복 또는 interval 충돌</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "Variant already exists: priceId=pri_premium_quarter" }
+```
+
+`VariantAlreadyExists` → `Variant already exists: priceId={priceId}`. `DuplicateVariantInterval` → `Plan {planCode} already has an active {interval} variant`. 응답 Content-Type `application/problem+json`.
+
+</details>
+
+---
+
+## 5. `PATCH` /api/payment/plans/{planCode}/variants/{priceId}
+
+variant 의 `enabled` 토글.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `Content-Type` | `application/json` | ✅ |
+
+### Security
+
+권한 검증 없음 — cluster-internal 라우팅 신뢰.
+
+### Request
+
+바디 + path 의 `planCode`, `priceId`.
 
 ```json
 { "enabled": false }
 ```
 
-#### Responses
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `enabled` | boolean | ❌ | 현재는 이 필드만 의미 |
 
-| Status | Schema |
-|---|---|
-| **200** | [`PlanResponse`](#planresponse) |
-| **404** | [`ProblemDetail`](#problemdetail) (`VariantNotFound`) |
+path 파라미터. **`planCode`** (string), **`priceId`** (string).
+
+### Response
+
+**200 OK** — 갱신된 `PlanResponse`.
+
+<details><summary><b>404 Not Found</b> — variant 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Variant not found: priceId=pri_premium_quarter" }
+```
+
+`VariantNotFound` → `Variant not found: priceId={priceId}`. 응답 Content-Type `application/problem+json`.
+
+</details>
 
 ---
 
-## Checkout
+## 6. `POST` /api/payment/checkout-links
 
-### `POST` /api/payment/checkout-links
+결제 시작 — FE 의 `Paddle.Checkout.open()` 이 사용할 transaction reference 를 server-side 로 미리 생성. `custom_data` (organization_id / user_id / user_pool) 는 서버가 박아 FE 변조 불가.
 
-**Operation ID** &nbsp;`createCheckoutLink`  &nbsp;**Tags** &nbsp;`checkout`
+### Header
 
-Builds the config payload that the frontend passes to `Paddle.Checkout.open(...)`. Ensures a `customer` row + Paddle customer exist for `(userPool, userId)` (creates lazily). Stamps `customData.organization_id` server-side so the frontend cannot tamper with it.
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` | ✅ |
+| `Content-Type` | `application/json` | ✅ |
 
-**Caller** — `b2b-service` only (`X-Caller-Service: b2b-service` required).
+### Security
 
-#### Request body
+internal-only. 인라인 가드 — `X-Caller-Service` 화이트리스트가 **`b2b-service` 단독**. `InternalCallerInterceptor` 가 아니라 컨트롤러 내부에서 직접 검사. 불허 caller 는 403 ProblemDetail.
 
-`application/json` &nbsp;**Required** — [`CreateCheckoutLinkRequest`](#createcheckoutlinkrequest)
+### Request
 
 ```json
 {
@@ -224,16 +376,18 @@ Builds the config payload that the frontend passes to `Paddle.Checkout.open(...)
 }
 ```
 
-#### Responses
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`userPool`** | enum | ✅ | `@NotNull` — `CARENCO` / `B2B` |
+| **`userId`** | string | ✅ | `@NotBlank` — 해당 풀 내 user id |
+| **`organizationId`** | string | ✅ | `@NotBlank` — B2B 결제 대상 organization |
+| **`priceId`** | string | ✅ | `@NotBlank` — `plan_variants` 에 등록된 Paddle `pri_...` |
+| **`customerName`** | string | ✅ | `@NotBlank` |
+| **`customerEmail`** | string | ✅ | `@NotBlank @Email` |
 
-| Status | Content-Type | Schema |
-|---|---|---|
-| **200** | `application/json` | [`CheckoutLinkResponse`](#checkoutlinkresponse) |
-| **403** | — | unknown caller |
-| **404** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`PlanNotFound`) |
-| **409** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`PlanDisabled`) |
+### Response
 
-#### 200 — example
+**200 OK** — Paddle transaction reference.
 
 ```json
 {
@@ -242,60 +396,145 @@ Builds the config payload that the frontend passes to `Paddle.Checkout.open(...)
 }
 ```
 
-> payment-service 가 Paddle `POST /transactions` 로 transaction 을 server-side pre-create 하고 reference 만 반환. FE 는 `Paddle.Checkout.open({ transactionId })` 또는 `checkoutUrl` redirect. `custom_data` (organization_id / user_id / user_pool) 는 transaction 단계에서 서버가 박아 FE 변조 불가, 결제 완료 시 Paddle 이 subscription 으로 상속.
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `transactionId` | string | — | Paddle `txn_...` (서버 pre-create). FE 가 `Paddle.Checkout.open({ transactionId })` 에 전달 |
+| `checkoutUrl` | string | — | Paddle hosted checkout URL — redirect 로도 사용 |
 
-### `POST` /api/payment/subscriptions/{paddleSubscriptionId}/link-organization
+<details><summary><b>403 Forbidden</b> — 허용되지 않은 caller</summary>
 
-**Operation ID** &nbsp;`linkOrganization`  &nbsp;**Tags** &nbsp;`checkout`
+```json
+{ "type": "about:blank", "title": "Forbidden", "status": 403, "detail": "Internal endpoint — caller unknown-svc not allowed" }
+```
 
-Backfill — attaches `organization_id` (and optional plan metadata) to an existing subscription whose webhook arrived without `custom_data.organization_id`. Cross-MSA call (`b2b → payment`); `X-Caller-Service: b2b-service` required.
+</details>
 
-#### Request body
+<details><summary><b>404 Not Found</b> — priceId 미등록</summary>
 
-`application/json` &nbsp;**Required** — [`LinkOrganizationRequest`](#linkorganizationrequest)
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Subscription plan not found: priceId=pri_xxx" }
+```
+
+`PlanNotFound` → `Subscription plan not found: priceId={priceId}`.
+
+</details>
+
+<details><summary><b>409 Conflict</b> — plan 비활성</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "Subscription plan disabled: priceId=pri_xxx" }
+```
+
+`PlanDisabled` → `Subscription plan disabled: priceId={priceId}`.
+
+</details>
+
+---
+
+## 7. `POST` /api/payment/subscriptions/{paddleSubscriptionId}/link-organization
+
+백필 — 이미 존재하는 subscription 에 organization 매핑(및 선택 plan 메타) 보정 + b2b 캐시 invalidate.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` | ✅ |
+| `Content-Type` | `application/json` | ✅ |
+
+### Security
+
+internal-only. 인라인 가드 — `X-Caller-Service` 는 `b2b-service` 단독. 성공 시 `b2bClient.invalidate(organizationId, "subscription.linked")` 호출(b2b 미배포면 skip).
+
+### Request
+
+바디 + path 의 `paddleSubscriptionId`.
 
 ```json
 { "organizationId": "01HXORG...", "planSeats": 20, "planCode": "pro" }
 ```
 
-#### Responses
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`organizationId`** | string | ✅ | `@NotBlank` |
+| `planSeats` | integer | ❌ | `@Min(0)`. null = `subscription_plans` 조회 또는 기존 값 유지 |
+| `planCode` | string | ❌ | null = 기존 값 유지 |
 
-| Status | Schema |
-|---|---|
-| **200** | [`Subscription`](#subscription) |
-| **404** | [`ProblemDetail`](#problemdetail) (`SubscriptionNotFound`) |
-| **409** | [`ProblemDetail`](#problemdetail) (`OrganizationConflict` — already mapped to a different organization) |
+path 파라미터. **`paddleSubscriptionId`** (string) — Paddle `sub_...`.
+
+### Response
+
+**200 OK** — 갱신된 `SubscriptionResponse` (아래 GET /api/subscriptions/{id} 와 동일 shape).
+
+<details><summary><b>404 Not Found</b> — subscription 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Subscription not found: paddleId=sub_xxx" }
+```
+
+`SubscriptionNotFound` → `Subscription not found: paddleId={paddleSubscriptionId}`.
+
+</details>
+
+<details><summary><b>409 Conflict</b> — 다른 organization 에 이미 매핑됨</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "Subscription already linked to organization=01HXORG_A, refused to relink to 01HXORG_B" }
+```
+
+`OrganizationConflict` → `Subscription already linked to organization={existing}, refused to relink to {requested}`.
+
+</details>
+
+<details><summary><b>400 Bad Request</b> — 입력 오류</summary>
+
+```json
+{ "type": "about:blank", "title": "Bad Request", "status": 400, "detail": "Invalid organizationId: blank" }
+```
+
+`InvalidInput` → `Invalid {field}: {reason}`.
+
+</details>
+
+<details><summary><b>403 Forbidden</b> — 허용되지 않은 caller</summary>
+
+```json
+{ "type": "about:blank", "title": "Forbidden", "status": 403, "detail": "Internal endpoint — caller unknown-svc not allowed" }
+```
+
+</details>
 
 ---
 
-## Plan change
+## 8. `POST` /api/payment/plan-change
 
-### `POST` /api/payment/plan-change
+organization 의 active subscription 을 새 `priceId` 로 교체. 업/다운그레이드 판정으로 `proration_billing_mode` 자동 결정, 차액 정산은 Paddle 이 처리.
 
-**Operation ID** &nbsp;`changePlan`  &nbsp;**Tags** &nbsp;`subscription`
+### Header
 
-Replaces the items of an organization's active subscription with a new `priceId`. Tier is compared (`plan_seats` first, then `billing_interval` where YEARLY > MONTHLY) to pick `proration_billing_mode` automatically — `prorated_immediately` for upgrade, `full_next_billing_period` for downgrade.
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` | ✅ |
+| `Content-Type` | `application/json` | ✅ |
 
-**Caller** — `b2b-service` only (`X-Caller-Service: b2b-service` required).
+### Security
 
-#### Request body
+internal-only. 인라인 가드 — `X-Caller-Service` 는 `b2b-service` 단독. **불허 caller 는 바디 없는 403** (`ResponseEntity.status(FORBIDDEN).build()` — 다른 endpoint 와 달리 ProblemDetail 본문 없음).
 
-`application/json` &nbsp;**Required** — [`PlanChangeRequest`](#planchangerequest)
+### Request
 
 ```json
 { "organizationId": "01HXORG...", "newPriceId": "pri_..." }
 ```
 
-#### Responses
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`organizationId`** | string | ✅ | `@NotBlank` — active subscription 자동 lookup |
+| **`newPriceId`** | string | ✅ | `@NotBlank` |
 
-| Status | Content-Type | Schema |
-|---|---|---|
-| **200** | `application/json` | [`PlanChangeResponse`](#planchangeresponse) |
-| **403** | — | unknown caller |
-| **404** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`SubscriptionNotFound` / `NewPlanNotFound`) |
-| **409** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`NewPlanDisabled` / `SamePriceAsCurrent` / `InvalidSubscriptionState`) |
+### Response
 
-#### 200 — example
+**200 OK** — 변경된 subscription 의 핵심 메타(FE 즉시 표시용, DB/proration 은 webhook 으로 후속 sync).
 
 ```json
 {
@@ -309,216 +548,823 @@ Replaces the items of an organization's active subscription with a new `priceId`
 }
 ```
 
-DB state (`subscriptions.priceId / plan_code / plan_seats / next_billed_at`) and proration transaction rows are populated asynchronously by Paddle webhooks (`subscription.updated`, `transaction.created`, `transaction.completed`).
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `paddleSubscriptionId` | string | — | 변경된 subscription |
+| `newPriceId` | string | — | 적용된 price |
+| `newPlanCode` | string | — | `plan_variants` join 으로 해석 |
+| `newPlanSeats` | integer | — | `subscription_plans` 에서 해석 |
+| `newBillingInterval` | string | — | `MONTHLY` / `YEARLY` |
+| `prorationMode` | string | — | 서버 결정 (예: `prorated_immediately` / `full_next_billing_period`) |
+| `status` | string | — | pre-webhook 스냅샷 상태 |
+
+<details><summary><b>403 Forbidden</b> — 허용되지 않은 caller (바디 없음)</summary>
+
+빈 본문. HTTP 403 상태만.
+
+</details>
+
+<details><summary><b>404 Not Found</b> — subscription 또는 plan variant 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "No subscription for organization: 01HXORG..." }
+```
+
+`SubscriptionNotFound` → `No subscription for organization: {organizationId}`. `NewPlanNotFound` → `Plan variant not found: {newPriceId}`. 응답 Content-Type `application/problem+json`.
+
+</details>
+
+<details><summary><b>409 Conflict</b> — plan 비활성 / 동일 price / 상태 불가</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "Subscription is already on price: pri_..." }
+```
+
+`NewPlanDisabled` → `Plan variant disabled: {newPriceId}`. `SamePriceAsCurrent` → `Subscription is already on price: {priceId}`. `InvalidSubscriptionState` → `Subscription not changeable in state: {current}`.
+
+</details>
 
 ---
 
-## Customers
+## 9. `POST` /api/internal/plan-variants/{priceId}/promote
 
-No external REST API. Customer rows are created/updated by two internal flows only.
+미매핑 priceId 를 `plan_variants` 로 단순 승격(활성 슬롯이 비어있을 때).
 
-- **Pre-payment** — `POST /api/payment/checkout-links` invokes `CheckoutLinkService`, which calls `CustomerService.createCustomer` to ensure a Paddle + local customer exists for `(userPool, userId)`.
-- **Post-payment** — `POST /webhooks/paddle` `customer.created` / `customer.updated` events are handled by `CustomerWebhookHandler` to keep metadata fresh across all rows that share the same `paddleCustomerId`.
+### Header
 
-`customers.paddle_customer_id` is **not unique** — a single Paddle customer (one email) can be referenced by multiple rows when the same person has both a `B2B` (b2b-service) and a `CARENCO` (user-service) identity. The `Customer` schema is still referenced inside `CheckoutLink` / `Subscription` / `Transaction` payloads (see schemas section).
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `admin-service` / `payment-ops` | ✅ |
+| `Content-Type` | `application/json` | ✅ |
 
----
+### Security
 
-## Subscriptions
+internal-only. 인라인 가드 — `X-Caller-Service` 화이트리스트 `admin-service` / `payment-ops`. 1차엔 운영자 Postman 수동 호출, 추후 admin-service 자동화. 불허 caller 는 403 ProblemDetail.
 
-> **Internal-only** — `X-Caller-Service` allowlist 필수 (`InternalCallerInterceptor`), gateway 외부 라우팅 제거됨. 외부는 b2b `/api/v2/b2b/billing/organizations/{orgId}/subscription[...]` 프록시 경유.
+### Request
 
-### `GET` /api/subscriptions/{id}
+바디 + path 의 `priceId`.
 
-**Operation ID** &nbsp;`getSubscription`  &nbsp;**Tags** &nbsp;`subscription`
+```json
+{ "planCode": "pro", "billingInterval": "MONTHLY" }
+```
 
-#### Responses
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`planCode`** | string | ✅ | `@NotBlank` |
+| **`billingInterval`** | enum | ✅ | `@NotNull` — `MONTHLY` / `YEARLY` |
 
-| Status | Schema |
-|---|---|
-| **200** | [`Subscription`](#subscription) |
-| **404** | [`ProblemDetail`](#problemdetail) |
+path 파라미터. **`priceId`** (string) — 승격 대상 Paddle `pri_...`.
 
-#### 200 — example
+### Response
+
+**200 OK** — 새로 만들어진 variant 메타(`PromoteResult`).
 
 ```json
 {
-  "id": "...", "paddleSubscriptionId": "sub_...",
-  "customerId": "...", "priceId": "pri_...",
-  "quantity": 1,
-  "organizationId": "01HXORG...",
-  "planSeats": 20, "planCode": "pro",
-  "status": "ACTIVE",
-  "nextBilledAt": "...", "canceledAt": null,
-  "createdAt": "...",
-  "currentPeriodStart": "...", "currentPeriodEnd": "..."
+  "priceId": "pri_new...",
+  "planCode": "pro",
+  "billingInterval": "MONTHLY",
+  "enabled": true
 }
 ```
 
-### `GET` /api/subscriptions
-
-**Operation ID** &nbsp;`listSubscriptions`  &nbsp;**Tags** &nbsp;`subscription`
-
-#### Parameters
-
-| In | Name | Type | Required |
+| 필드 | 타입 | 필수 | 규칙/설명 |
 |---|---|---|---|
-| query | `customerId` | string | yes |
+| `priceId` | string | — | 승격된 Paddle `pri_...` |
+| `planCode` | string | — | 매핑된 plan (없으면 null) |
+| `billingInterval` | string | — | `MONTHLY` / `YEARLY` |
+| `enabled` | boolean | — | 활성 여부 |
 
-#### Responses
+<details><summary><b>404 Not Found</b> — pending priceId 없음</summary>
 
-| Status | Schema |
-|---|---|
-| **200** | [`Subscription`](#subscription)[] |
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Pending priceId not found: pri_xxx" }
+```
 
-### `POST` /api/subscriptions/{id}/cancel
+`NotFound` → `Pending priceId not found: {priceId}`.
 
-**Operation ID** &nbsp;`cancelSubscription`  &nbsp;**Tags** &nbsp;`subscription`
+</details>
 
-Cancel (effective at next billing period).
+<details><summary><b>400 Bad Request</b> — planCode 없음</summary>
 
-#### Responses
+```json
+{ "type": "about:blank", "title": "Bad Request", "status": 400, "detail": "planCode not found: pro" }
+```
 
-| Status | Schema |
-|---|---|
-| **200** | [`Subscription`](#subscription) |
-| **404** | [`ProblemDetail`](#problemdetail) (`NotFound` — `Subscription not found: {id}`) |
-| **409** | [`ProblemDetail`](#problemdetail) (`IllegalStateTransition` — `Cannot cancel subscription {id} in status {currentStatus}`) |
+`PlanNotFound` → `planCode not found: {planCode}`.
 
-### `POST` /api/subscriptions/{id}/pause
+</details>
 
-**Operation ID** &nbsp;`pauseSubscription`  &nbsp;**Tags** &nbsp;`subscription`
+<details><summary><b>409 Conflict</b> — 이미 매핑됨 / 활성 슬롯 점유</summary>
 
-Status → `PAUSED`.
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "priceId already mapped: pri_xxx → planCode=pro" }
+```
 
-#### Responses
+`AlreadyMapped` → `priceId already mapped: {priceId} → planCode={existingPlanCode}`. `DuplicateMapping` → `(planCode={planCode}, billingInterval={billingInterval}) already has an active priceId — use swap to replace`.
 
-| Status | Schema |
-|---|---|
-| **200** | [`Subscription`](#subscription) |
-| **404** | [`ProblemDetail`](#problemdetail) (`NotFound`) |
-| **409** | [`ProblemDetail`](#problemdetail) (`IllegalStateTransition` — `Cannot pause subscription {id} in status {currentStatus}`) |
-
-### `POST` /api/subscriptions/{id}/resume
-
-**Operation ID** &nbsp;`resumeSubscription`  &nbsp;**Tags** &nbsp;`subscription`
-
-Status → `ACTIVE`.
-
-#### Responses
-
-| Status | Schema |
-|---|---|
-| **200** | [`Subscription`](#subscription) |
-| **404** | [`ProblemDetail`](#problemdetail) (`NotFound`) |
-| **409** | [`ProblemDetail`](#problemdetail) (`IllegalStateTransition` — `Cannot resume subscription {id} in status {currentStatus}`) |
-
-### `POST` /api/subscriptions/{paddleSubscriptionId}/sync
-
-**Operation ID** &nbsp;`syncSubscription`  &nbsp;**Tags** &nbsp;`subscription`
-
-Force-sync from Paddle (ops use). Webhook is the normal path.
+</details>
 
 ---
 
-## Transactions
+## 10. `POST` /api/internal/plan-variants/{newPriceId}/swap
 
-> **Internal-only** — `X-Caller-Service` allowlist 필수, gateway 외부 라우팅 제거됨. 외부는 b2b `/api/v2/b2b/billing/organizations/{orgId}/transactions` 프록시 경유.
+가격 정책 세대 교체 — 옛 priceId 비활성 + 새 priceId 활성. 승격/스왑은 같은 `PendingPromoteError` enum 을 공유.
 
-### `GET` /api/transactions/{id}
+### Header
 
-**Operation ID** &nbsp;`getTransaction`  &nbsp;**Tags** &nbsp;`transaction`
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `admin-service` / `payment-ops` | ✅ |
+| `Content-Type` | `application/json` | ✅ |
 
-#### Responses
+### Security
 
-| Status | Schema |
-|---|---|
-| **200** | [`Transaction`](#transaction) |
-| **404** | [`ProblemDetail`](#problemdetail) |
+internal-only. 인라인 가드 — `admin-service` / `payment-ops`. 불허 caller 는 403 ProblemDetail.
 
-#### 200 — example
+### Request
+
+바디 + path 의 `newPriceId`.
+
+```json
+{ "replacePriceId": "pri_old...", "planCode": "pro", "billingInterval": "MONTHLY" }
+```
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`replacePriceId`** | string | ✅ | `@NotBlank` — 비활성화할 옛 priceId |
+| **`planCode`** | string | ✅ | `@NotBlank` |
+| **`billingInterval`** | enum | ✅ | `@NotNull` — `MONTHLY` / `YEARLY` |
+
+path 파라미터. **`newPriceId`** (string) — 활성화할 신규 Paddle `pri_...`.
+
+### Response
+
+**200 OK** — 옛/새 priceId 짝(`SwapResult`).
 
 ```json
 {
-  "id": "...", "paddleTransactionId": "txn_...",
-  "customerId": "...", "subscriptionId": "...",
-  "status": "COMPLETED", "currencyCode": "KRW",
-  "subtotal": 1000, "discountTotal": 0,
-  "taxTotal": 100, "totalAmount": 1100,
-  "billingPeriodStartsAt": "...", "billingPeriodEndsAt": "...",
+  "oldPriceId": "pri_old...",
+  "newPriceId": "pri_new...",
+  "planCode": "pro",
+  "billingInterval": "MONTHLY",
+  "newEnabled": true
+}
+```
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `oldPriceId` | string | — | 비활성된 옛 priceId |
+| `newPriceId` | string | — | 활성된 새 priceId |
+| `planCode` | string | — | — |
+| `billingInterval` | string | — | `MONTHLY` / `YEARLY` |
+| `newEnabled` | boolean | — | 새 variant 활성 여부 |
+
+<details><summary><b>404 Not Found</b> — 교체 대상 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "replacePriceId not in plan_variants: pri_old..." }
+```
+
+`ReplaceTargetNotFound` → `replacePriceId not in plan_variants: {replacePriceId}`.
+
+</details>
+
+<details><summary><b>400 Bad Request</b> — planCode 없음 / 매핑 불일치</summary>
+
+```json
+{ "type": "about:blank", "title": "Bad Request", "status": 400, "detail": "planCode not found: pro" }
+```
+
+`PlanNotFound` → `planCode not found: {planCode}`. `ReplaceMismatch` → `replacePriceId {id} 의 실제 매핑 ({actualPlanCode}, {actualBillingInterval}) 이 요청 ({requestedPlanCode}, {requestedBillingInterval}) 과 다름`.
+
+</details>
+
+<details><summary><b>409 Conflict</b> — 옛 priceId 가 이미 비활성</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "replacePriceId already disabled (use promote): pri_old..." }
+```
+
+`ReplaceAlreadyDisabled` → `replacePriceId already disabled (use promote): {replacePriceId}`.
+
+</details>
+
+---
+
+## 11. `POST` /api/internal/subscriptions/migrate-price
+
+옛 priceId → 새 priceId 일괄 마이그레이션. `dryRun=true` 로 영향 평가 → announcement → `dryRun=false` 실행.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `admin-service` / `payment-ops` | ✅ |
+| `Content-Type` | `application/json` | ✅ |
+
+### Security
+
+internal-only. 인라인 가드 — `admin-service` / `payment-ops`. 불허 caller 는 403 ProblemDetail. caller 값은 마이그레이션 감사에 기록.
+
+### Request
+
+```json
+{
+  "fromPriceId": "pri_old...",
+  "toPriceId": "pri_new...",
+  "prorationMode": "prorated_immediately",
+  "dryRun": true
+}
+```
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`fromPriceId`** | string | ✅ | `@NotBlank` |
+| **`toPriceId`** | string | ✅ | `@NotBlank` |
+| **`prorationMode`** | string | ✅ | `@NotBlank` — Paddle 표준 5개(`do_not_bill` / `prorated_immediately` / `prorated_next_billing_period` / `full_immediately` / `full_next_billing_period`) |
+| **`dryRun`** | boolean | ✅ | `@NotNull`. true 면 영향 평가만 |
+
+### Response
+
+**200 OK** — 마이그레이션 결과(`MigratePriceResult`).
+
+```json
+{
+  "fromPriceId": "pri_old...",
+  "toPriceId": "pri_new...",
+  "prorationMode": "prorated_immediately",
+  "dryRun": true,
+  "totalCandidates": 12,
+  "succeeded": 0,
+  "failed": 0,
+  "skippedScheduledChange": 2,
+  "failedSubscriptionIds": [],
+  "skippedSubscriptionIds": ["sub_a", "sub_b"],
+  "durationMs": 143
+}
+```
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `fromPriceId` / `toPriceId` | string | — | — |
+| `prorationMode` | string | — | 요청 반향 |
+| `dryRun` | boolean | — | — |
+| `totalCandidates` | integer | — | 대상 subscription 수 |
+| `succeeded` / `failed` | integer | — | 실행 결과 (dryRun 이면 0) |
+| `skippedScheduledChange` | integer | — | scheduled_change 있어 자동 제외된 수(Paddle 가 PATCH 거절) |
+| `failedSubscriptionIds` | array\<string> | — | 실패한 subscription id |
+| `skippedSubscriptionIds` | array\<string> | — | 제외된 subscription id |
+| `durationMs` | integer(long) | — | 소요 ms |
+
+<details><summary><b>400 Bad Request</b> — 동일 priceId / 잘못된 proration / plan·interval 불일치</summary>
+
+```json
+{ "type": "about:blank", "title": "Bad Request", "status": 400, "detail": "fromPriceId == toPriceId — 의미 없는 호출: pri_x" }
+```
+
+`SamePriceId` → `fromPriceId == toPriceId — 의미 없는 호출: {priceId}`. `InvalidProrationMode` → `Invalid prorationMode (Paddle 표준 5개): {mode}`. `FromToMismatch` → `from ({fromPlanCode}, {fromInterval}) / to ({toPlanCode}, {toInterval}) plan/interval 불일치`.
+
+</details>
+
+<details><summary><b>404 Not Found</b> — priceId 미매핑</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "fromPriceId not mapped in plan_variants: pri_old..." }
+```
+
+`FromPriceNotMapped` → `fromPriceId not mapped in plan_variants: {fromPriceId}`. `ToPriceNotMapped` → `toPriceId not mapped — promote/swap 부터: {toPriceId}`.
+
+</details>
+
+---
+
+## 12. `GET` /api/internal/subscriptions/expiring
+
+cancel 예약된 subscription 중 N 일 이내 만료 예정 목록(retention dashboard 용).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `admin-service` / `payment-ops` | ✅ |
+
+### Security
+
+internal-only. 인라인 가드 — `admin-service` / `payment-ops`. 불허 caller 는 403 ProblemDetail.
+
+### Request
+
+바디 없음 — query 파라미터만.
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `days` | integer | ❌ | 기본값 `30`. 범위 1~365(벗어나면 400) |
+
+### Response
+
+**200 OK** — `SubscriptionResponse` 배열 (아래 GET /api/subscriptions/{id} shape).
+
+```json
+[
+  { "id": "...", "paddleSubscriptionId": "sub_...", "status": "ACTIVE", "scheduledChangeAction": "cancel", "scheduledChangeEffectiveAt": "2026-07-20T00:00:00Z" }
+]
+```
+
+<details><summary><b>400 Bad Request</b> — days 범위 초과</summary>
+
+```json
+{ "type": "about:blank", "title": "Bad Request", "status": 400, "detail": "days must be 1~365: 500" }
+```
+
+</details>
+
+<details><summary><b>403 Forbidden</b> — 허용되지 않은 caller</summary>
+
+```json
+{ "type": "about:blank", "title": "Forbidden", "status": 403, "detail": "Internal endpoint — caller unknown-svc not allowed" }
+```
+
+</details>
+
+---
+
+## 13. `GET` /api/subscriptions/{id}
+
+로컬 pk 로 subscription 단건 조회.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 가 `/api/subscriptions/**` 에 대해 `X-Caller-Service` allowlist(`b2b-service` / `admin-service` / `payment-ops`) 검증. `X-Acting-User-Id` 는 MDC 감사 로그로 전파(권한 판단은 호출 측). 불허 caller 는 403 ProblemDetail. 외부는 b2b `/api/v2/b2b/billing/**` 프록시 경유.
+
+### Request
+
+바디 없음 — path 의 `id` (subscription 로컬 pk).
+
+### Response
+
+**200 OK** — `SubscriptionResponse`.
+
+```json
+{
+  "id": "...",
+  "paddleSubscriptionId": "sub_...",
+  "customerId": "...",
+  "organizationId": "01HXORG...",
+  "priceId": "pri_...",
+  "quantity": 1,
+  "planSeats": 20,
+  "planCode": "pro",
+  "status": "ACTIVE",
+  "nextBilledAt": "2026-08-01T00:00:00Z",
+  "currentPeriodStart": "2026-07-01T00:00:00Z",
+  "currentPeriodEnd": "2026-08-01T00:00:00Z",
+  "canceledAt": null,
+  "scheduledChangeAction": null,
+  "scheduledChangeEffectiveAt": null,
+  "scheduledChangeResumeAt": null,
+  "createdAt": "2026-07-01T00:00:00Z"
+}
+```
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `id` | string | — | 로컬 pk |
+| `paddleSubscriptionId` | string | — | `sub_...` |
+| `customerId` | string | — | `customers.id` FK |
+| `organizationId` | string \| null | — | B2B 대상 organization(비 B2B 는 null) |
+| `priceId` | string | — | `pri_...` |
+| `quantity` | integer | — | — |
+| `planSeats` | integer | — | `subscription_plans` 스냅샷(license 조회용 비정규화) |
+| `planCode` | string | — | `subscription_plans` 스냅샷 |
+| `status` | string | — | `ACTIVE` `CANCELED` `PAST_DUE` `PAUSED` `TRIALING` `EXPIRED` |
+| `nextBilledAt` | string(date-time) | — | — |
+| `currentPeriodStart` | string(date-time) \| null | — | Paddle `current_billing_period.starts_at` |
+| `currentPeriodEnd` | string(date-time) \| null | — | Paddle `current_billing_period.ends_at` |
+| `canceledAt` | string(date-time) \| null | — | — |
+| `scheduledChangeAction` | string \| null | — | `cancel` / `pause` / `resume`. null=예약 없음 |
+| `scheduledChangeEffectiveAt` | string(date-time) \| null | — | scheduled change 적용 시점 |
+| `scheduledChangeResumeAt` | string(date-time) \| null | — | pause 후 resume 예약 시점 |
+| `createdAt` | string(date-time) | — | — |
+
+<details><summary><b>404 Not Found</b> — subscription 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Subscription not found: {id}" }
+```
+
+`NotFound` → `Subscription not found: {id}`.
+
+</details>
+
+---
+
+## 14. `GET` /api/subscriptions
+
+customer 의 subscription 목록.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 검증(`/api/subscriptions/**`).
+
+### Request
+
+바디 없음 — query 파라미터만.
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`customerId`** | string | ✅ | 로컬 `customers.id` |
+
+### Response
+
+**200 OK** — `SubscriptionResponse` 배열(위 shape). 조회 결과 없으면 빈 배열.
+
+---
+
+## 15. `POST` /api/subscriptions/{id}/cancel
+
+subscription 취소(다음 청구 주기에 반영).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 검증.
+
+### Request
+
+바디 없음 — path 의 `id` (subscription 로컬 pk).
+
+### Response
+
+**200 OK** — 갱신된 `SubscriptionResponse`.
+
+<details><summary><b>404 Not Found</b> — subscription 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Subscription not found: {id}" }
+```
+
+</details>
+
+<details><summary><b>409 Conflict</b> — 상태 전이 불가</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "Cannot cancel subscription {id} in status CANCELED" }
+```
+
+`IllegalStateTransition` → `Cannot {requestedAction} subscription {id} in status {currentStatus}`.
+
+</details>
+
+---
+
+## 16. `POST` /api/subscriptions/{id}/pause
+
+subscription 일시 정지(status → `PAUSED`).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 검증.
+
+### Request
+
+바디 없음 — path 의 `id`.
+
+### Response
+
+**200 OK** — 갱신된 `SubscriptionResponse`.
+
+<details><summary><b>404 Not Found</b> — subscription 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Subscription not found: {id}" }
+```
+
+</details>
+
+<details><summary><b>409 Conflict</b> — 상태 전이 불가</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "Cannot pause subscription {id} in status CANCELED" }
+```
+
+</details>
+
+---
+
+## 17. `POST` /api/subscriptions/{id}/resume
+
+subscription 재개(status → `ACTIVE`).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 검증.
+
+### Request
+
+바디 없음 — path 의 `id`.
+
+### Response
+
+**200 OK** — 갱신된 `SubscriptionResponse`.
+
+<details><summary><b>404 Not Found</b> — subscription 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Subscription not found: {id}" }
+```
+
+</details>
+
+<details><summary><b>409 Conflict</b> — 상태 전이 불가</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "Cannot resume subscription {id} in status CANCELED" }
+```
+
+</details>
+
+---
+
+## 18. `POST` /api/subscriptions/{paddleSubscriptionId}/sync
+
+Paddle 에서 subscription 강제 재동기화(운영용, 정상 경로는 webhook).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 검증.
+
+### Request
+
+바디 없음 — path 의 `paddleSubscriptionId` (Paddle `sub_...`).
+
+### Response
+
+**200 OK** — `SubscriptionResponse`. Result 를 쓰지 않고 직접 반환 — Paddle↔DB 불일치 등 시스템 이상은 throw 되어 500(글로벌 핸들러)으로 노출.
+
+---
+
+## 19. `GET` /api/transactions/{id}
+
+로컬 pk 로 transaction 단건 조회(항목·결제수단 포함).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 가 `/api/transactions/**` 검증. 외부는 b2b billing 프록시 경유.
+
+### Request
+
+바디 없음 — path 의 `id` (transaction 로컬 pk).
+
+### Response
+
+**200 OK** — `TransactionResponse`. 금액 필드는 모두 정수 minor-units(`Long`).
+
+```json
+{
+  "id": "...",
+  "paddleTransactionId": "txn_...",
+  "customerId": "...",
+  "subscriptionId": "...",
+  "status": "COMPLETED",
+  "currencyCode": "KRW",
+  "subtotal": 1000,
+  "discountTotal": 0,
+  "taxTotal": 100,
+  "totalAmount": 1100,
+  "billingPeriodStartsAt": "...",
+  "billingPeriodEndsAt": "...",
   "billingCountryCode": "KR",
-  "billingPostalCode": "...", "billingRegion": "...",
-  "billingCity": "...", "billingAddressLine": "...",
+  "billingPostalCode": "...",
+  "billingRegion": "...",
+  "billingCity": "...",
+  "billingAddressLine": "...",
   "items": [
     {
-      "id": "...", "paddleItemId": "txnitm_...",
-      "priceId": "pri_...", "productId": "pro_...",
-      "productName": "...", "productDescription": "...",
-      "quantity": 1, "unitPrice": 1000,
-      "subtotal": 1000, "discountAmount": 0,
-      "taxAmount": 100, "total": 1100, "taxRate": "10.0%"
+      "id": "...",
+      "paddleItemId": "txnitm_...",
+      "priceId": "pri_...",
+      "productId": "pro_...",
+      "productName": "...",
+      "productDescription": "...",
+      "quantity": 1,
+      "unitPrice": 1000,
+      "subtotal": 1000,
+      "discountAmount": 0,
+      "taxAmount": 100,
+      "total": 1100,
+      "taxRate": "10.0%"
     }
   ],
   "payments": [
     {
-      "id": "...", "amount": 1100, "status": "captured",
+      "id": "...",
+      "amount": 1100,
+      "status": "captured",
       "paymentType": "card",
-      "cardType": "visa", "cardLast4": "1111",
-      "cardExpiryMonth": 12, "cardExpiryYear": 2030,
-      "cardholderName": "...", "capturedAt": "..."
+      "cardType": "visa",
+      "cardLast4": "1111",
+      "cardExpiryMonth": 12,
+      "cardExpiryYear": 2030,
+      "cardholderName": "...",
+      "capturedAt": "..."
     }
   ],
   "createdAt": "..."
 }
 ```
 
-### `GET` /api/transactions
-
-**Operation ID** &nbsp;`listTransactions`  &nbsp;**Tags** &nbsp;`transaction`
-
-#### Parameters
-
-| In | Name | Type | Required |
+| 필드 | 타입 | 필수 | 규칙/설명 |
 |---|---|---|---|
-| query | `customerId` | string | yes |
+| `id` | string | — | 로컬 pk |
+| `paddleTransactionId` | string | — | `txn_...` |
+| `customerId` | string | — | — |
+| `subscriptionId` | string \| null | — | one-off 면 null |
+| `status` | string | — | `DRAFT` `READY` `BILLED` `PAID` `COMPLETED` `CANCELED` `PAST_DUE` |
+| `currencyCode` | string | — | ISO 4217 |
+| `subtotal` `discountTotal` `taxTotal` `totalAmount` | integer(long) | — | minor-units |
+| `billingPeriodStartsAt` `billingPeriodEndsAt` | string(date-time) | — | — |
+| `billingCountryCode` | string | — | ISO 3166-1 α-2 |
+| `billingPostalCode` `billingRegion` `billingCity` `billingAddressLine` | string | — | — |
+| `items[]` | array | — | 아래 항목 |
+| `items[].id` | string | — | 로컬 pk |
+| `items[].paddleItemId` | string | — | `txnitm_...` |
+| `items[].priceId` | string | — | `pri_...` |
+| `items[].productId` | string | — | `pro_...` |
+| `items[].productName` `productDescription` | string | — | — |
+| `items[].quantity` | integer | — | — |
+| `items[].unitPrice` `subtotal` `discountAmount` `taxAmount` `total` | integer(long) | — | minor-units |
+| `items[].taxRate` | string | — | 예 `"10.0%"` |
+| `payments[]` | array | — | 아래 항목 |
+| `payments[].id` | string | — | — |
+| `payments[].amount` | integer(long) | — | minor-units |
+| `payments[].status` | string | — | `captured` `pending` `failed` 등 |
+| `payments[].paymentType` | string | — | `card` `apple_pay` 등 |
+| `payments[].cardType` | string | — | `visa` `mastercard` 등(카드일 때) |
+| `payments[].cardLast4` | string | — | — |
+| `payments[].cardExpiryMonth` | integer | — | 1-12 |
+| `payments[].cardExpiryYear` | integer | — | 4자리 |
+| `payments[].cardholderName` | string | — | — |
+| `payments[].capturedAt` | string(date-time) | — | — |
+| `createdAt` | string(date-time) | — | — |
 
-#### Responses
+<details><summary><b>404 Not Found</b> — transaction 없음</summary>
 
-| Status | Schema |
-|---|---|
-| **200** | [`Transaction`](#transaction)[] |
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Transaction not found: id=txn_xxx" }
+```
 
-### `GET` /api/transactions/subscription/{subscriptionId}
+`NotFound` → `Transaction not found: {identifierKind}={identifier}` (identifierKind 는 조회 키 종류).
 
-**Operation ID** &nbsp;`listTransactionsBySubscription`  &nbsp;**Tags** &nbsp;`transaction`
-
-#### Responses
-
-| Status | Schema |
-|---|---|
-| **200** | [`Transaction`](#transaction)[] |
-
-### `POST` /api/transactions/{paddleTransactionId}/sync
-
-**Operation ID** &nbsp;`syncTransaction`  &nbsp;**Tags** &nbsp;`transaction`
-
-Force-sync from Paddle.
+</details>
 
 ---
 
-## Refunds
+## 20. `GET` /api/transactions
 
-> **Internal-only** — `X-Caller-Service` allowlist 필수, gateway 외부 라우팅 제거됨. 외부는 b2b `/api/v2/b2b/billing/organizations/{orgId}/refunds[...]` 프록시 경유 (거래 소유 검증 포함).
+customer 의 transaction 목록.
 
-### `POST` /api/refunds
+### Header
 
-**Operation ID** &nbsp;`createRefund`  &nbsp;**Tags** &nbsp;`refund`
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
 
-Create refund (full or partial).
+### Security
 
-#### Request body
+internal-only. `InternalCallerInterceptor` 검증.
 
-`application/json` &nbsp;**Required** — [`CreateRefundRequest`](#createrefundrequest)
+### Request
+
+바디 없음 — query 파라미터만.
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`customerId`** | string | ✅ | 로컬 `customers.id` |
+
+### Response
+
+**200 OK** — `TransactionResponse` 배열(위 shape). 없으면 빈 배열.
+
+---
+
+## 21. `GET` /api/transactions/subscription/{subscriptionId}
+
+subscription 의 transaction 목록.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 검증.
+
+### Request
+
+바디 없음 — path 의 `subscriptionId` (로컬 pk).
+
+### Response
+
+**200 OK** — `TransactionResponse` 배열(위 shape). 없으면 빈 배열.
+
+---
+
+## 22. `POST` /api/transactions/{paddleTransactionId}/sync
+
+Paddle 에서 transaction 강제 재동기화.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 검증.
+
+### Request
+
+바디 없음 — path 의 `paddleTransactionId` (Paddle `txn_...`).
+
+### Response
+
+**200 OK** — `TransactionResponse`. Result 미사용 — 직접 반환하며 시스템 이상은 throw → 500.
+
+---
+
+## 23. `POST` /api/refunds
+
+환불 생성(전체 또는 부분). 성공 시 refund 는 `PENDING_APPROVAL` 로 시작.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+| `Content-Type` | `application/json` | ✅ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 가 `/api/refunds/**` 검증. 외부는 b2b billing 프록시(거래 소유 검증 포함) 경유.
+
+### Request
 
 ```json
 {
@@ -528,59 +1374,275 @@ Create refund (full or partial).
 }
 ```
 
-#### Responses
-
-| Status | Content-Type | Schema | Headers |
+| 필드 | 타입 | 필수 | 규칙/설명 |
 |---|---|---|---|
-| **201** | `application/json` | [`Refund`](#refund) | `Location: /api/refunds/{id}` |
-| **400** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`InvalidItem` / `AmountExceedsOriginal` / `InvalidAmount` / `DuplicateItem`) | — |
-| **404** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`TransactionNotFound`) | — |
-| **409** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (`TransactionNotRefundable` — `Transaction {id} is not refundable in status {status}`) | — |
+| **`transactionId`** | string | ✅ | `@NotBlank` — 로컬 pk |
+| **`reason`** | string | ✅ | `@NotBlank` |
+| `items[]` | array | ❌ | null/빈 배열 → 전체 환불. 값 있으면 부분 환불 |
+| **`items[].paddleItemId`** | string | ✅ | `@NotBlank` — `TransactionItem.paddleItemId` (`txnitm_...`) |
+| `items[].amount` | string | ❌ | null → 해당 항목 전체 환불. 값은 minor-units 문자열(예 `"500"`) |
 
-### `GET` /api/refunds/{id}
+### Response
 
-**Operation ID** &nbsp;`getRefund`  &nbsp;**Tags** &nbsp;`refund`
+**201 Created** — `Location: /api/refunds/{id}`. 바디는 `RefundResponse`. `amount` 는 minor-units(`Long`).
 
-#### Responses
+```json
+{
+  "id": "...",
+  "paddleAdjustmentId": "adj_...",
+  "transactionId": "...",
+  "reason": "Customer request",
+  "status": "PENDING_APPROVAL",
+  "currencyCode": "KRW",
+  "amount": 500,
+  "createdAt": "..."
+}
+```
 
-| Status | Schema |
-|---|---|
-| **200** | [`Refund`](#refund) |
-| **404** | [`ProblemDetail`](#problemdetail) |
-
-### `GET` /api/refunds
-
-**Operation ID** &nbsp;`listRefunds`  &nbsp;**Tags** &nbsp;`refund`
-
-#### Parameters
-
-| In | Name | Type | Required |
+| 필드 | 타입 | 필수 | 규칙/설명 |
 |---|---|---|---|
-| query | `transactionId` | string | yes |
+| `id` | string | — | 로컬 pk |
+| `paddleAdjustmentId` | string | — | `adj_...` |
+| `transactionId` | string | — | — |
+| `reason` | string | — | — |
+| `status` | string | — | `PENDING_APPROVAL` `APPROVED` `REJECTED` |
+| `currencyCode` | string | — | ISO 4217 |
+| `amount` | integer(long) | — | minor-units |
+| `createdAt` | string(date-time) | — | — |
 
-#### Responses
+<details><summary><b>400 Bad Request</b> — 항목/금액 오류</summary>
 
-| Status | Schema |
-|---|---|
-| **200** | [`Refund`](#refund)[] |
+```json
+{ "type": "about:blank", "title": "Bad Request", "status": 400, "detail": "Refund amount 900 exceeds item txnitm_x max 500" }
+```
+
+`InvalidItem` → `Invalid refund item {paddleItemId}: {reason}`. `AmountExceedsOriginal` → `Refund amount {requestedAmount} exceeds item {paddleItemId} max {maxAmount}`. `InvalidAmount` → `Invalid refund amount '{requestedAmount}' for item {paddleItemId}`. `DuplicateItem` → `Duplicate refund item: {paddleItemId}`.
+
+</details>
+
+<details><summary><b>404 Not Found</b> — refund/transaction 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Transaction not found: {transactionId}" }
+```
+
+`TransactionNotFound` → `Transaction not found: {transactionId}`. (`NotFound` → `Refund not found: {id}` 는 GET 경로에서.)
+
+</details>
+
+<details><summary><b>409 Conflict</b> — 환불 불가 상태</summary>
+
+```json
+{ "type": "about:blank", "title": "Conflict", "status": 409, "detail": "Transaction txn_x is not refundable in status DRAFT" }
+```
+
+`TransactionNotRefundable` → `Transaction {transactionId} is not refundable in status {currentStatus}`.
+
+</details>
 
 ---
 
-## Test API (dev only)
+## 24. `GET` /api/refunds/{id}
 
-활성화 조건. `@Profile("dev-k3s")` + `payment.test-api.enabled=true` 둘 다 충족해야 노출. 운영 / staging 에서는 컴파일은 되지만 bean 자체가 등록되지 않아 호출 시 404. integration-tests 진입점 — Paddle webhook 우회로 license `ACTIVE` 시드.
+로컬 pk 로 refund 단건 조회.
 
-> **Fake Paddle (test-api 활성 시)** — 시드된 구독/거래의 paddle id 는 `test_sub_*` / `test_txn_*` prefix. `PaddleApiClient` 가 이 prefix 를 만나면 cancel / pause / resume / createAdjustment(환불) 에서 실제 Paddle 호출을 우회하고 canonical stub 을 반환한다 → 실 Paddle 샌드박스 없이 b2b billing 프록시의 정방향 WRITE(상태전이·환불) e2e 자동화 가능. 실 paddle id(`sub_*`/`txn_*`) 는 그대로 Paddle 로 전송되어 dev 실 체크아웃/webhook 무영향. prod 는 `test-api.enabled=false` 라 항상 실 Paddle.
+### Header
 
-### `POST` /api/v1/test/payment/seed-active-subscription
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
 
-**Operation ID** &nbsp;`seedActiveSubscription`  &nbsp;**Tags** &nbsp;`test-api`
+### Security
 
-Paddle webhook 없이 customer + subscription 행을 직접 INSERT 해 license `ACTIVE` 상태를 만든다. e2e flow (b2b-service 가 license 를 ACTIVE 로 인지) 검증용. `withTransaction=true` 면 환불 정방향 테스트용 `PAID` 거래 1건(+항목) 도 함께 시드한다.
+internal-only. `InternalCallerInterceptor` 검증.
 
-#### Request body
+### Request
 
-`application/json` &nbsp;**Required** — [`SeedSubscriptionRequest`](#seedsubscriptionrequest)
+바디 없음 — path 의 `id` (refund 로컬 pk).
+
+### Response
+
+**200 OK** — `RefundResponse`(위 shape).
+
+<details><summary><b>404 Not Found</b> — refund 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Refund not found: {id}" }
+```
+
+`NotFound` → `Refund not found: {id}`.
+
+</details>
+
+---
+
+## 25. `GET` /api/refunds
+
+transaction 의 refund 목록.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 검증. 이 목록 조회는 Result 미사용 — 항상 200 배열 반환.
+
+### Request
+
+바디 없음 — query 파라미터만.
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`transactionId`** | string | ✅ | 로컬 transaction pk |
+
+### Response
+
+**200 OK** — `RefundResponse` 배열(위 shape). 없으면 빈 배열.
+
+---
+
+## 26. `POST` /api/customer-portal/sessions
+
+Paddle 호스팅 Customer Portal 의 deep link 묶음 생성 — 각 URL 은 임시 인증 토큰 포함, 캐싱 금지.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `X-Caller-Service` | `b2b-service` / `admin-service` / `payment-ops` | ✅ |
+| `X-Acting-User-Id` | 감사용 acting user id | ❌ |
+| `Content-Type` | `application/json` | ✅ |
+
+### Security
+
+internal-only. `InternalCallerInterceptor` 가 `/api/customer-portal/**` 검증. customerId 위조 방지는 호출 측(b2b) 책임 — b2b 가 OWNER 검증 후 organization 소유 구독에서 customerId 도출.
+
+### Request
+
+```json
+{ "customerId": "..." }
+```
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`customerId`** | string | ✅ | `@NotBlank` — 본인 customerId |
+
+### Response
+
+**200 OK** — `CustomerPortalResponse`.
+
+```json
+{
+  "overviewUrl": "https://customer-portal.paddle.com/...",
+  "subscriptions": [
+    {
+      "subscriptionId": "sub_...",
+      "cancelUrl": "https://customer-portal.paddle.com/.../cancel",
+      "updatePaymentMethodUrl": "https://customer-portal.paddle.com/.../payment-method"
+    }
+  ]
+}
+```
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `overviewUrl` | string \| null | — | 결제 내역/송장/셀프서비스 메인 |
+| `subscriptions[]` | array | — | sub 별 deep link |
+| `subscriptions[].subscriptionId` | string | — | Paddle `sub_...` |
+| `subscriptions[].cancelUrl` | string | — | 취소 deep link |
+| `subscriptions[].updatePaymentMethodUrl` | string | — | 결제수단 변경 deep link |
+
+<details><summary><b>404 Not Found</b> — customer 없음</summary>
+
+```json
+{ "type": "about:blank", "title": "Not Found", "status": 404, "detail": "Customer not found: ctm_xxx" }
+```
+
+`NotFound` → `Customer not found: {customerId}`.
+
+</details>
+
+<details><summary><b>403 Forbidden</b> — archived customer</summary>
+
+```json
+{ "type": "about:blank", "title": "Forbidden", "status": 403, "detail": "Customer archived: ctm_xxx" }
+```
+
+`Archived` → `Customer archived: {customerId}` (영구 비활성 — 접근 거부 의미의 403, 상태 충돌 409 아님).
+
+</details>
+
+---
+
+## 27. `POST` /webhooks/paddle
+
+Paddle 웹훅 수신 — raw body 를 그대로 받아 HMAC 서명 검증. `event_id` 기준 idempotent(Paddle 재시도 dedup).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `Paddle-Signature` | `ts=<unix>;h1=<hmac-sha256>` | ✅ |
+| `Content-Type` | `application/json` | ✅ |
+
+### Security
+
+공개(외부 직접 호출 가능). caller allowlist 없음 — 대신 `Paddle-Signature` HMAC-SHA256 검증으로 진위 확인. 개별 handler 오류는 로깅되지만 요청은 200 반환(재처리 회피).
+
+### Request
+
+raw bytes(서명 검증 위해 원본 보존). `PaddleWebhookEvent` 로 파싱.
+
+```json
+{
+  "event_type": "subscription.created",
+  "event_id": "evt_...",
+  "occurred_at": "...",
+  "notification_id": "ntf_...",
+  "data": { }
+}
+```
+
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `event_type` | string | — | 이벤트 종류 |
+| `event_id` | string | — | dedup 키 |
+| `occurred_at` | string(date-time) | — | — |
+| `notification_id` | string | — | — |
+| `data` | object | — | 이벤트별 payload |
+
+### Response
+
+**200 OK** — 빈 본문. 성공/부분 handler 실패 모두 200.
+
+<details><summary><b>401 Unauthorized</b> — 서명 검증 실패</summary>
+
+`WebhookService.processEvent` 가 HMAC 불일치 시 예외를 throw 하며 글로벌 핸들러가 4xx(401)로 매핑. 컨트롤러 자체는 정상 흐름에서 200 만 반환.
+
+</details>
+
+---
+
+## 28. `POST` /api/v1/test/payment/seed-active-subscription
+
+dev 전용 — Paddle webhook 없이 customer + subscription 행을 직접 INSERT 해 license `ACTIVE` 시드. `@Profile("dev-k3s")` + `payment.test-api.enabled=true` 둘 다 충족해야 bean 등록(아니면 404).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `Content-Type` | `application/json` | ✅ |
+
+### Security
+
+dev 전용. caller 가드 없음(`InternalCallerInterceptor` 대상 경로 아님). 운영/staging 에서는 bean 미등록이라 404. 시드된 paddle id 는 `test_sub_*` / `test_txn_*` prefix — `PaddleApiClient` 가 이 prefix 를 만나면 실 Paddle 호출을 우회하고 stub 반환.
+
+### Request
 
 ```json
 {
@@ -592,15 +1654,17 @@ Paddle webhook 없이 customer + subscription 행을 직접 INSERT 해 license `
 }
 ```
 
-#### Responses
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| **`organizationId`** | string | ✅ | `@NotBlank` |
+| **`userId`** | string | ✅ | `@NotBlank` |
+| **`planCode`** | string | ✅ | `@NotBlank` |
+| **`planSeats`** | integer | ✅ | `@Min(1)` |
+| `withTransaction` | boolean | ❌ | true 면 환불 정방향 테스트용 `PAID` 거래 1건(+항목) 도 시드. 기본 false |
 
-| Status | Content-Type | Schema |
-|---|---|---|
-| **201** | `application/json` | [`SeedSubscriptionResponse`](#seedsubscriptionresponse) |
-| **400** | `application/problem+json` | [`ProblemDetail`](#problemdetail) (request validation) |
-| **404** | — | profile / property 조건 미충족 시 bean 미등록 |
+### Response
 
-#### 201 — example
+**201 Created** — `SeedSubscriptionResponse`.
 
 ```json
 {
@@ -614,340 +1678,27 @@ Paddle webhook 없이 customer + subscription 행을 직접 INSERT 해 license `
 }
 ```
 
-`transactionId` / `paddleItemId` 는 `withTransaction=true` 일 때만 채워지고, 아니면 `null`.
+| 필드 | 타입 | 필수 | 규칙/설명 |
+|---|---|---|---|
+| `subscriptionId` | string | — | 시드된 subscription 로컬 pk |
+| `customerId` | string | — | 시드된 customer 로컬 pk |
+| `organizationId` | string | — | 요청 반향 |
+| `paddleSubscriptionId` | string | — | 합성 `test_sub_...` (Paddle 미호출) |
+| `licenseState` | string | — | `ACTIVE` (b2b gRPC license 와 매칭) |
+| `transactionId` | string \| null | — | `withTransaction=true` 일 때만, 아니면 null |
+| `paddleItemId` | string \| null | — | 시드 항목 id(`test_txnitm_...`), 아니면 null |
 
 ---
 
-## Webhook
+## 에러 코드 (ProblemDetail)
 
-### `POST` /webhooks/paddle
+패턴 A — 컨트롤러 inline `toResponse(error)` 또는 남은 throw 를 `*ExceptionHandler` 가 RFC 9457 `ProblemDetail` 로 매핑한다. `code` 필드는 없다 (status + title + detail).
 
-**Operation ID** &nbsp;`receivePaddleWebhook`  &nbsp;**Tags** &nbsp;`webhook`
-**Security** &nbsp;`Paddle-Signature` HMAC-SHA256 (`ts=<unix>;h1=<hash>`)
-
-Receive a Paddle webhook event. Idempotent on `event_id` (Paddle retries are deduplicated). Per-handler errors are logged but the request still returns `200`.
-
-#### Parameters
-
-| In | Name | Type | Required |
-|---|---|---|---|
-| header | `Paddle-Signature` | string | yes |
-
-#### Request body
-
-raw bytes (preserved for signature verification). Parsed as [`PaddleWebhookEvent`](#paddlewebhookevent).
-
-```json
-{
-  "event_type": "subscription.created",
-  "event_id": "evt_...",
-  "occurred_at": "...",
-  "notification_id": "ntf_...",
-  "data": { }
-}
-```
-
-**Supported `event_type`**
-
-- Customer: `customer.created` `customer.updated`
-- Subscription: `subscription.created` `subscription.activated` `subscription.updated` `subscription.canceled` `subscription.paused` `subscription.resumed` `subscription.past_due`
-- Transaction: `transaction.completed` `transaction.payment_failed` `transaction.canceled` `transaction.billed`
-- Adjustment / Refund: `adjustment.created` `adjustment.updated`
-
-#### Responses
-
-| Status | Body |
-|---|---|
-| **200** | (empty) |
-| **401** | invalid signature |
-
----
-
-## gRPC — `SubscriptionQuery` (internal)
-
-Read-only license query exposed for `b2b-service`. Proto: `com.carenco.grpc.payment.v1.SubscriptionQuery`. Server port `9090` inside the cluster — not exposed via the edge gateway.
-
-### `getLicenseStatus(GetLicenseStatusRequest) → LicenseStatus`
-
-Looks up the latest `subscription` for the given `organization_id` and maps its status to a `LicenseState`.
-
-**Mapping** — Paddle subscription status → `LicenseState`
-
-| Paddle status | `LicenseState` |
-|---|---|
-| `ACTIVE`, `TRIALING` | `LICENSE_STATE_ACTIVE` |
-| `PAST_DUE` | `LICENSE_STATE_GRACE` (grace period = `nextBilledAt + 7d`; `grace_remaining_days` + `grace_remaining_seconds` 응답 필드로 잔여 시간 노출, 그 외 상태에선 0) |
-| `PAUSED` | `LICENSE_STATE_SUSPENDED` |
-| `CANCELED`, `EXPIRED` | `LICENSE_STATE_EXPIRED` |
-| (no row) | `LICENSE_STATE_NONE` |
-
-**Errors** — `INVALID_ARGUMENT` (missing `organization_id`), `INTERNAL` (unexpected).
-
-### `batchGetLicenseStatus(BatchGetLicenseStatusRequest) → BatchGetLicenseStatusResponse`
-
-Same lookup for a list of `organization_ids`. Returns one `LicenseStatus` per requested id (no row → `LICENSE_STATE_NONE`).
-
----
-
-## Schemas
-
-### `CreatePlanRequest`
-
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `planCode` | string | yes | `@NotBlank` |
-| `audience` | enum (`B2C` / `B2B`) | yes | `@NotNull` |
-| `displayName` | string | no | — |
-| `planSeats` | integer | yes | `@NotNull @PositiveOrZero` |
-| `enabled` | boolean | no | default `true` |
-| `variants` | array<[`VariantInput`](#variantinput)> | no | — |
-
-### `VariantInput`
-
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `priceId` | string | yes | `@NotBlank` |
-| `billingInterval` | enum (`MONTHLY` / `YEARLY`) | yes | `@NotNull` |
-| `enabled` | boolean | no | default `true` |
-
-### `UpdatePlanRequest`
-
-Partial update — `null` fields keep current value.
-
-| Field | Type | Validation |
+| HTTP | title | 상황 |
 |---|---|---|
-| `displayName` | string | — |
-| `planSeats` | integer | `@PositiveOrZero` |
-| `enabled` | boolean | — |
-
-### `CreateVariantRequest`
-
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `priceId` | string | yes | `@NotBlank` |
-| `billingInterval` | enum (`MONTHLY` / `YEARLY`) | yes | `@NotNull` |
-| `enabled` | boolean | no | default `true` |
-
-### `UpdateVariantRequest`
-
-| Field | Type |
-|---|---|
-| `enabled` | boolean |
-
-### `PlanResponse`
-
-| Field | Type | Description |
-|---|---|---|
-| `planCode` | string | plan PK |
-| `displayName` | string | label |
-| `planSeats` | integer | seats |
-| `enabled` | boolean | catalog visibility |
-| `variants` | array<[`PlanVariantSummary`](#planvariantsummary)> | one per `(plan_code, billing_interval)` |
-
-### `PlanVariantSummary`
-
-| Field | Type | Description |
-|---|---|---|
-| `priceId` | string | Paddle `pri_...` |
-| `billingInterval` | enum (`MONTHLY` / `YEARLY`) | — |
-| `enabled` | boolean | catalog visibility (admin response includes disabled rows; public catalog response does not) |
-
-### `CreateCheckoutLinkRequest`
-
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `userPool` | enum (`CARENCO` / `B2B`) | yes | `@NotNull` |
-| `userId` | string | yes | `@NotBlank` |
-| `organizationId` | string | yes | `@NotBlank` (B2B subscription target) |
-| `priceId` | string | yes | `@NotBlank` (must exist in `plan_variants`) |
-| `customerName` | string | yes | `@NotBlank` |
-| `customerEmail` | string | yes | `@NotBlank @Email` |
-
-### `CheckoutLinkResponse`
-
-| Field | Type | Description |
-|---|---|---|
-| `transactionId` | string | Paddle `txn_...` — server-side pre-created via `POST /transactions`. FE 가 `Paddle.Checkout.open({ transactionId })` 에 전달 |
-| `checkoutUrl` | string | Paddle hosted checkout URL — FE 가 redirect 로도 사용 가능 |
-
-> 이전 응답 (`items` / `customer` / `customData` / `plan` / `paddleCustomerId`) 은 단종됨. `custom_data` 가 FE 변조 가능했던 문제를 해결하기 위해 transaction pre-create 로 전환. Pricing / plan 메타데이터는 FE 가 `Paddle.PricePreview()` + `GET /api/payment/plans` 로 별도 조회.
-
-### `LinkOrganizationRequest`
-
-| Field | Type | Validation |
-|---|---|---|
-| `organizationId` | string | `@NotBlank` |
-| `planSeats` | integer | `@Min(0)` (null = keep existing or fall back to `plan_variants` lookup) |
-| `planCode` | string | nullable |
-
-### `PlanChangeRequest`
-
-| Field | Type | Validation |
-|---|---|---|
-| `organizationId` | string | `@NotBlank` |
-| `newPriceId` | string | `@NotBlank` |
-
-### `PlanChangeResponse`
-
-| Field | Type | Description |
-|---|---|---|
-| `paddleSubscriptionId` | string | the subscription that was updated |
-| `newPriceId` | string | applied price |
-| `newPlanCode` | string | resolved from `plan_variants` join |
-| `newPlanSeats` | integer | resolved from `subscription_plans` |
-| `newBillingInterval` | enum (`MONTHLY` / `YEARLY`) | — |
-| `prorationMode` | enum (`prorated_immediately` / `full_next_billing_period`) | server-decided from tier comparison |
-| `status` | enum (`ACTIVE` `CANCELED` `PAST_DUE` `PAUSED` `TRIALING` `EXPIRED`) | subscription status (pre-webhook snapshot) |
-
-### `Customer`
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | local pk (UUID) |
-| `userPool` | enum (`CARENCO` / `B2B`) | nullable when row created by webhook before `createCustomer` |
-| `userId` | string | the user id within that pool; nullable along with `userPool` |
-| `paddleCustomerId` | string | `ctm_...` — not unique (one Paddle customer can map to multiple rows across pools) |
-| `name` | string | — |
-| `email` | string | — |
-| `status` | string (enum: `ACTIVE` `ARCHIVED`) | — |
-| `createdAt` | string (date-time, UTC) | — |
-
-### `Subscription`
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | local pk |
-| `paddleSubscriptionId` | string | `sub_...` |
-| `customerId` | string | FK to `customers.id` |
-| `priceId` | string | `pri_...` |
-| `quantity` | integer | — |
-| `organizationId` | string \| null | B2B target organization (null for non-B2B) |
-| `planSeats` | integer | snapshot from `subscription_plans` (denormalized for license queries) |
-| `planCode` | string | snapshot from `subscription_plans` |
-| `status` | enum (`ACTIVE` `CANCELED` `PAST_DUE` `PAUSED` `TRIALING` `EXPIRED`) | — |
-| `nextBilledAt` | string (date-time, UTC) | — |
-| `canceledAt` | string (date-time, UTC) | nullable |
-| `createdAt` | string (date-time, UTC) | — |
-| `currentPeriodStart` | string (date-time, UTC) | Paddle `current_billing_period.starts_at`. nullable (백필 전 row). additive — payment-service 가 unversioned 라 dual versioning 불가, Jackson default 로 모르는 필드 무시 가정 |
-| `currentPeriodEnd` | string (date-time, UTC) | Paddle `current_billing_period.ends_at`. nullable |
-
-### `Transaction`
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | local pk |
-| `paddleTransactionId` | string | `txn_...` |
-| `customerId` | string | — |
-| `subscriptionId` | string | nullable |
-| `status` | string (enum: `DRAFT` `READY` `BILLED` `PAID` `COMPLETED` `CANCELED` `PAST_DUE`) | — |
-| `currencyCode` | string (ISO 4217) | — |
-| `subtotal` `discountTotal` `taxTotal` `totalAmount` | integer (`Long`) | minor units |
-| `billingPeriodStartsAt` `billingPeriodEndsAt` | string (date-time, UTC) | — |
-| `billingCountryCode` | string (ISO 3166-1 α-2) | — |
-| `billingPostalCode` `billingRegion` `billingCity` `billingAddressLine` | string | — |
-| `items` | [`TransactionItem`](#transactionitem)[] | — |
-| `payments` | [`TransactionPayment`](#transactionpayment)[] | — |
-| `createdAt` | string (date-time, UTC) | — |
-
-### `TransactionItem`
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | local pk |
-| `paddleItemId` | string | `txnitm_...` |
-| `priceId` | string | `pri_...` |
-| `productId` | string | `pro_...` |
-| `productName` | string | — |
-| `productDescription` | string | — |
-| `quantity` | integer | — |
-| `unitPrice` `subtotal` `discountAmount` `taxAmount` `total` | integer (`Long`) | minor units |
-| `taxRate` | string (e.g. `"10.0%"`) | — |
-
-### `TransactionPayment`
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | — |
-| `amount` | integer (`Long`) | minor units |
-| `status` | string | `captured` `pending` `failed` etc. |
-| `paymentType` | string | `card` `apple_pay` `google_pay` `paypal` `alipay` etc. |
-| `cardType` | string | `visa` `mastercard` `amex` … (when card) |
-| `cardLast4` | string | — |
-| `cardExpiryMonth` | integer (1-12) | — |
-| `cardExpiryYear` | integer (4-digit) | — |
-| `cardholderName` | string | — |
-| `capturedAt` | string (date-time, UTC) | — |
-
-### `CreateRefundRequest`
-
-| Field | Type | Required | Validation | Description |
-|---|---|---|---|---|
-| `transactionId` | string | yes | `@NotBlank` | local pk |
-| `reason` | string | yes | `@NotBlank` | — |
-| `items` | array<[`RefundItemRequest`](#refunditemrequest)> | no | — | full refund when omitted/empty |
-
-### `RefundItemRequest`
-
-| Field | Type | Required | Validation | Description |
-|---|---|---|---|---|
-| `paddleItemId` | string | yes | `@NotBlank` | `txnitm_...` |
-| `amount` | string (minor units) | no | — | item full refund when null |
-
-### `Refund`
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | local pk |
-| `paddleAdjustmentId` | string | `adj_...` |
-| `transactionId` | string | — |
-| `reason` | string | — |
-| `status` | string (enum: `PENDING_APPROVAL` `APPROVED` `REJECTED`) | — |
-| `currencyCode` | string (ISO 4217) | — |
-| `amount` | integer (`Long`) | minor units |
-| `createdAt` | string (date-time, UTC) | — |
-
-### `PaddleWebhookEvent`
-
-| Field | Type | Description |
-|---|---|---|
-| `event_type` | string | — |
-| `event_id` | string | dedup key |
-| `occurred_at` | string (date-time, UTC) | — |
-| `notification_id` | string | — |
-| `data` | object | event-specific payload |
-
-### `SeedSubscriptionRequest`
-
-dev-only test API payload.
-
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `organizationId` | string | yes | `@NotBlank` |
-| `userId` | string | yes | `@NotBlank` |
-| `planCode` | string | yes | `@NotBlank` |
-| `planSeats` | integer | yes | `@Min(1)` |
-| `withTransaction` | boolean | no | true 면 `PAID` 거래 1건(+항목) 도 시드. 기본 false |
-
-### `SeedSubscriptionResponse`
-
-| Field | Type | Description |
-|---|---|---|
-| `subscriptionId` | string | local pk of seeded `subscriptions` row |
-| `customerId` | string | local pk of seeded `customers` row |
-| `organizationId` | string | echo of request |
-| `paddleSubscriptionId` | string | synthetic `test_sub_...` id (Paddle 미호출) |
-| `licenseState` | string | `ACTIVE` (b2b-service gRPC license 와 매칭) |
-| `transactionId` | string \| null | `withTransaction=true` 일 때 시드된 거래 pk, 아니면 null |
-| `paddleItemId` | string \| null | 시드된 거래 항목 id (`test_txnitm_...`), 아니면 null |
-
-### `ProblemDetail`
-
-```json
-{
-  "type": "about:blank",
-  "title": "Bad Request",
-  "status": 400,
-  "detail": "Validation failure",
-  "errors": [{ "field": "email", "message": "must be a well-formed email address" }]
-}
-```
+| 400 | Bad Request | request validation (`MethodArgumentNotValidException`), 잘못된 enum/파라미터 |
+| 401 | Unauthorized | webhook `Paddle-Signature` HMAC 검증 실패 (`WebhookService`) |
+| 403 | Forbidden | 알 수 없는 `X-Caller-Service` (internal 엔드포인트). `plan-change` 만 예외적으로 **빈 body 403** (ProblemDetail 아님) |
+| 404 | Not Found | Subscription / Transaction / Refund / Plan / Variant 미존재 |
+| 409 | Conflict | duplicate / state conflict (plan · variant · subscription 상태 전이) |
+| 500 | Internal Server Error | Paddle API 5xx·IO 실패, `sync` 경로의 시스템 이상 (throw) |
