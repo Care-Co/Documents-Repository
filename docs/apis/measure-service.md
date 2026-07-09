@@ -1,10 +1,10 @@
 # measure-service
 
 > 엔드포인트별 Header · Request · Response 정의 — **버전별 전량 전개**. 소스는 실제 컨트롤러/DTO.
-> 표기 — **굵은 필드 = 필수**, 규칙은 키워드만, 긴 설명은 각주(¹²³⁴). 버전 매칭은 정확 일치 (미등록 버전 → `400 Invalid API version`).
+> 표기 — **굵은 필드 = 필수**, 규칙은 키워드만, 긴 설명은 각주(¹²³⁴⁵⁶). 버전 매칭은 정확 일치 (미등록 버전 → `400 Invalid API version`).
 
 Source: `/Users/jonghak/GitHub/Care&Co/measure-service`
-Updated: 2026-07-08
+Updated: 2026-07-09
 
 **Servers**
 - `https://api.example.com`
@@ -19,7 +19,7 @@ Updated: 2026-07-08
 
 **Security** &nbsp;메서드 시큐리티 애너테이션(`@PreAuthorize`/`@Secured`) 없음. 인증 컨텍스트는 컨트롤러 내부에서 `AuthService.userGetData(userId)` 로 imperative 하게 해석·검증한다.
 
-**Common response envelope** ([`Envelope`](#envelope))
+**Common response envelope** (`Envelope`) — 모든 응답 샘플의 바깥 틀. 아래 필드는 모든 엔드포인트 공통이라 개별 섹션에서 반복하지 않는다.
 
 ```json
 {
@@ -29,7 +29,13 @@ Updated: 2026-07-08
 }
 ```
 
-**Error envelope** ([`ErrorResponse`](#errorresponse))
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `success` | boolean | yes | — |
+| `data` | object | no | endpoint-specific |
+| `timestamp` | string (date-time, UTC) | yes | — |
+
+**Error envelope** (`ErrorResponse`)
 
 ```json
 {
@@ -39,6 +45,13 @@ Updated: 2026-07-08
   "timestamp": "2026-04-27T08:00:00Z"
 }
 ```
+
+| 필드 | 타입 | 필수 |
+|---|---|---|
+| `success` | boolean | yes |
+| `code` | string | yes |
+| `message` | string | yes |
+| `timestamp` | string (date-time, UTC) | yes |
 
 DTO calendar 이력 — `2026-01-13` (record DTO, V9 부터 `deviceId` / `deviceSerial` / `source` / `appVersion` 포함), `2026-02-02` (activity DTO).
 
@@ -130,14 +143,16 @@ DTO calendar 이력 — `2026-01-13` (record DTO, V9 부터 `deviceId` / `device
 
 </details>
 
-### Request 필드 정의 (공통 — PUT)
+### Request 필드 정의 (공통 — PUT `CaptureSettingsUpdateRequest`)
 
-| 필드 | 값 | 기본값 |
-|---|---|---|
-| **`captureMode`** | `SELF` (혼자 촬영) · `ASSISTED` (타인 촬영) | `SELF` |
-| **`shutterMode`** | `COUNTDOWN` (타이머) · `MOTION` (동작인식 자동촬영) | `COUNTDOWN` |
-| **`countdownSeconds`** | 1~10 (`Short`) | `5` |
-| **`rememberSettings`** | boolean ⁴ | `true` |
+응답(`CaptureSettingsResponse`)도 동일 4필드를 그대로 반환.
+
+| 필드 | 값 | 기본값 | Validation |
+|---|---|---|---|
+| **`captureMode`** | `SELF` (혼자 촬영) · `ASSISTED` (타인 촬영) | `SELF` | `@NotNull @ValidEnum(CaptureMode)` |
+| **`shutterMode`** | `COUNTDOWN` (타이머) · `MOTION` (동작인식 자동촬영) | `COUNTDOWN` | `@NotNull @ValidEnum(ShutterMode)` |
+| **`countdownSeconds`** | 1~10 (`Short`) | `5` | `@NotNull @Min(1) @Max(10)` |
+| **`rememberSettings`** | boolean ⁴ | `true` | `@NotNull` |
 
 > 게이트웨이 — `/api/{v}/users/*/capture-settings` 는 measure-service 라우팅 (`GatewayConstants.Measure.CAPTURE_SETTINGS`). `/users/**` 하위 신규 리소스는 라우트 추가 없으면 user-service 로 흘러간다.
 
@@ -159,7 +174,7 @@ DTO calendar 이력 — `2026-01-13` (record DTO, V9 부터 `deviceId` / `device
 
 ### `1.0.0` — Request
 
-`multipart/form-data` parts:
+`multipart/form-data` parts (`CreateRecordRequestV1_0_0` — validation 애너테이션 없음):
 
 | Part | 타입 | 필수 |
 |---|---|---|
@@ -206,7 +221,7 @@ curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=VIS
 
 ### `1.0.1` — Request (= 1.0.0 parts + `macAddress` · `source` · `appVersion` · `firmwareVersion`)
 
-`multipart/form-data` parts:
+`multipart/form-data` parts (`CreateRecordRequestV1_0_1`):
 
 | Part | 타입 | 필수 | 규칙 |
 |---|---|---|---|
@@ -269,6 +284,59 @@ curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=FOO
 
 </details>
 
+### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1`
+
+`1.0.0` 은 아래 상단 8개 필드, `1.0.1` 은 + `deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion` ⁵. nested 타입(`Footprint`/`Vision`/`Score`)은 버전별로 독립 정의되지만 필드 동일.
+
+| 필드 | 타입 | 버전 | 설명 |
+|---|---|---|---|
+| `id` | string (uuid) | 전 버전 | — |
+| `userId` | string (uuid) | 전 버전 | — |
+| `measuredDateTime` | string (date-time, UTC) | 전 버전 | — |
+| `timezone` | string (IANA zone id) | 전 버전 | 측정 시점 사용자 zone snapshot |
+| `footprint` | `Footprint` | 전 버전 | 아래 |
+| `front` `side` | `Vision` | 전 버전 | 아래 |
+| `score` | `Score` — `{ bodyScore: number, predictedAge: number }` | 전 버전 | — |
+| `deviceId` | string (uuid) \| null | **1.0.1만** | device-service lookup. `allowed=true`+empty(미클레임/TMP)·macAddress 미전송 시 null |
+| `deviceSerial` | string \| null | **1.0.1만** | 응답의 `hardwareSerial` |
+| `deviceType` | string \| null | **1.0.1만** | device 타입 |
+| `source` | enum `RecordSource` | **1.0.1만** | enum 이름 직렬화. 미전송 시 `UNSPECIFIED` |
+| `appVersion` | string \| null | **1.0.1만** | 전송된 앱 버전 (`firmwareVersion` 은 응답 미노출) |
+
+**`Footprint`**
+
+| Field | Type |
+|---|---|
+| `id` | string |
+| `firstClass` / `secondaryClass` / `thirdClass` | `{ type: number, accuracy: number }` |
+| `leftFootDimension` / `rightFootDimension` | `{ length: number, width: number }` |
+| `imageUrl` | string (uri) |
+| `centerOfGravity` | `{ x: number, y: number }` |
+| `leftPressure` / `rightPressure` | `{ top: number, middle: number, bottom: number, total: number }` |
+| `weight` / `height` / `age` | number / number / integer |
+
+**`Vision`** (`front` / `side`)
+
+| Field | Type |
+|---|---|
+| `id` | string |
+| `type` | string (enum `VisionType`) |
+| `angleFace` / `anglePelvis` / `angleShoulder` | number |
+| `classType` / `accuracy` | number / number |
+| `imageUrl` | string (uri) |
+| `keypoints` | object — 17 named keypoints, each `{ x: number, y: number, accuracy: number }` |
+
+**`Score`** — `bodyScore`(number), `predictedAge`(number).
+
+**`RecordSource`** (`source` enum, `EnumType.STRING` 저장)
+
+| Value | Meaning |
+|---|---|
+| `UNSPECIFIED` | v1.0.1 호출자가 의도적으로 미전송. "정말 모름". NULL 회피용 명시 분류 |
+| `SELF` | B2C 사용자가 본인 device 로 자가 측정 (B2B 시설 무관). v1.0.0 호출은 모두 이 case |
+| `TRAINER_GUIDED` | B2B 시설의 device 로 측정 (트레이너 입회 가능) |
+| `IMPORT` | 데이터 마이그레이션 / 일괄 인입 (수동 또는 batch) |
+
 ### Request 필드 정의 (공통)
 
 | 필드 | 버전 | 비고 |
@@ -277,6 +345,8 @@ curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=FOO
 | `macAddress` | **1.0.1만** | 전송 시 device-service lookup 수행 ² |
 | `source` | **1.0.1만** | 미전송 → `UNSPECIFIED` ³ |
 | `appVersion` `firmwareVersion` | **1.0.1만** | 추적용 · firmwareVersion 은 응답 미노출 |
+
+**`recordType`** (쿼리 enum) — `VISION` \| `FOOTPRINT`.
 
 ---
 
@@ -306,7 +376,7 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 ### `1.0.0` — Response
 
-**200 OK** — `deviceId` / `deviceSerial` / `deviceType` / `source` / `appVersion` 미노출
+**200 OK** — `Page<RecordResponseV1_0_0>`. `deviceId` / `deviceSerial` / `deviceType` / `source` / `appVersion` 미노출
 
 ```json
 {
@@ -344,7 +414,7 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 ### `1.0.1` — Response
 
-**200 OK** — 1.0.0 content + `deviceId` / `deviceSerial` / `deviceType` / `source` / `appVersion` ⁵
+**200 OK** — `Page<RecordResponseV1_0_1>`. 1.0.0 content + `deviceId` / `deviceSerial` / `deviceType` / `source` / `appVersion` ⁵
 
 ```json
 {
@@ -377,6 +447,25 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 </details>
 
+### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1`
+
+`data` 는 Spring Data `Page<T>` (`content[]` + `totalElements` `totalPages` `number` `size` `first` `last` `sort`). `content[]` 항목:
+
+| 필드 | 타입 | 버전 | 설명 |
+|---|---|---|---|
+| `id` | string (uuid) | 전 버전 | — |
+| `userId` | string (uuid) | 전 버전 | — |
+| `measuredDateTime` | string (date-time, UTC) | 전 버전 | — |
+| `timezone` | string (IANA zone id) | 전 버전 | 측정 시점 사용자 zone snapshot |
+| `footprint` | `Footprint` | 전 버전 | POST §2 참조 |
+| `front` `side` | `Vision` | 전 버전 | POST §2 참조 |
+| `score` | `Score` — `{ bodyScore, predictedAge : number }` | 전 버전 | — |
+| `deviceId` | string (uuid) \| null | **1.0.1만** | device-service lookup. 미클레임/미전송 시 null |
+| `deviceSerial` | string \| null | **1.0.1만** | 응답의 `hardwareSerial` |
+| `deviceType` | string \| null | **1.0.1만** | device 타입 |
+| `source` | enum `RecordSource` | **1.0.1만** | enum 이름 직렬화 (`UNSPECIFIED`/`SELF`/`TRAINER_GUIDED`/`IMPORT`) |
+| `appVersion` | string \| null | **1.0.1만** | 전송된 앱 버전 |
+
 ---
 
 ## 4. `GET` /api/v2/users/{userId}/records/{recordId}
@@ -396,7 +485,7 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 ### `1.0.0` — Response
 
-**200 OK** — 측정 컨텍스트 필드 미노출 (POST §2 의 1.0.0 응답 shape 와 동일)
+**200 OK** — `RecordResponseV1_0_0` (측정 컨텍스트 필드 미노출, POST §2 의 1.0.0 응답 shape 와 동일)
 
 ```json
 {
@@ -431,7 +520,7 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 ### `1.0.1` — Response
 
-**200 OK** — 1.0.0 shape + `deviceId` / `deviceSerial` / `deviceType` / `source` / `appVersion` ⁵
+**200 OK** — `RecordResponseV1_0_1` (1.0.0 shape + `deviceId` / `deviceSerial` / `deviceType` / `source` / `appVersion` ⁵)
 
 ```json
 {
@@ -460,6 +549,25 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 </details>
 
+### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1`
+
+`1.0.0` 은 상단 8개 필드, `1.0.1` 은 + 5개 (`deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion`) ⁵. nested 타입 상세는 POST §2 참조.
+
+| 필드 | 타입 | 버전 | 설명 |
+|---|---|---|---|
+| `id` | string (uuid) | 전 버전 | — |
+| `userId` | string (uuid) | 전 버전 | — |
+| `measuredDateTime` | string (date-time, UTC) | 전 버전 | — |
+| `timezone` | string (IANA zone id) | 전 버전 | 측정 시점 사용자 zone snapshot |
+| `footprint` | `Footprint` | 전 버전 | POST §2 참조 |
+| `front` `side` | `Vision` | 전 버전 | POST §2 참조 |
+| `score` | `Score` — `{ bodyScore, predictedAge : number }` | 전 버전 | — |
+| `deviceId` | string (uuid) \| null | **1.0.1만** | device-service lookup. 미클레임/미전송 시 null |
+| `deviceSerial` | string \| null | **1.0.1만** | 응답의 `hardwareSerial` |
+| `deviceType` | string \| null | **1.0.1만** | device 타입 |
+| `source` | enum `RecordSource` | **1.0.1만** | enum 이름 직렬화 (`UNSPECIFIED`/`SELF`/`TRAINER_GUIDED`/`IMPORT`) |
+| `appVersion` | string \| null | **1.0.1만** | 전송된 앱 버전 |
+
 ---
 
 ## 5. `DELETE` /api/v2/users/{userId}/records
@@ -484,7 +592,7 @@ ids · 시간범위로 bulk 삭제.
 
 ### `1.0.0` — Response
 
-**200 OK** — 삭제 집계
+**200 OK** — 삭제 집계 (`RecordDeleteResult`)
 
 ```json
 {
@@ -499,13 +607,23 @@ ids · 시간범위로 bulk 삭제.
 }
 ```
 
-### Request 필드 정의 (공통)
+### Request 필드 정의 (공통 — `RecordDeleteRequestV1_0_0`)
 
 | 필드 | 타입 | 필수 |
 |---|---|---|
-| `ids` | array&lt;string&gt; | no |
-| `from` | date-time (UTC) | no |
-| `to` | date-time (UTC) | no |
+| `ids` | array&lt;string&gt; (`Optional`) | no |
+| `from` | date-time (UTC) (`Optional`) | no |
+| `to` | date-time (UTC) (`Optional`) | no |
+
+### Response 필드 정의 — `RecordDeleteResult`
+
+| 필드 | 타입 |
+|---|---|
+| `recordCount` | integer (long) |
+| `footprintCount` | integer (long) |
+| `frontVisionCount` | integer (long) |
+| `sideVisionCount` | integer (long) |
+| `deletedRecordIds` | array&lt;string&gt; |
 
 ---
 
@@ -568,7 +686,7 @@ ids · 시간범위로 bulk 삭제.
 
 </details>
 
-### Request 필드 정의 (공통)
+### Request 필드 정의 (공통 — `CreateActivityRequestV1_0_0`)
 
 | 필드 | 타입 | 필수 | 규칙 |
 |---|---|---|---|
@@ -576,6 +694,17 @@ ids · 시간범위로 bulk 삭제.
 | **`startTime`** | date-time (UTC) | yes | |
 | **`endTime`** | date-time (UTC) | yes | |
 | **`painDecreased`** `samePain` `mildPain` `moderatePain` `severePain` | boolean | yes | 5개 pain flag (요청은 primitive `boolean`) |
+
+### Response 필드 정의 — `Activity` (`ActivityResponseV1_0_0`)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `id` | string (uuid) | — |
+| `userId` | string (uuid) | — |
+| `type` | string (enum `ActivityType`) | 응답은 enum 이름 (`WORK_THERAPY` … `MASSAGE_AND_PAIN_MANAGEMENT`) |
+| `startTime` | string (date-time, UTC) | — |
+| `endTime` | string (date-time, UTC) | — |
+| `paindata` | `{ painDecreased, samePain, mildPain, moderatePain, severePain : boolean }` | 필드명 lowercase `paindata` · 응답은 wrapper `Boolean` |
 
 ---
 
@@ -636,6 +765,19 @@ ids · 시간범위로 bulk 삭제.
 
 </details>
 
+### Response 필드 정의 — `Activity` (`ActivityResponseV1_0_0`)
+
+`data` 는 Spring Data `Page<T>` (`content[]` + `totalElements` `totalPages` `number` `size` …). `content[]` 항목:
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `id` | string (uuid) | — |
+| `userId` | string (uuid) | — |
+| `type` | string (enum `ActivityType`) | 응답은 enum 이름 |
+| `startTime` | string (date-time, UTC) | — |
+| `endTime` | string (date-time, UTC) | — |
+| `paindata` | `{ painDecreased, samePain, mildPain, moderatePain, severePain : boolean }` | 필드명 lowercase `paindata` · wrapper `Boolean` |
+
 ---
 
 ## 8. `DELETE` /api/v2/users/{userId}/activities
@@ -676,7 +818,7 @@ ids · 시간범위로 bulk 삭제. `from`/`to` 는 UTC `Instant`. 요청 shape 
 { "ids": ["..."], "from": "2026-04-01T00:00:00Z", "to": "2026-04-27T00:00:00Z" }
 ```
 
-(요청 shape 는 1.0.0 과 동일 — `ActivityDeleteRequest`.)
+(요청 shape 는 1.0.0 과 동일 — `ActivityDeleteRequestV1_0_0`.)
 
 ### `1.0.1` — Response
 
@@ -698,13 +840,30 @@ ids · 시간범위로 bulk 삭제. `from`/`to` 는 UTC `Instant`. 요청 shape 
 
 </details>
 
-### Request 필드 정의 (공통)
+### Request 필드 정의 (공통 — `ActivityDeleteRequestV1_0_0`, 1.0.0·1.0.1 공용)
 
 | 필드 | 타입 | 필수 |
 |---|---|---|
-| `ids` | array&lt;string&gt; | no |
-| `from` | date-time (UTC) | no |
-| `to` | date-time (UTC) | no |
+| `ids` | array&lt;string&gt; (`Optional`) | no |
+| `from` | date-time (UTC) (`Optional`) | no |
+| `to` | date-time (UTC) (`Optional`) | no |
+
+컴팩트 생성자가 null → `Optional.empty()` 로 정규화.
+
+### Response 필드 정의 — 버전별
+
+**`ActivityDeleteResponse`** (1.0.0)
+
+| 필드 | 타입 |
+|---|---|
+| `result` | `ActivityDeleteResult` (`{ activityCount: long }`) |
+| `total` | integer (long) |
+
+**`ActivityDeleteResult`** (1.0.1)
+
+| 필드 | 타입 |
+|---|---|
+| `activityCount` | integer (long) |
 
 ---
 
@@ -727,195 +886,3 @@ ids · 시간범위로 bulk 삭제. `from`/`to` 는 UTC `Instant`. 요청 shape 
 | — | 404 | record 미존재 (`ResponseStatusException`, `Record not found`) |
 | `AUTH-401-*` | 401 | `AuthService.userGetData` 인증/유저 조회 실패 propagate |
 | device-service `ErrorCode` | 4xx/5xx | `macAddress` 전송 시 `DeviceLookup.LookupByMac` propagate (owner mismatch · device inactive 등) |
-
----
-
-## Schemas
-
-### `Envelope`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `success` | boolean | yes | — |
-| `data` | object | no | endpoint-specific |
-| `timestamp` | string (date-time, UTC) | yes | — |
-
-### `RecordResponseV1_0_0`
-
-v1.0.0 응답 DTO. 측정 컨텍스트 필드 노출 안 함. nested 타입 (`Footprint` / `Vision` / `Score`) 은 `RecordResponseV1_0_1` 와 field-identical (버전별로 독립 정의되지만 필드 동일).
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string (uuid) | — |
-| `userId` | string (uuid) | — |
-| `measuredDateTime` | string (date-time, UTC) | — |
-| `timezone` | string (IANA zone id) | 측정 시점 사용자 zone snapshot |
-| `footprint` | [`Footprint`](#footprint) | — |
-| `front` | [`Vision`](#vision) | — |
-| `side` | [`Vision`](#vision) | — |
-| `score` | [`Score`](#score) | — |
-
-### `RecordResponseV1_0_1`
-
-(V9, 이전 이름 `RecordDtoV20260113`) — V1_0_0 의 8개 필드 + 아래 5개 추가.
-
-| Field | Type | Description |
-|---|---|---|
-| (V1_0_0 의 8개 필드 동일) | | |
-| `deviceId` | string (uuid) \| null | device-service `DeviceLookup.LookupByMac` 응답. `allowed=true` + empty `deviceId`(미클레임/TMP) 는 null 로 정규화. macAddress 미전송 시 null |
-| `deviceSerial` | string \| null | device-service 응답의 `hardwareSerial`. macAddress 미전송 시 null |
-| `deviceType` | string \| null | device-service 응답의 device 타입 |
-| `source` | [`RecordSource`](#recordsource) | enum 이름으로 직렬화. 미전송 시 `UNSPECIFIED` |
-| `appVersion` | string \| null | 전송된 앱 버전 |
-
-### `Footprint`
-
-| Field | Type |
-|---|---|
-| `id` | string |
-| `firstClass` / `secondaryClass` / `thirdClass` | `{ type: number, accuracy: number }` |
-| `leftFootDimension` / `rightFootDimension` | `{ length: number, width: number }` |
-| `imageUrl` | string (uri) |
-| `centerOfGravity` | `{ x: number, y: number }` |
-| `leftPressure` / `rightPressure` | `{ top: number, middle: number, bottom: number, total: number }` |
-| `weight` / `height` / `age` | number / number / integer |
-
-### `Vision`
-
-| Field | Type |
-|---|---|
-| `id` | string |
-| `type` | string (enum `VisionType`) |
-| `angleFace` / `anglePelvis` / `angleShoulder` | number |
-| `classType` / `accuracy` | number / number |
-| `imageUrl` | string (uri) |
-| `keypoints` | object — 17 named keypoints, each `{ x: number, y: number, accuracy: number }` |
-
-### `Score`
-
-| Field | Type |
-|---|---|
-| `bodyScore` | number |
-| `predictedAge` | number |
-
-### `CreateRecordRequestV1_0_0`
-
-multipart form-data — `POST /records — 1.0.0` 의 part 표 참조. 필드에 validation 애너테이션 없음.
-
-### `CreateRecordRequestV1_0_1`
-
-multipart form-data — `POST /records — 1.0.1` 의 part 표 참조. v1.0.0 의 4개 part + `macAddress`(`@ValidMacAddress`) / `source` / `appVersion` / `firmwareVersion` (모두 String). `macAddress` 만 validation 애너테이션 보유.
-
-### `RecordSource`
-
-| Value | Meaning |
-|---|---|
-| `UNSPECIFIED` | v1.0.1 호출자가 의도적으로 미전송. "정말 모름". NULL 회피용 명시 분류 |
-| `SELF` | B2C 사용자가 본인 device 로 자가 측정 (B2B 시설 무관). v1.0.0 호출은 모두 이 case |
-| `TRAINER_GUIDED` | B2B 시설의 device 로 측정 (트레이너 입회 가능) |
-| `IMPORT` | 데이터 마이그레이션 / 일괄 인입 (수동 또는 batch) |
-
-DB 에는 `EnumType.STRING` 으로 저장 — 새 case 추가 시 schema 변경 없음.
-
-### `RecordType`
-
-| Value |
-|---|
-| `VISION` |
-| `FOOTPRINT` |
-
-### `RecordDeleteRequestV1_0_0`
-
-| Field | Type | Required |
-|---|---|---|
-| `ids` | array&lt;string&gt; (`Optional`) | no |
-| `from` | string (date-time, UTC) (`Optional`) | no |
-| `to` | string (date-time, UTC) (`Optional`) | no |
-
-### `RecordDeleteResult`
-
-| Field | Type |
-|---|---|
-| `recordCount` | integer (long) |
-| `footprintCount` | integer (long) |
-| `frontVisionCount` | integer (long) |
-| `sideVisionCount` | integer (long) |
-| `deletedRecordIds` | array&lt;string&gt; |
-
-### `Activity` (`ActivityResponseV1_0_0`)
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string (uuid) | — |
-| `userId` | string (uuid) | — |
-| `type` | string (enum `ActivityType`) | `WORK_THERAPY` `ORIENTAL_TREATMENT` `PERSONAL_EXERCISE` `PROFESSIONAL_GUIDANCE` `MASSAGE_AND_PAIN_MANAGEMENT` |
-| `startTime` | string (date-time, UTC) | — |
-| `endTime` | string (date-time, UTC) | — |
-| `paindata` | `{ painDecreased, samePain, mildPain, moderatePain, severePain : boolean }` | 필드명 lowercase `paindata` · 응답은 wrapper `Boolean` |
-
-### `CreateActivityRequestV1_0_0`
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `type` | integer | yes | `0`~`4` (`ActivityType.parse`) |
-| `startTime` | string (date-time, UTC) | yes | — |
-| `endTime` | string (date-time, UTC) | yes | — |
-| `painDecreased` `samePain` `mildPain` `moderatePain` `severePain` | boolean | yes | primitive `boolean` |
-
-### `ActivityType`
-
-| Value | number |
-|---|---|
-| `WORK_THERAPY` | 0 |
-| `ORIENTAL_TREATMENT` | 1 |
-| `PERSONAL_EXERCISE` | 2 |
-| `PROFESSIONAL_GUIDANCE` | 3 |
-| `MASSAGE_AND_PAIN_MANAGEMENT` | 4 |
-
-요청은 정수 `0`~`4` 를 받고, 응답은 enum 이름을 반환한다.
-
-### `ActivityDeleteRequestV1_0_0` (1.0.0 · 1.0.1 공용)
-
-| Field | Type | Required |
-|---|---|---|
-| `ids` | array&lt;string&gt; (`Optional`) | no |
-| `from` | string (date-time, UTC) (`Optional`) | no |
-| `to` | string (date-time, UTC) (`Optional`) | no |
-
-컴팩트 생성자가 null → `Optional.empty()` 로 정규화.
-
-### `ActivityDeleteResponse` (1.0.0 응답)
-
-| Field | Type |
-|---|---|
-| `result` | `ActivityDeleteResult` |
-| `total` | integer (long) |
-
-### `ActivityDeleteResult` (1.0.1 응답)
-
-| Field | Type |
-|---|---|
-| `activityCount` | integer (long) |
-
-### `Page_Record` / `Page_Activity`
-
-Spring Data `Page<T>`:
-
-```json
-{
-  "content": [ ],
-  "totalElements": 0, "totalPages": 0,
-  "number": 0, "size": 10,
-  "first": true, "last": true,
-  "sort": { "sorted": true, "unsorted": false }
-}
-```
-
-### `ErrorResponse`
-
-| Field | Type | Required |
-|---|---|---|
-| `success` | boolean | yes |
-| `code` | string | yes |
-| `message` | string | yes |
-| `timestamp` | string (date-time, UTC) | yes |
