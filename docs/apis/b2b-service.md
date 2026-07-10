@@ -1,28 +1,157 @@
 # b2b-service
 
-> 엔드포인트별 Header · Request · Response 정의 — **버전별 전량 전개**. 소스는 실제 컨트롤러/DTO.
-> 표기 — **굵은 필드 = 필수**, 규칙은 키워드만. 버전 매칭은 정확 일치 (미등록 버전 → `400 Invalid API version`).
+> 엔드포인트별 **Header · Request · Response** 정의 — 버전별 전량 전개, 소스는 실제 컨트롤러/DTO. 표기 — **굵은 필드 = 필수**, 규칙은 키워드만.
 
-Source: `/Users/jonghak/GitHub/Care&Co/b2b-service` (origin/develop-k3s)
-Updated: 2026-07-09
+| 항목 | 값 |
+|---|---|
+| Source | `/Users/jonghak/GitHub/Care&Co/b2b-service` (`origin/develop-k3s`) |
+| Updated | 2026-07-10 |
+| 배포 상태 | **dev 전용 (prod 미배포)** — `develop-k3s` 현행 구현, 운영 API 계약 미확정 |
+| Server | `https://api.example.com` |
+| Base path | 모든 엔드포인트 `/api/v2/b2b/...` 하위 |
 
-> **배포 상태** — b2b-service 는 **dev 전용(prod 미배포)**. 아래 스펙은 `develop-k3s` 기준 현행 구현이며, 운영 API 계약으로 확정된 것이 아니다.
+---
 
-**Servers**
-- `https://api.example.com`
+## 공통 규칙
 
-**Base path** &nbsp;모든 엔드포인트는 `/api/v2/b2b/...` 하위.
+### 1) 버전 — `api-version` 헤더
 
-**Common headers**
+- 모든 엔드포인트가 versioned (Spring API versioning, unversioned 없음).
+- **정확 일치만 허용** — 미등록 버전은 `400 Invalid API version`.
+- **대부분 `1.0.0` 단일 버전.** 복수 버전을 제공하는 엔드포인트는 아래 3그룹이 전부다.
+
+| 엔드포인트 | 제공 버전 | 최신 | 버전 간 차이 |
+|---|---|---|---|
+| `POST /organizations` · `GET /organizations/{id}` | `1.0.0` `1.0.1` `1.0.2` | `1.0.2` | `1.0.1`+ — country·BRN 필수, 응답에 stats 추가. `1.0.2` — country alpha-3 |
+| devices 6종 (목록 · 등록 · 단건 · 수정 · 삭제 · deactivate) | `1.0.0` `1.0.1` | `1.0.1` | `1.0.1` — 응답에 `deviceType` · `deviceNumber` 추가 |
+| `POST /users` · `GET /users/{b2bUserId}` · `PATCH /users/{b2bUserId}` | `1.0.0` `1.0.1` | `1.0.1` | country 표기 — `1.0.0` alpha-2 / `1.0.1` alpha-3 |
+
+<details>
+<summary><b>전체 엔드포인트 색인 (57개)</b> — 도메인별 Method · Path · 제공 버전 (복수 버전은 굵게)</summary>
+
+#### auth (5)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| POST | /api/v2/b2b/auth/login | 1.0.0 |
+| POST | /api/v2/b2b/auth/logout | 1.0.0 |
+| POST | /api/v2/b2b/auth/oauth2/apple | 1.0.0 |
+| POST | /api/v2/b2b/auth/oauth2/google | 1.0.0 |
+| POST | /api/v2/b2b/auth/token | 1.0.0 |
+
+#### users (5)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| POST | /api/v2/b2b/users | **1.0.0, 1.0.1** |
+| DELETE | /api/v2/b2b/users/{b2bUserId} | 1.0.0 |
+| GET | /api/v2/b2b/users/{b2bUserId} | **1.0.0, 1.0.1** |
+| PATCH | /api/v2/b2b/users/{b2bUserId} | **1.0.0, 1.0.1** |
+| POST | /api/v2/b2b/users/{b2bUserId}/password | 1.0.0 |
+
+#### organizations (5)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| POST | /api/v2/b2b/organizations | **1.0.0, 1.0.1, 1.0.2** |
+| GET | /api/v2/b2b/organizations/search | 1.0.0 |
+| DELETE | /api/v2/b2b/organizations/{id} | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{id} | **1.0.0, 1.0.1, 1.0.2** |
+| PATCH | /api/v2/b2b/organizations/{id} | 1.0.0 |
+
+#### organizations — 멤버/가입 (6)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| POST | /api/v2/b2b/organizations/{organizationId}/join-requests | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/members | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/members/{memberId}/measurements | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/members/{memberId}/measurements/summary | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/members/{memberId}/measurements/{recordId} | 1.0.0 |
+| POST | /api/v2/b2b/organizations/{organizationId}/staff | 1.0.0 |
+
+#### organizations — devices (7)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| GET | /api/v2/b2b/organizations/{organizationId}/devices | **1.0.0, 1.0.1** |
+| POST | /api/v2/b2b/organizations/{organizationId}/devices | **1.0.0, 1.0.1** |
+| GET | /api/v2/b2b/organizations/{organizationId}/devices/preview | 1.0.0 |
+| DELETE | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId} | **1.0.0, 1.0.1** |
+| GET | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId} | **1.0.0, 1.0.1** |
+| PATCH | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId} | **1.0.0, 1.0.1** |
+| POST | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId}/deactivate | **1.0.0, 1.0.1** |
+
+#### memberships / b2c (6)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| GET | /api/v2/b2b/availability | 1.0.0 |
+| GET | /api/v2/b2b/b2c-members/{carencoUserId}/organizations | 1.0.0 |
+| POST | /api/v2/b2b/memberships/{membershipId}/approve | 1.0.0 |
+| POST | /api/v2/b2b/memberships/{membershipId}/leave | 1.0.0 |
+| POST | /api/v2/b2b/memberships/{membershipId}/reject | 1.0.0 |
+| POST | /api/v2/b2b/memberships/{membershipId}/suspend | 1.0.0 |
+
+#### invite-codes (4)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| POST | /api/v2/b2b/invite-codes/redeem | 1.0.0 |
+| POST | /api/v2/b2b/invite-codes/{inviteCodeId}/revoke | 1.0.0 |
+| GET | /api/v2/b2b/organizations/{organizationId}/invite-codes | 1.0.0 |
+| POST | /api/v2/b2b/organizations/{organizationId}/invite-codes | 1.0.0 |
+
+#### billing (12)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| POST | /api/v2/b2b/billing/checkout-init | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/portal-session | 1.0.0 |
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/refunds | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/refunds | 1.0.0 |
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/refunds/{refundId} | 1.0.0 |
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/subscription | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/cancel | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/pause | 1.0.0 |
+| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/resume | 1.0.0 |
+| GET | /api/v2/b2b/billing/organizations/{organizationId}/transactions | 1.0.0 |
+| POST | /api/v2/b2b/billing/plan-change | 1.0.0 |
+| GET | /api/v2/b2b/billing/plans | 1.0.0 |
+
+#### feedbacks (5)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| GET | /api/v2/b2b/feedbacks/measurements/{recordId} | 1.0.0 |
+| GET | /api/v2/b2b/feedbacks/memberships/{membershipId} | 1.0.0 |
+| POST | /api/v2/b2b/feedbacks/memberships/{membershipId} | 1.0.0 |
+| DELETE | /api/v2/b2b/feedbacks/{feedbackId} | 1.0.0 |
+| PATCH | /api/v2/b2b/feedbacks/{feedbackId} | 1.0.0 |
+
+#### license-summary (2)
+
+| Method | Path | 제공 버전 |
+|---|---|---|
+| GET | /api/v2/b2b/license-summary | 1.0.0 |
+| GET | /api/v2/b2b/license-summary/{organizationId} | 1.0.0 |
+
+</details>
+
+### 2) 공통 헤더
 
 | Header | Value | Notes |
 |---|---|---|
-| `api-version` | `x.y.z` | 모든 엔드포인트 versioned (Spring API versioning). 엔드포인트별 Header 표 참조 |
+| `api-version` | `x.y.z` | 필수. 엔드포인트별 Header 표 참조 |
 | `Authorization` | `Bearer <jwt>` | 보호 엔드포인트에 필수 (b2b JWT) |
 | `Cookie` | `B2B-SESSION=<id>` | 웹 세션 인증 대안 (Bearer 없을 때) |
 | `Content-Type` | `application/json` | 요청 바디가 있을 때 |
 
-**Security** &nbsp;필터 체인(`SecurityConfig`)은 `Authorization: Bearer` (모바일) → `B2B-SESSION` 쿠키(웹) → 익명 순으로 인증을 분기한다. **역할/권한(OWNER · ADMIN · TRAINER)·본인 확인은 필터가 아니라 application 레이어에서 imperative 하게 검증**되며 실패 시 sealed Error → `403 PERMISSION_DENIED` 로 응답한다. 아래 경로만 인증 없이 통과(그 외 전부 인증 필요).
+### 3) 인증
+
+- 필터 체인(`SecurityConfig`) 인증 분기 — `Authorization: Bearer` (모바일) → `B2B-SESSION` 쿠키 (웹) → 익명.
+- 역할/권한(OWNER · ADMIN · TRAINER) · 본인 확인은 필터가 아니라 **application 레이어에서 imperative 검증** — 실패 시 sealed Error → `403 PERMISSION_DENIED`.
+- 아래 공개 경로만 인증 없이 통과, 그 외 전부 인증 필수.
 
 | 공개 경로 | 비고 |
 |---|---|
@@ -33,7 +162,11 @@ Updated: 2026-07-09
 | `GET /api/v2/b2b/availability` | 가입 전 가용성 검사 |
 | `GET /api/v2/b2b/b2c-members/{carencoUserId}/organizations` | Carenco 사용자 가입 현황 조회 |
 
-**Common response envelope** (`CncResponse`) — 모든 응답 샘플의 바깥 틀. 아래 필드는 모든 엔드포인트 공통이라 개별 섹션에서 반복하지 않는다.
+### 4) 응답 envelope
+
+모든 응답 샘플의 바깥 틀 — 아래 필드는 전 엔드포인트 공통이라 개별 섹션에서 반복하지 않는다.
+
+**성공** (`CncResponse`)
 
 ```json
 {
@@ -45,15 +178,7 @@ Updated: 2026-07-09
 }
 ```
 
-| 필드 | 타입 | 필수 |
-|---|---|---|
-| `success` | boolean | yes |
-| `data` | object | no — endpoint-specific |
-| `token` | object | no — 인증 계열 응답에서만 (`accessToken`/`refreshToken`) |
-| `error` | object | no |
-| `timestamp` | string (date-time, UTC) | yes |
-
-**Error envelope** (`ErrorResponse`)
+**에러** (`ErrorResponse`) — 코드 전체는 문서 하단 [에러 코드](#에러-코드) 참조
 
 ```json
 {
@@ -64,73 +189,14 @@ Updated: 2026-07-09
 }
 ```
 
-에러 코드 전체는 문서 하단 [## 에러 코드](#에러-코드) 참조.
-
----
-
-## API 버전 (endpoint별)
-
-> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. 모든 엔드포인트가 versioned (unversioned 없음). 미등록 버전 → `400 Invalid API version`.
-
-| Method | Path | 제공 버전 | 최신 |
-|---|---|---|---|
-| POST | /api/v2/b2b/auth/login | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/auth/logout | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/auth/oauth2/apple | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/auth/oauth2/google | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/auth/token | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/availability | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/b2c-members/{carencoUserId}/organizations | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/billing/checkout-init | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/billing/organizations/{organizationId}/portal-session | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/billing/organizations/{organizationId}/refunds | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/billing/organizations/{organizationId}/refunds | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/billing/organizations/{organizationId}/refunds/{refundId} | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/billing/organizations/{organizationId}/subscription | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/cancel | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/pause | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/billing/organizations/{organizationId}/subscription/resume | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/billing/organizations/{organizationId}/transactions | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/billing/plan-change | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/billing/plans | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/feedbacks/measurements/{recordId} | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/feedbacks/memberships/{membershipId} | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/feedbacks/memberships/{membershipId} | 1.0.0 | 1.0.0 |
-| DELETE | /api/v2/b2b/feedbacks/{feedbackId} | 1.0.0 | 1.0.0 |
-| PATCH | /api/v2/b2b/feedbacks/{feedbackId} | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/invite-codes/redeem | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/invite-codes/{inviteCodeId}/revoke | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/license-summary | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/license-summary/{organizationId} | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/memberships/{membershipId}/approve | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/memberships/{membershipId}/leave | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/memberships/{membershipId}/reject | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/memberships/{membershipId}/suspend | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/organizations | 1.0.0, 1.0.1, 1.0.2 | 1.0.2 |
-| GET | /api/v2/b2b/organizations/search | 1.0.0 | 1.0.0 |
-| DELETE | /api/v2/b2b/organizations/{id} | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/organizations/{id} | 1.0.0, 1.0.1, 1.0.2 | 1.0.2 |
-| PATCH | /api/v2/b2b/organizations/{id} | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/organizations/{organizationId}/devices | 1.0.0, 1.0.1 | 1.0.1 |
-| POST | /api/v2/b2b/organizations/{organizationId}/devices | 1.0.0, 1.0.1 | 1.0.1 |
-| GET | /api/v2/b2b/organizations/{organizationId}/devices/preview | 1.0.0 | 1.0.0 |
-| DELETE | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId} | 1.0.0, 1.0.1 | 1.0.1 |
-| GET | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId} | 1.0.0, 1.0.1 | 1.0.1 |
-| PATCH | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId} | 1.0.0, 1.0.1 | 1.0.1 |
-| POST | /api/v2/b2b/organizations/{organizationId}/devices/{deviceId}/deactivate | 1.0.0, 1.0.1 | 1.0.1 |
-| GET | /api/v2/b2b/organizations/{organizationId}/invite-codes | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/organizations/{organizationId}/invite-codes | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/organizations/{organizationId}/join-requests | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/organizations/{organizationId}/members | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/organizations/{organizationId}/members/{memberId}/measurements | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/organizations/{organizationId}/members/{memberId}/measurements/summary | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/organizations/{organizationId}/members/{memberId}/measurements/{recordId} | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/organizations/{organizationId}/staff | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/users | 1.0.0 | 1.0.0 |
-| DELETE | /api/v2/b2b/users/{b2bUserId} | 1.0.0 | 1.0.0 |
-| GET | /api/v2/b2b/users/{b2bUserId} | 1.0.0 | 1.0.0 |
-| PATCH | /api/v2/b2b/users/{b2bUserId} | 1.0.0 | 1.0.0 |
-| POST | /api/v2/b2b/users/{b2bUserId}/password | 1.0.0 | 1.0.0 |
+| 필드 | 타입 | 필수 |
+|---|---|---|
+| `success` | boolean | yes |
+| `data` | object | no — endpoint-specific |
+| `token` | object | no — 인증 계열 응답에서만 (`accessToken`/`refreshToken`) |
+| `error` | object | no |
+| `code` · `message` | string | 에러 응답에서만 |
+| `timestamp` | string (date-time, UTC) | yes |
 
 ---
 
