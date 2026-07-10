@@ -630,7 +630,7 @@ GET /api/v2/b2b/availability?field=EMAIL&value=owner@example.com
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
-| `api-version` | `1.0.0` (단일 버전) | yes |
+| `api-version` | `1.0.0` \| `1.0.1` (country 표기 차이) | yes |
 | `Content-Type` | `application/json` | yes |
 | `Authorization` | — (공개 엔드포인트) | no |
 
@@ -653,7 +653,7 @@ GET /api/v2/b2b/availability?field=EMAIL&value=owner@example.com
 
 ### `1.0.0` — Response
 
-**201 Created** — `data` 에 `UserResponse` (`organizations` 는 빈 배열)
+**201 Created** — `data` 에 `UserResponse` (`organizations` 는 빈 배열). country 는 표시용 **alpha-2** (저장 alpha-3 를 역변환)
 
 ```json
 {
@@ -664,7 +664,7 @@ GET /api/v2/b2b/availability?field=EMAIL&value=owner@example.com
     "firstName": "종학",
     "lastName": "이",
     "phoneNumber": "+821012345678",
-    "country": "KOR",
+    "country": "KR",
     "profileImageUrl": null,
     "accountStatus": "ACTIVE",
     "lastLoginTime": null,
@@ -692,6 +692,44 @@ GET /api/v2/b2b/availability?field=EMAIL&value=owner@example.com
 
 </details>
 
+### `1.0.1` — Request (요청 shape 동일 — country 수용 규칙만 확대)
+
+```json
+{
+  "email": "owner@example.com",
+  "password": "P@ssw0rd!",
+  "firstName": "종학",
+  "lastName": "이",
+  "country": "UK",
+  "phoneNumber": "+821012345678"
+}
+```
+
+### `1.0.1` — Response
+
+**201 Created** — country 를 **alpha-3 저장값 그대로** 반환
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "3f2a...uuid",
+    "email": "owner@example.com",
+    "firstName": "종학",
+    "lastName": "이",
+    "phoneNumber": "+821012345678",
+    "country": "GBR",
+    "profileImageUrl": null,
+    "accountStatus": "ACTIVE",
+    "lastLoginTime": null,
+    "createdAt": "2026-07-10T09:00:00Z",
+    "organizations": []
+  }
+}
+```
+
+400/409 는 `1.0.0` 과 동일.
+
 ### Request 필드 정의 — `SignUpRequest`
 
 | 필드 | 타입 | 필수 | 규칙/설명 |
@@ -700,7 +738,7 @@ GET /api/v2/b2b/availability?field=EMAIL&value=owner@example.com
 | **`password`** | string | yes | `@ValidPassword(allowEmpty=false, allowNull=false)` — 영문·숫자·특수문자 8자+ |
 | **`firstName`** | string | yes | `@ValidName(allowEmpty=false, allowNull=false)` |
 | **`lastName`** | string | yes | `@ValidName(allowEmpty=false, allowNull=false)` |
-| `country` | string | no | `@ValidCountryCode(allowNull=true)` — ISO 3166-1 alpha-2 입력 (저장은 alpha-3) |
+| `country` | string | no | `@ValidEnum(CountryCode)` — alpha-2/alpha-3/별칭(`UK`·`UAE`) 수용 · 저장은 alpha-3 · **미제공 → `UNKNOWN`** |
 | `phoneNumber` | string | no | `@ValidPhoneNumber(allowNull=true)` — E.164 |
 
 ### Response 필드 정의 — `UserResponse`
@@ -711,7 +749,7 @@ GET /api/v2/b2b/availability?field=EMAIL&value=owner@example.com
 | `email` | string | yes | — |
 | `firstName` `lastName` | string | yes | — |
 | `phoneNumber` | string \| null | no | — |
-| `country` | string \| null | no | 저장·응답은 ISO 3166-1 alpha-3 (`KOR`) |
+| `country` | string | yes | **버전별** — `1.0.0`: alpha-2(`KR`, 역변환) / `1.0.1`: alpha-3(`KOR`) · 미제공 `UNKNOWN` |
 | `profileImageUrl` | string \| null | no | — |
 | `accountStatus` | string (enum `AccountStatus`) | yes | `ACTIVE` `SUSPENDED` `BANNED` `DELETION_PENDING` `DELETED` |
 | `lastLoginTime` | string (date-time, UTC) \| null | no | — |
@@ -728,7 +766,7 @@ GET /api/v2/b2b/availability?field=EMAIL&value=owner@example.com
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
-| `api-version` | `1.0.0` (단일 버전) | yes |
+| `api-version` | `1.0.0` \| `1.0.1` (country 표기 차이) | yes |
 | `Authorization` | `Bearer <jwt>` (본인) | yes |
 
 ### Security
@@ -741,7 +779,7 @@ self-check — path 의 `b2bUserId` 가 인증 principal 의 id 와 일치해야
 
 ### `1.0.0` — Response
 
-**200 OK** — `data` 에 `UserResponse` (`organizations` 채워짐)
+**200 OK** — `data` 에 `UserResponse` (`organizations` 채워짐). country 는 표시용 **alpha-2** (역변환)
 
 ```json
 {
@@ -752,7 +790,7 @@ self-check — path 의 `b2bUserId` 가 인증 principal 의 id 와 일치해야
     "firstName": "종학",
     "lastName": "이",
     "phoneNumber": "+821012345678",
-    "country": "KOR",
+    "country": "KR",
     "profileImageUrl": null,
     "accountStatus": "ACTIVE",
     "lastLoginTime": "2026-07-08T09:00:00Z",
@@ -790,6 +828,45 @@ self-check — path 의 `b2bUserId` 가 인증 principal 의 id 와 일치해야
 
 </details>
 
+### `1.0.1` — Request
+
+바디 없음 — path 의 `b2bUserId` (uuid) 만.
+
+### `1.0.1` — Response
+
+**200 OK** — `1.0.0` 과 동일 shape, country 만 **alpha-3 저장값 그대로**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "3f2a...uuid",
+    "email": "owner@example.com",
+    "firstName": "종학",
+    "lastName": "이",
+    "phoneNumber": "+821012345678",
+    "country": "KOR",
+    "profileImageUrl": null,
+    "accountStatus": "ACTIVE",
+    "lastLoginTime": "2026-07-08T09:00:00Z",
+    "createdAt": "2026-07-01T09:00:00Z",
+    "organizations": [
+      {
+        "id": "org-uuid",
+        "name": "강남 필라테스",
+        "type": "PILATES",
+        "role": "OWNER",
+        "seatsUsed": 12,
+        "planSeats": 30,
+        "licenseState": "ACTIVE"
+      }
+    ]
+  }
+}
+```
+
+403/404 는 `1.0.0` 과 동일.
+
 ### Request 필드 정의
 
 바디 없음. path `b2bUserId` (uuid) 만.
@@ -802,7 +879,7 @@ self-check — path 의 `b2bUserId` 가 인증 principal 의 id 와 일치해야
 | `email` | string | yes | — |
 | `firstName` `lastName` | string | yes | — |
 | `phoneNumber` | string \| null | no | — |
-| `country` | string \| null | no | alpha-3 (`KOR`) |
+| `country` | string | yes | **버전별** — `1.0.0`: alpha-2(`KR`) / `1.0.1`: alpha-3(`KOR`) · 미제공 `UNKNOWN` |
 | `profileImageUrl` | string \| null | no | — |
 | `accountStatus` | string (enum `AccountStatus`) | yes | — |
 | `lastLoginTime` | string (date-time, UTC) \| null | no | — |
@@ -831,7 +908,7 @@ self-check — path 의 `b2bUserId` 가 인증 principal 의 id 와 일치해야
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
-| `api-version` | `1.0.0` (단일 버전) | yes |
+| `api-version` | `1.0.0` \| `1.0.1` (country 표기 차이) | yes |
 | `Authorization` | `Bearer <jwt>` (본인) | yes |
 | `Content-Type` | `application/json` | yes |
 
@@ -852,7 +929,7 @@ self-check — path `b2bUserId` 가 principal id 와 불일치 시 `403 PERMISSI
 
 ### `1.0.0` — Response
 
-**200 OK** — `data` 에 갱신된 `UserResponse`
+**200 OK** — `data` 에 갱신된 `UserResponse`. country 는 표시용 **alpha-2** (역변환)
 
 ```json
 {
@@ -863,7 +940,7 @@ self-check — path `b2bUserId` 가 principal id 와 불일치 시 `403 PERMISSI
     "firstName": "종학",
     "lastName": "이",
     "phoneNumber": "+821099998888",
-    "country": "KOR",
+    "country": "KR",
     "profileImageUrl": "https://cdn.example.com/p.jpg",
     "accountStatus": "ACTIVE",
     "lastLoginTime": "2026-07-08T09:00:00Z",
@@ -909,6 +986,42 @@ self-check — path `b2bUserId` 가 principal id 와 불일치 시 `403 PERMISSI
 
 </details>
 
+### `1.0.1` — Request (요청 shape 동일 — country 수용 규칙만 확대)
+
+```json
+{
+  "firstName": "종학",
+  "phoneNumber": "+821099998888",
+  "profileImageUrl": "https://cdn.example.com/p.jpg",
+  "country": "UK"
+}
+```
+
+### `1.0.1` — Response
+
+**200 OK** — country 를 **alpha-3 저장값 그대로** 반환
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "3f2a...uuid",
+    "email": "owner@example.com",
+    "firstName": "종학",
+    "lastName": "이",
+    "phoneNumber": "+821099998888",
+    "country": "GBR",
+    "profileImageUrl": "https://cdn.example.com/p.jpg",
+    "accountStatus": "ACTIVE",
+    "lastLoginTime": "2026-07-08T09:00:00Z",
+    "createdAt": "2026-07-01T09:00:00Z",
+    "organizations": []
+  }
+}
+```
+
+400/403/404 는 `1.0.0` 과 동일.
+
 ### Request 필드 정의 — `UpdateProfileRequest` (모든 필드 `JsonNullable<T>`)
 
 | 필드 | 타입 | 필수 | 규칙/설명 |
@@ -917,11 +1030,11 @@ self-check — path `b2bUserId` 가 principal id 와 불일치 시 `403 PERMISSI
 | `lastName` | `JsonNullable<String>` | no | `@ValidName(allowEmpty=false, allowNull=true)` (type-arg) · `null` clear 거부 → 400 |
 | `phoneNumber` | `JsonNullable<String>` | no | `@ValidPhoneNumber(allowNull=true)` · clear 허용 |
 | `profileImageUrl` | `JsonNullable<String>` | no | `@Size(max=500)` (type-arg) · clear 허용 |
-| `country` | `JsonNullable<String>` | no | `@ValidCountryCode(allowNull=true)` — alpha-2 입력 · clear 허용 |
+| `country` | `JsonNullable<String>` | no | `@ValidEnum(CountryCode)` — alpha-2/alpha-3/별칭 수용 · `null` clear 시 **`UNKNOWN` 으로 리셋** |
 
 ### Response 필드 정의 — `UserResponse`
 
-§GET /users/{b2bUserId} 응답과 동일 shape (`organizations` 포함). 참조.
+§GET /users/{b2bUserId} 응답과 동일 shape (`organizations` 포함). country 표기도 버전 규칙 동일 — `1.0.0`: alpha-2 / `1.0.1`: alpha-3.
 
 ---
 
