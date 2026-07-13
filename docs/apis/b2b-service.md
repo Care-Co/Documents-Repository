@@ -14,11 +14,14 @@
 
 ## 공통 규칙
 
-### 1) 버전 — `api-version` 헤더
+| 규칙 | 내용 |
+|---|---|
+| 버전 | 모든 엔드포인트 versioned — `api-version: x.y.z` 헤더 필수, **정확 일치만** (미등록 → `400 Invalid API version`) |
+| 인증 | `Authorization: Bearer <jwt>` (모바일) → `B2B-SESSION` 쿠키 (웹) → 익명 순 분기. 역할(OWNER · ADMIN · TRAINER)·본인 확인은 application 레이어 검증 — 실패 시 `403 PERMISSION_DENIED` |
+| 바디 | 요청 바디가 있으면 `Content-Type: application/json` |
+| 응답 틀 | 모든 응답은 `CncResponse` envelope — 아래 접기 참조, 개별 섹션 샘플에서 반복하지 않음 |
 
-- 모든 엔드포인트가 versioned (Spring API versioning, unversioned 없음).
-- **정확 일치만 허용** — 미등록 버전은 `400 Invalid API version`.
-- **대부분 `1.0.0` 단일 버전.** 복수 버전 엔드포인트는 아래 11개가 전부 — **버전 간 차이는 각 섹션 상단의 버전 표** 참조.
+**복수 버전 엔드포인트** — 대부분 `1.0.0` 단일, 아래 11개만 복수. 버전 간 차이는 각 섹션 상단의 버전 표 참조.
 
 | 그룹 | 엔드포인트 | 최신 |
 |---|---|---|
@@ -26,7 +29,59 @@
 | organizations (BRN·stats·country) | [`POST /organizations`](#13-post-apiv2b2borganizations) · [`GET /organizations/{id}`](#15-get-apiv2b2borganizationsid) | `1.0.2` |
 | devices (deviceType·deviceNumber) | [`목록`](#30-get-apiv2b2borganizationsorganizationiddevices) · [`등록`](#29-post-apiv2b2borganizationsorganizationiddevices) · [`단건`](#32-get-apiv2b2borganizationsorganizationiddevicesdeviceid) · [`수정`](#33-patch-apiv2b2borganizationsorganizationiddevicesdeviceid) · [`삭제`](#34-delete-apiv2b2borganizationsorganizationiddevicesdeviceid) · [`deactivate`](#35-post-apiv2b2borganizationsorganizationiddevicesdeviceiddeactivate) | `1.0.1` |
 
-### 전체 엔드포인트 색인 (57개)
+<details>
+<summary><b>공개 경로</b> (인증 불필요) — 그 외 전부 인증 필수</summary>
+
+| 공개 경로 | 비고 |
+|---|---|
+| `/api/v2/b2b/auth/**` | 로그인 · 토큰 회전 · OAuth2 |
+| `GET /api/v2/b2b/organizations/search` · `GET /api/v2/b2b/organizations/{id}` | 시설 검색/열람 (가입 전) |
+| `POST /api/v2/b2b/organizations/{id}/join-requests` · `POST /api/v2/b2b/invite-codes/redeem` · `POST /api/v2/b2b/memberships/{id}/leave` | Carenco 사용자 가입 흐름 (body 의 memberId 로 식별) |
+| `POST /api/v2/b2b/users` | 관리자 회원가입 |
+| `GET /api/v2/b2b/availability` | 가입 전 가용성 검사 |
+| `GET /api/v2/b2b/b2c-members/{carencoUserId}/organizations` | Carenco 사용자 가입 현황 조회 |
+
+</details>
+
+<details>
+<summary><b>응답 envelope</b> — 성공/에러 JSON · 필드 정의</summary>
+
+**성공** (`CncResponse`)
+
+```json
+{
+  "success": true,
+  "data": {},
+  "token": null,
+  "error": null,
+  "timestamp": "2026-04-27T08:00:00Z"
+}
+```
+
+**에러** (`ErrorResponse`) — 코드 전체는 문서 하단 [에러 코드](#에러-코드) 참조
+
+```json
+{
+  "success": false,
+  "code": "CMN-400-001",
+  "message": "Invalid request parameter. Field: email, Value: ...",
+  "timestamp": "2026-04-27T08:00:00Z"
+}
+```
+
+| 필드 | 타입 | 필수 |
+|---|---|---|
+| `success` | boolean | yes |
+| `data` | object | no — endpoint-specific |
+| `token` | object | no — 인증 계열 응답에서만 (`accessToken`/`refreshToken`) |
+| `error` | object | no |
+| `code` · `message` | string | 에러 응답에서만 |
+| `timestamp` | string (date-time, UTC) | yes |
+
+</details>
+
+<details>
+<summary><b>전체 엔드포인트 색인</b> (57개) — 도메인별 · Method · Path · 버전 · 인증 · 설명</summary>
 
 Path 는 `/api/v2/b2b` 이하만 표기 — 클릭하면 해당 섹션으로 이동. 복수 버전은 굵게.
 
@@ -167,65 +222,7 @@ Path 는 `/api/v2/b2b` 이하만 표기 — 클릭하면 해당 섹션으로 이
 
 </details>
 
-### 2) 공통 헤더
-
-| Header | Value | Notes |
-|---|---|---|
-| `api-version` | `x.y.z` | 필수. 엔드포인트별 Header 표 참조 |
-| `Authorization` | `Bearer <jwt>` | 보호 엔드포인트에 필수 (b2b JWT) |
-| `Cookie` | `B2B-SESSION=<id>` | 웹 세션 인증 대안 (Bearer 없을 때) |
-| `Content-Type` | `application/json` | 요청 바디가 있을 때 |
-
-### 3) 인증
-
-- 필터 체인(`SecurityConfig`) 인증 분기 — `Authorization: Bearer` (모바일) → `B2B-SESSION` 쿠키 (웹) → 익명.
-- 역할/권한(OWNER · ADMIN · TRAINER) · 본인 확인은 필터가 아니라 **application 레이어에서 imperative 검증** — 실패 시 sealed Error → `403 PERMISSION_DENIED`.
-- 아래 공개 경로만 인증 없이 통과, 그 외 전부 인증 필수.
-
-| 공개 경로 | 비고 |
-|---|---|
-| `/api/v2/b2b/auth/**` | 로그인 · 토큰 회전 · OAuth2 |
-| `GET /api/v2/b2b/organizations/search` · `GET /api/v2/b2b/organizations/{id}` | 시설 검색/열람 (가입 전) |
-| `POST /api/v2/b2b/organizations/{id}/join-requests` · `POST /api/v2/b2b/invite-codes/redeem` · `POST /api/v2/b2b/memberships/{id}/leave` | Carenco 사용자 가입 흐름 (body 의 memberId 로 식별) |
-| `POST /api/v2/b2b/users` | 관리자 회원가입 |
-| `GET /api/v2/b2b/availability` | 가입 전 가용성 검사 |
-| `GET /api/v2/b2b/b2c-members/{carencoUserId}/organizations` | Carenco 사용자 가입 현황 조회 |
-
-### 4) 응답 envelope
-
-모든 응답 샘플의 바깥 틀 — 아래 필드는 전 엔드포인트 공통이라 개별 섹션에서 반복하지 않는다.
-
-**성공** (`CncResponse`)
-
-```json
-{
-  "success": true,
-  "data": {},
-  "token": null,
-  "error": null,
-  "timestamp": "2026-04-27T08:00:00Z"
-}
-```
-
-**에러** (`ErrorResponse`) — 코드 전체는 문서 하단 [에러 코드](#에러-코드) 참조
-
-```json
-{
-  "success": false,
-  "code": "CMN-400-001",
-  "message": "Invalid request parameter. Field: email, Value: ...",
-  "timestamp": "2026-04-27T08:00:00Z"
-}
-```
-
-| 필드 | 타입 | 필수 |
-|---|---|---|
-| `success` | boolean | yes |
-| `data` | object | no — endpoint-specific |
-| `token` | object | no — 인증 계열 응답에서만 (`accessToken`/`refreshToken`) |
-| `error` | object | no |
-| `code` · `message` | string | 에러 응답에서만 |
-| `timestamp` | string (date-time, UTC) | yes |
+</details>
 
 ---
 
