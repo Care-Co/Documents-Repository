@@ -1,16 +1,30 @@
 # ML-service
 
-> 엔드포인트별 Header · Request · Response 정의 — 소스는 실제 Flask blueprint 컨트롤러 / Marshmallow 스키마 / 결과 빌드 코드.
-> 표기 — **굵은 필드 = 필수**. ML-service 는 unversioned (Spring API versioning 미사용) 이라 버전 라벨 없이 Request / Response 로 전개한다.
+> 엔드포인트별 **Header · Request · Response** 정의 — 소스는 실제 Flask blueprint 컨트롤러 / Marshmallow 스키마 / 결과 빌드 코드. 표기 — **굵은 필드 = 필수**.
 
-Source: `/Users/jonghak/GitHub/Care&Co/ML-service`
-Framework: Flask (blueprint-based)
-Updated: 2026-07-09
+| 항목 | 값 |
+|---|---|
+| Source | `/Users/jonghak/GitHub/Care&Co/ML-service` |
+| Framework | Flask (blueprint-based) |
+| Updated | 2026-07-13 |
+| Server | `https://ml.example.com` |
+| Base path | URL prefix 없음 — 경로는 blueprint 에 정의된 그대로 |
 
 Inference service for plantar pressure (footprint) and human pose estimation. Used by `measure-service` to produce per-record analysis bundles.
 
-**Servers**
-- `https://ml.example.com`
+---
+
+## 공통 규칙
+
+- **버전** — ML-service 는 unversioned — Flask(blueprint) 기반이라 Spring API versioning 미사용. `api-version` 헤더 불필요, 버전 라벨 없이 Request / Response 로 전개한다.
+- **인증** — none — 게이트웨이에서 guard. 서비스 자체 인증 없음.
+- **바디** — JSON 계열은 `Content-Type: application/json`, 이미지 업로드 계열(`/measure`, `/pose`)은 `multipart/form-data`.
+- **응답 틀** — JSON 을 반환하는 모든 엔드포인트의 바깥 틀은 `Envelope` (아래 접기 참조). probe 2종(`GET /check`, `GET /measure/test`)은 envelope 아님 (plain text).
+- **에러 처리** — `handle_api_errors` 데코레이터가 예외를 상태 코드로 매핑한다. `PoseDetectionError` → 422, `ValueError` → 400, `FileNotFoundError` → 404, `RuntimeError` → 500, 그 외 `Exception` → 500. Marshmallow `ValidationError` 는 검증 데코레이터에서 400 으로 즉시 반환된다.
+- **동시성** — 세마포어 초과 대기 30 s 타임아웃 → `503 Server is busy. Try again later.` (한도는 아래 접기 참조).
+
+<details>
+<summary><b>Architecture · Concurrency</b> — 모델 구성 · 세마포어 한도</summary>
 
 **Architecture**
 - Footprint: PyTorch JIT classifier on a 29×22 pressure grid (CPU default).
@@ -26,7 +40,12 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 
 `/footprint/classification`, `/footprint/size-mask`, `/weight`, `/check`, `/measure/test` 는 세마포어 미적용 (경량 CPU 연산 또는 probe).
 
-**Common response envelope** (`Envelope`) — JSON 을 반환하는 모든 엔드포인트의 바깥 틀. `ApiResponse.create_response` 가 `success = 200 ≤ status < 300` 으로 계산하고 `data` 는 있을 때만 직렬화한다.
+</details>
+
+<details>
+<summary><b>응답 envelope</b> (<code>Envelope</code>) — 성공 JSON · 필드 정의</summary>
+
+`ApiResponse.create_response` 가 `success = 200 ≤ status < 300` 으로 계산하고 `data` 는 있을 때만 직렬화한다.
 
 ```json
 {
@@ -42,53 +61,24 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 | `message` | string | yes | 성공/실패 메시지 |
 | `data` | object | no | endpoint-specific payload (`None` 이면 미직렬화) |
 
-**Error 처리** — `handle_api_errors` 데코레이터가 예외를 상태 코드로 매핑한다. `PoseDetectionError` → 422, `ValueError` → 400, `FileNotFoundError` → 404, `RuntimeError` → 500, 그 외 `Exception` → 500. Marshmallow `ValidationError` 는 검증 데코레이터에서 400 으로 즉시 반환된다.
-
-**Security** &nbsp;none — 게이트웨이에서 guard. 서비스 자체 인증 없음.
+</details>
 
 ---
 
-## API 버전 (endpoint별)
-
-> ML-service 는 Flask(blueprint) 기반 — Spring API versioning 미사용. 모든 endpoint 가 unversioned(`—`). 경로는 blueprint 에 정의된 그대로 (URL prefix 없음).
-
-| Method | Path | 제공 버전 | 최신 |
-|---|---|---|---|
-| `GET` | /check | — | unversioned |
-| `POST` | /footprint | — | unversioned |
-| `POST` | /footprint/classification | — | unversioned |
-| `POST` | /footprint/size-mask | — | unversioned |
-| `GET` | /measure/test | — | unversioned |
-| `POST` | /measure | — | unversioned |
-| `POST` | /pose | — | unversioned |
-| `POST` | /weight | — | unversioned |
+| Method | Path | 버전 | 인증 | 설명 |
+|---|---|---|---|---|
+| POST | [`/footprint`](#1-post-footprint) | — | 공개 | 족저압 전체 분석 (분류 top-3 + 체중 + 구간별 압력 + 무게중심…) |
+| POST | [`/footprint/classification`](#2-post-footprintclassification) | — | 공개 | 족저압 top-9 클래스 신뢰도만 반환 |
+| POST | [`/footprint/size-mask`](#3-post-footprintsize-mask) | — | 공개 | 발 크기만 측정 (압력/분류/체중 없음) |
+| POST | [`/weight`](#4-post-weight) | — | 공개 | 동일 hex payload 에서 체중만 디코딩 |
+| POST | [`/pose`](#5-post-pose) | — | 공개 | 단일 이미지 포즈 추정 (multipart `file` 또는 `image_url`) |
+| POST | [`/measure`](#6-post-measure) | — | 공개 | 족저압 + 전면/측면 포즈 2장 + 선택적 body/age 스코어링 합성 |
+| GET | [`/check`](#7-get-check) | — | 공개 | 서버 상태 확인 probe (빈 본문 200) |
+| GET | [`/measure/test`](#8-get-measuretest) | — | 공개 | 측정 blueprint 헬스 probe (plain text) |
 
 ---
 
-## 1. `GET` /check
-
-서버 상태 확인 probe. **빈 본문**을 200 으로 반환한다 (JSON envelope 아님).
-
-### Header
-
-| 헤더 | 값 | 필수 |
-|---|---|---|
-| `api-version` | — (unversioned) | no |
-
-### Request
-
-바디·파라미터 없음.
-
-### Response
-
-**200 OK** — 빈 문자열 본문 (`Content-Type: text/html`, 본문 길이 0)
-
-```
-```
-
----
-
-## 2. `POST` /footprint
+## 1. `POST` /footprint
 
 족저압 전체 분석 (분류 top-3 + 체중 + 구간별 압력 + 무게중심 + footprint 이미지 업로드). `semaphore_req` (15) 적용.
 
@@ -98,6 +88,9 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 |---|---|---|
 | `api-version` | — (unversioned) | no |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b>Request · Response</b></summary>
 
 ### Request
 
@@ -111,15 +104,6 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
   "version": "01"
 }
 ```
-
-### Request 필드 정의
-
-| 필드 | 타입 | 필수 | Validation | 설명 |
-|---|---|---|---|---|
-| **`rawData`** | string | yes | length ≥ 1, 디코딩 시 1290 hex chars (645 bytes) | 29×22 pressure grid + meta hex payload |
-| `uid` | string | no | length 1–100 | 미지정 시 서버가 UUID 생성 |
-| `gender` | string | no | `male` `female` `MALE` `FEMALE` `Male` `Female` | — |
-| `version` | string | no | `01` `02`, 기본값 `01` | — |
 
 ### Response
 
@@ -173,6 +157,17 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 
 </details>
 
+</details>
+
+### Request 필드 정의
+
+| 필드 | 타입 | 필수 | Validation | 설명 |
+|---|---|---|---|---|
+| **`rawData`** | string | yes | length ≥ 1, 디코딩 시 1290 hex chars (645 bytes) | 29×22 pressure grid + meta hex payload |
+| `uid` | string | no | length 1–100 | 미지정 시 서버가 UUID 생성 |
+| `gender` | string | no | `male` `female` `MALE` `FEMALE` `Male` `Female` | — |
+| `version` | string | no | `01` `02`, 기본값 `01` | — |
+
 ### Response 필드 정의 (`data`)
 
 | 필드 | 타입 | 설명 |
@@ -193,7 +188,7 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 
 ---
 
-## 3. `POST` /footprint/classification
+## 2. `POST` /footprint/classification
 
 족저압 top-9 클래스 신뢰도만 반환. 세마포어 미적용.
 
@@ -204,22 +199,16 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 | `api-version` | — (unversioned) | no |
 | `Content-Type` | `application/json` | yes |
 
+<details>
+<summary><b>Request · Response</b></summary>
+
 ### Request
 
-`application/json` 바디 (`FootprintRequestSchema` — §2 와 동일).
+`application/json` 바디 (`FootprintRequestSchema` — §1 와 동일).
 
 ```json
 { "rawData": "0102....(1290 hex chars)", "uid": "user-123", "gender": "male", "version": "01" }
 ```
-
-### Request 필드 정의
-
-| 필드 | 타입 | 필수 | Validation | 설명 |
-|---|---|---|---|---|
-| **`rawData`** | string | yes | length ≥ 1, 1290 hex chars (645 bytes) | 29×22 pressure grid + meta |
-| `uid` | string | no | length 1–100 | — |
-| `gender` | string | no | `male` `female` (any case) | 사용 안 함 (분류만) |
-| `version` | string | no | `01` `02`, 기본값 `01` | — |
 
 ### Response
 
@@ -251,6 +240,17 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 
 </details>
 
+</details>
+
+### Request 필드 정의
+
+| 필드 | 타입 | 필수 | Validation | 설명 |
+|---|---|---|---|---|
+| **`rawData`** | string | yes | length ≥ 1, 1290 hex chars (645 bytes) | 29×22 pressure grid + meta |
+| `uid` | string | no | length 1–100 | — |
+| `gender` | string | no | `male` `female` (any case) | 사용 안 함 (분류만) |
+| `version` | string | no | `01` `02`, 기본값 `01` | — |
+
 ### Response 필드 정의 (`data`)
 
 | 필드 | 타입 | 설명 |
@@ -259,7 +259,7 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 
 ---
 
-## 4. `POST` /footprint/size-mask
+## 3. `POST` /footprint/size-mask
 
 발 크기만 측정 (압력/분류/체중 없음). 클라이언트가 측정 세션 동안 누적한 binary contact mask (셀이 한 번이라도 접촉했는지) 를 입력으로 받아, 좌/우 발의 width / length 와 quality / confidence 를 산출한다. 분류·체중 경로와 독립. 세마포어 미적용.
 
@@ -269,6 +269,9 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 |---|---|---|
 | `api-version` | — (unversioned) | no |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b>Request · Response</b></summary>
 
 ### Request
 
@@ -281,14 +284,6 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
   "durationMs": 4000
 }
 ```
-
-### Request 필드 정의
-
-| 필드 | 타입 | 필수 | Validation | 설명 |
-|---|---|---|---|---|
-| **`mask`** | array | yes | 29×22 grid 또는 flat length 638; 값은 0/1 또는 boolean (유한 수치) | 누적 binary contact mask. `> 0` 인 셀이 "한 번이라도 접촉" 으로 간주 |
-| `frameCount` | integer | no | 1–10000 (`allow_none`) | 누적 프레임 수 (응답에 echo) |
-| `durationMs` | integer | no | 1–600000 (`allow_none`) | 측정 세션 길이(ms) (응답에 echo) |
 
 ### Response
 
@@ -333,6 +328,16 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 
 </details>
 
+</details>
+
+### Request 필드 정의
+
+| 필드 | 타입 | 필수 | Validation | 설명 |
+|---|---|---|---|---|
+| **`mask`** | array | yes | 29×22 grid 또는 flat length 638; 값은 0/1 또는 boolean (유한 수치) | 누적 binary contact mask. `> 0` 인 셀이 "한 번이라도 접촉" 으로 간주 |
+| `frameCount` | integer | no | 1–10000 (`allow_none`) | 누적 프레임 수 (응답에 echo) |
+| `durationMs` | integer | no | 1–600000 (`allow_none`) | 측정 세션 길이(ms) (응답에 echo) |
+
 ### Response 필드 정의 (`data`)
 
 | 필드 | 타입 | 설명 |
@@ -363,27 +368,179 @@ Inference service for plantar pressure (footprint) and human pose estimation. Us
 
 ---
 
-## 5. `GET` /measure/test
+## 4. `POST` /weight
 
-측정 blueprint 헬스 probe. **plain text `measure test`** 를 200 으로 반환한다 (JSON envelope 아님).
+동일 hex payload 에서 체중만 디코딩. 세마포어 미적용.
 
 ### Header
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
 | `api-version` | — (unversioned) | no |
+| `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b>Request · Response</b></summary>
 
 ### Request
 
-바디·파라미터 없음.
+`application/json` 바디 (`FootprintRequestSchema` — §1 와 동일, `rawData` 만 사용).
+
+```json
+{ "rawData": "0102....(1290 hex chars)" }
+```
 
 ### Response
 
-**200 OK** — plain text (`Content-Type: text/html`)
+**201 Created** — `Envelope` + `data.weight`
 
+```json
+{ "success": true, "message": "Weight processed successfully", "data": { "weight": 70.5 } }
 ```
-measure test
+
+<details>
+<summary><b>400 Bad Request</b> — rawData 누락/형식 오류</summary>
+
+```json
+{ "success": false, "message": "Invalid plantar pressure data: expected 1290 hex chars (645 bytes)" }
 ```
+
+</details>
+
+<details>
+<summary><b>500 Internal Server Error</b> — 처리 중 RuntimeError</summary>
+
+```json
+{ "success": false, "message": "Internal server error: ..." }
+```
+
+</details>
+
+</details>
+
+### Request 필드 정의
+
+| 필드 | 타입 | 필수 | Validation | 설명 |
+|---|---|---|---|---|
+| **`rawData`** | string | yes | length ≥ 1, 1290 hex chars (645 bytes) | 29×22 pressure grid + meta. 체중만 디코딩 |
+| `uid` / `gender` / `version` | string | no | §1 참조 | 사용 안 함 |
+
+### Response 필드 정의 (`data`)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `weight` | number | kg |
+
+---
+
+## 5. `POST` /pose
+
+단일 이미지 포즈 추정. `semaphore_req_pose` (5) 적용. 입력은 multipart `file` 또는 query `image_url` (MediaService 다운로드) 중 하나.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | — (unversioned) | no |
+| `Content-Type` | `multipart/form-data` (file 전송 시) | file 사용 시 |
+
+<details>
+<summary><b>Request · Response</b></summary>
+
+### Request
+
+query params (`PoseRequestSchema`, source `args`) + 선택적 multipart `file`.
+
+```bash
+curl -X POST "https://ml.example.com/pose?uid=u1&mosaic=true" -F "file=@front.jpg"
+```
+
+### Response
+
+**201 Created** — `Envelope` + `data` = 포즈 결과 (`process_pose_inference`)
+
+```json
+{
+  "success": true,
+  "message": "Pose processed successfully",
+  "data": {
+    "angleFace": 0.5,
+    "anglePelvis": 1.0,
+    "angleShoulder": 0.2,
+    "url": "https://.../skeleton.jpg",
+    "keypoints": {
+      "nose": { "x": 0.5, "y": 0.2, "accuracy": 99.0 },
+      "shoulderCenter": { "x": 0.5, "y": 0.4, "accuracy": 100 }
+    }
+  }
+}
+```
+
+<details>
+<summary><b>400 Bad Request</b> — file·image_url 모두 없음, filename 없음, 10 MB 초과, image_url 다운로드 실패, 얼굴 모자이크 키포인트 부족</summary>
+
+```json
+{ "success": false, "message": "Missing required file or image_url" }
+```
+
+</details>
+
+<details>
+<summary><b>422 Unprocessable Entity</b> — 사람(포즈) 미검출</summary>
+
+```json
+{
+  "success": false,
+  "message": "Person was not detected. Please retake the photo with the full body in frame.",
+  "data": { "code": "PERSON_NOT_DETECTED", "retakeRequired": true }
+}
+```
+
+</details>
+
+<details>
+<summary><b>503 Service Unavailable</b> — semaphore_req_pose 타임아웃 (30 s)</summary>
+
+```json
+{ "success": false, "message": "Server is busy. Try again later." }
+```
+
+</details>
+
+</details>
+
+### Request 필드 정의
+
+| In | 이름 | 타입 | 필수 | Validation |
+|---|---|---|---|---|
+| query | `uid` | string | no | length 1–100 |
+| query | `timestamp` | string | no | length 1–50 |
+| query | `mosaic` | boolean | no | 기본값 `true` |
+| query | `image_url` | string (url) | no | 유효 URL (`allow_none`). `file` 미전송 시 대체 입력 |
+| form | `file` | binary (jpg/jpeg/png) | 조건부 | ≤ 10 MB. `image_url` 없으면 필수 |
+
+`file` 과 `image_url` 이 **모두 없으면 400**. `mosaic=true` 인데 얼굴 키포인트(코·양쪽 귀)를 못 찾으면 모자이크 실패 → ValueError → 400.
+
+### Response 필드 정의 (`data`)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `angleFace` | number | 얼굴 각도 (deg) |
+| `anglePelvis` | number | 골반 각도 (deg) |
+| `angleShoulder` | number | 어깨 각도 (deg) |
+| `url` | string (uri) | 스켈레톤/척추가 그려진 이미지 URL |
+| `keypoints` | object<string, Keypoint> | 검출된 관절 맵 (아래) |
+
+### Keypoint 필드 정의
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| **`x`** | number | yes | x 좌표 |
+| **`y`** | number | yes | y 좌표 |
+| **`accuracy`** | number (0–100) | yes | 신뢰도. computed spine joint 는 100 고정 |
+
+Keypoint 키 (17 COCO) — `nose`, `leftEye`, `rightEye`, `leftEar`, `rightEar`, `leftShoulder`, `rightShoulder`, `leftElbow`, `rightElbow`, `leftWrist`, `rightWrist`, `leftHip`, `rightHip`, `leftKnee`, `rightKnee`, `leftAnkle`, `rightAnkle`.
+Computed spine joint (양 어깨·엉덩이 검출 시 추가) — `shoulderCenter`, `hipCenter`, `upperChest`, `chest`, `spine`.
 
 ---
 
@@ -398,21 +555,12 @@ measure test
 | `api-version` | — (unversioned) | no |
 | `Content-Type` | `multipart/form-data` | yes |
 
+<details>
+<summary><b>Request · Response</b></summary>
+
 ### Request
 
 query params + `multipart/form-data` parts (`MeasurementRequestSchema`, source `mixed` — form + query 병합).
-
-| In | 이름 | 타입 | 필수 | Validation |
-|---|---|---|---|---|
-| query | **`uid`** | string | yes | length 1–100 |
-| query | **`gender`** | string | yes | `male` `female` (any case) |
-| query | `timestamp` | string | no | length 1–50 (`allow_none`) |
-| query | `height` | string (decimal) | no | `^\d+(\.\d+)?$`. score 계산에 필요 |
-| query | `age` | string (integer) | no | `^\d+$`. score 계산에 필요 |
-| query | `mosaic` | boolean | no | 기본값 `true` |
-| form | **`rawData`** | string | yes | length ≥ 1 |
-| form | **`front`** | binary (이미지) | yes | ≤ 10 MB |
-| form | **`side`** | binary (이미지) | yes | ≤ 10 MB |
 
 ```bash
 curl -X POST "https://ml.example.com/measure?uid=u1&gender=male&height=175.5&age=30" \
@@ -492,11 +640,27 @@ curl -X POST "https://ml.example.com/measure?uid=u1&gender=male&height=175.5&age
 
 </details>
 
+</details>
+
+### Request 필드 정의
+
+| In | 이름 | 타입 | 필수 | Validation |
+|---|---|---|---|---|
+| query | **`uid`** | string | yes | length 1–100 |
+| query | **`gender`** | string | yes | `male` `female` (any case) |
+| query | `timestamp` | string | no | length 1–50 (`allow_none`) |
+| query | `height` | string (decimal) | no | `^\d+(\.\d+)?$`. score 계산에 필요 |
+| query | `age` | string (integer) | no | `^\d+$`. score 계산에 필요 |
+| query | `mosaic` | boolean | no | 기본값 `true` |
+| form | **`rawData`** | string | yes | length ≥ 1 |
+| form | **`front`** | binary (이미지) | yes | ≤ 10 MB |
+| form | **`side`** | binary (이미지) | yes | ≤ 10 MB |
+
 ### Response 필드 정의 (`data`)
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `foot` | object | footprint 결과 — §2 의 `data` 와 동일 shape (battery / weight / class types / foot 크기 / 압력 비율 / cog / image url) |
+| `foot` | object | footprint 결과 — §1 의 `data` 와 동일 shape (battery / weight / class types / foot 크기 / 압력 비율 / cog / image url) |
 | `pose.front` | object | 전면 포즈 결과 (아래 pose 필드) |
 | `pose.side` | object | 측면 포즈 결과 |
 | `score` | object | `height` + `age` 제공 시에만 존재 |
@@ -511,168 +675,61 @@ curl -X POST "https://ml.example.com/measure?uid=u1&gender=male&height=175.5&age
 | `anglePelvis` | number | 골반 각도 (deg) |
 | `angleShoulder` | number | 어깨 각도 (deg) |
 | `url` | string (uri) | 스켈레톤/척추가 그려진 이미지 URL |
-| `keypoints` | object<string, Keypoint> | 17 COCO joint + 5 computed spine joint. §7 참조 |
+| `keypoints` | object<string, Keypoint> | 17 COCO joint + 5 computed spine joint. §5 참조 |
 
 ---
 
-## 7. `POST` /pose
+## 7. `GET` /check
 
-단일 이미지 포즈 추정. `semaphore_req_pose` (5) 적용. 입력은 multipart `file` 또는 query `image_url` (MediaService 다운로드) 중 하나.
+서버 상태 확인 probe. **빈 본문**을 200 으로 반환한다 (JSON envelope 아님).
 
 ### Header
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
 | `api-version` | — (unversioned) | no |
-| `Content-Type` | `multipart/form-data` (file 전송 시) | file 사용 시 |
+
+<details>
+<summary><b>Request · Response</b></summary>
 
 ### Request
 
-query params (`PoseRequestSchema`, source `args`) + 선택적 multipart `file`.
-
-| In | 이름 | 타입 | 필수 | Validation |
-|---|---|---|---|---|
-| query | `uid` | string | no | length 1–100 |
-| query | `timestamp` | string | no | length 1–50 |
-| query | `mosaic` | boolean | no | 기본값 `true` |
-| query | `image_url` | string (url) | no | 유효 URL (`allow_none`). `file` 미전송 시 대체 입력 |
-| form | `file` | binary (jpg/jpeg/png) | 조건부 | ≤ 10 MB. `image_url` 없으면 필수 |
-
-`file` 과 `image_url` 이 **모두 없으면 400**. `mosaic=true` 인데 얼굴 키포인트(코·양쪽 귀)를 못 찾으면 모자이크 실패 → ValueError → 400.
-
-```bash
-curl -X POST "https://ml.example.com/pose?uid=u1&mosaic=true" -F "file=@front.jpg"
-```
+바디·파라미터 없음.
 
 ### Response
 
-**201 Created** — `Envelope` + `data` = 포즈 결과 (`process_pose_inference`)
+**200 OK** — 빈 문자열 본문 (`Content-Type: text/html`, 본문 길이 0)
 
-```json
-{
-  "success": true,
-  "message": "Pose processed successfully",
-  "data": {
-    "angleFace": 0.5,
-    "anglePelvis": 1.0,
-    "angleShoulder": 0.2,
-    "url": "https://.../skeleton.jpg",
-    "keypoints": {
-      "nose": { "x": 0.5, "y": 0.2, "accuracy": 99.0 },
-      "shoulderCenter": { "x": 0.5, "y": 0.4, "accuracy": 100 }
-    }
-  }
-}
 ```
-
-<details>
-<summary><b>400 Bad Request</b> — file·image_url 모두 없음, filename 없음, 10 MB 초과, image_url 다운로드 실패, 얼굴 모자이크 키포인트 부족</summary>
-
-```json
-{ "success": false, "message": "Missing required file or image_url" }
 ```
 
 </details>
-
-<details>
-<summary><b>422 Unprocessable Entity</b> — 사람(포즈) 미검출</summary>
-
-```json
-{
-  "success": false,
-  "message": "Person was not detected. Please retake the photo with the full body in frame.",
-  "data": { "code": "PERSON_NOT_DETECTED", "retakeRequired": true }
-}
-```
-
-</details>
-
-<details>
-<summary><b>503 Service Unavailable</b> — semaphore_req_pose 타임아웃 (30 s)</summary>
-
-```json
-{ "success": false, "message": "Server is busy. Try again later." }
-```
-
-</details>
-
-### Response 필드 정의 (`data`)
-
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| `angleFace` | number | 얼굴 각도 (deg) |
-| `anglePelvis` | number | 골반 각도 (deg) |
-| `angleShoulder` | number | 어깨 각도 (deg) |
-| `url` | string (uri) | 스켈레톤/척추가 그려진 이미지 URL |
-| `keypoints` | object<string, Keypoint> | 검출된 관절 맵 (아래) |
-
-### Keypoint 필드 정의
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|---|---|
-| **`x`** | number | yes | x 좌표 |
-| **`y`** | number | yes | y 좌표 |
-| **`accuracy`** | number (0–100) | yes | 신뢰도. computed spine joint 는 100 고정 |
-
-Keypoint 키 (17 COCO) — `nose`, `leftEye`, `rightEye`, `leftEar`, `rightEar`, `leftShoulder`, `rightShoulder`, `leftElbow`, `rightElbow`, `leftWrist`, `rightWrist`, `leftHip`, `rightHip`, `leftKnee`, `rightKnee`, `leftAnkle`, `rightAnkle`.
-Computed spine joint (양 어깨·엉덩이 검출 시 추가) — `shoulderCenter`, `hipCenter`, `upperChest`, `chest`, `spine`.
 
 ---
 
-## 8. `POST` /weight
+## 8. `GET` /measure/test
 
-동일 hex payload 에서 체중만 디코딩. 세마포어 미적용.
+측정 blueprint 헬스 probe. **plain text `measure test`** 를 200 으로 반환한다 (JSON envelope 아님).
 
 ### Header
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
 | `api-version` | — (unversioned) | no |
-| `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b>Request · Response</b></summary>
 
 ### Request
 
-`application/json` 바디 (`FootprintRequestSchema` — §2 와 동일, `rawData` 만 사용).
-
-```json
-{ "rawData": "0102....(1290 hex chars)" }
-```
-
-### Request 필드 정의
-
-| 필드 | 타입 | 필수 | Validation | 설명 |
-|---|---|---|---|---|
-| **`rawData`** | string | yes | length ≥ 1, 1290 hex chars (645 bytes) | 29×22 pressure grid + meta. 체중만 디코딩 |
-| `uid` / `gender` / `version` | string | no | §2 참조 | 사용 안 함 |
+바디·파라미터 없음.
 
 ### Response
 
-**201 Created** — `Envelope` + `data.weight`
+**200 OK** — plain text (`Content-Type: text/html`)
 
-```json
-{ "success": true, "message": "Weight processed successfully", "data": { "weight": 70.5 } }
 ```
-
-<details>
-<summary><b>400 Bad Request</b> — rawData 누락/형식 오류</summary>
-
-```json
-{ "success": false, "message": "Invalid plantar pressure data: expected 1290 hex chars (645 bytes)" }
+measure test
 ```
 
 </details>
-
-<details>
-<summary><b>500 Internal Server Error</b> — 처리 중 RuntimeError</summary>
-
-```json
-{ "success": false, "message": "Internal server error: ..." }
-```
-
-</details>
-
-### Response 필드 정의 (`data`)
-
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| `weight` | number | kg |

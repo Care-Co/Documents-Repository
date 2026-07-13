@@ -1,31 +1,44 @@
 # graph-service
 
-> 엔드포인트별 Header · Request · Response 정의 — **버전별 전량 전개**. 소스는 실제 컨트롤러/DTO.
-> 표기 — **굵은 필드 = 필수**, 스키마는 사용처마다 인라인으로 중복 전개. 버전 매칭은 정확 일치 (미등록/누락 버전 → common-core 의 API version 처리, 4xx).
+> 엔드포인트별 **Header · Request · Response** 정의 — 버전별 전량 전개, 소스는 실제 컨트롤러/DTO. 표기 — **굵은 필드 = 필수**, 스키마는 사용처마다 인라인으로 중복 전개.
 
-Source: `/Users/jonghak/GitHub/Care&Co/graph-service`
-Updated: 2026-07-09
+| 항목 | 값 |
+|---|---|
+| Source | `/Users/jonghak/GitHub/Care&Co/graph-service` |
+| Updated | 2026-07-13 |
+| Server | `https://dev.carencoinc.com` (dev gateway) · `https://app.carencoinc.com` (production gateway) |
+| Base path | 모든 엔드포인트 `/api/recommendation/...` 하위 |
 
 `src/main/resources/shoes.json` 을 인메모리로 적재하는 러닝화 추천·카탈로그 서비스. 레거시 Neo4j 그래프 의존은 현재 런타임 경로에서 제거됐다. recommendation API 는 footprint/pressure/class 입력으로 신발을 랭킹하고, catalog API 는 검색 가능한 신발·브랜드 데이터를 노출한다. 컨트롤러는 3개 — `GraphSyncController`(v1.0.0), `GraphSyncV101Controller`(v1.0.1, GET shoes 전용), `ShoeQueryController`(catalog, v1.0.0).
 
-**Servers**
-- `https://dev.carencoinc.com` — dev gateway
-- `https://app.carencoinc.com` — production gateway
+---
 
-**Common headers**
+## 공통 규칙
 
-| Header | Value |
-|---|---|
-| `api-version` | `1.0.0` \| `1.0.1` — 엔드포인트별 Header 표 참조 |
-| `Content-Type` | `application/json` (요청 바디가 있을 때) |
+- **버전** — 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning), 매칭은 **정확 일치** (미등록/누락 버전 → common-core 의 API version 처리, 4xx). unversioned 엔드포인트 없음 — 전부 `1.0.0`, `GET /shoes` 만 `1.0.1` 추가.
+- **인증** — 서비스에 `SecurityConfig` · 메서드 시큐리티 애너테이션(`@PreAuthorize`/`@Secured`) 이 없다. 모든 엔드포인트가 사실상 permitAll 이며 인증은 gateway 에 위임된다. 서비스는 `userId` 를 검증 없이 그대로 recommendation 조회 키로 사용한다.
+- **바디** — 요청 바디가 있으면 `Content-Type: application/json`.
+- **응답 틀** — 성공 응답은 두 종류 — catalog · stateless 계열은 `CncResponse{ success, data }`, `GET /shoes` 는 raw `LinkedHashMap` (아래 접기 참조).
+- **에러 틀** — graph-service 는 common-core **0.0.30** (`carenco-platform 0.0.30`) 을 쓴다. 에러 코드 체계가 `CMN-XXX-XXX` 가 아니라 `E001`/`E002`… (`ErrorCodeV2`) 다. 원인별 바디 shape 은 아래 접기 참조.
 
-**Security** &nbsp;서비스에 `SecurityConfig` · 메서드 시큐리티 애너테이션(`@PreAuthorize`/`@Secured`) 이 없다. 모든 엔드포인트가 사실상 permitAll 이며 인증은 gateway 에 위임된다. 서비스는 `userId` 를 검증 없이 그대로 recommendation 조회 키로 사용한다.
+**복수 버전 엔드포인트** — 나머지 전부 `1.0.0` 단일, 아래 1개만 복수. 버전 간 차이는 해당 섹션 상단의 버전 표 참조.
 
-**Success 응답 틀** — 성공 응답은 두 종류다.
+| 그룹 | 엔드포인트 | 최신 |
+|---|---|---|
+| recommendation (`full` payload 추가) | [`GET /shoes`](#1-get-apirecommendationshoes) | `1.0.1` |
+
+<details>
+<summary><b>Success 응답 틀</b> — 두 종류 · <code>CncResponse</code> 직렬화 규칙</summary>
+
 - catalog · stateless 계열은 common-core `CncResponse` 빌더를 직접 쓰되 `success` + `data` 만 세팅한다 (`timestamp` 미포함). → `{ "success": true, "data": ... }`
 - `GET /api/recommendation/shoes` 는 **`CncResponse` 가 아니라 raw `LinkedHashMap`** 을 반환한다. 1.0.0 은 `{ success, data }`, 1.0.1 은 `{ success, data, full }`.
 
-**Error 틀** — graph-service 는 common-core **0.0.30** (`carenco-platform 0.0.30`) 을 쓴다. 에러 코드 체계가 `CMN-XXX-XXX` 가 아니라 `E001`/`E002`… (`ErrorCodeV2`) 다.
+> `CncResponse` 는 `NON_NULL` 직렬화라 세팅한 필드만 나온다. 필드 집합 — `code` · `success` · `message` · `data` · `token` · `error` · `timestamp` · `userVerified` · `emailVerified`.
+
+</details>
+
+<details>
+<summary><b>Error 틀</b> — 원인별 핸들러 · 바디 shape</summary>
 
 | 원인 | 핸들러 | 바디 shape |
 |---|---|---|
@@ -35,23 +48,19 @@ Updated: 2026-07-09
 | 잘못된 `metric` 형식 (name 비어있음) | `MetricFilter.parse` → `CncException(E001)` → GlobalExceptionHandler | `{ success:false, code:"E001", message }` |
 | 신발 미존재 (`match`, `getShoe`) | 컨트롤러 inline 404 | `{ success:false, message:"shoe not found: <id>" }` |
 
-> `CncResponse` 는 `NON_NULL` 직렬화라 세팅한 필드만 나온다. 필드 집합 — `code` · `success` · `message` · `data` · `token` · `error` · `timestamp` · `userVerified` · `emailVerified`.
+</details>
 
 ---
 
-## API 버전 (endpoint별)
-
-> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. graph-service 는 unversioned 엔드포인트가 없다 (전부 `1.0.0`, GET shoes 만 `1.0.1` 추가).
-
-| Method | Path | 제공 버전 | 최신 |
-|---|---|---|---|
-| GET | /api/recommendation/shoes | 1.0.0, 1.0.1 | 1.0.1 |
-| POST | /api/recommendation/shoes/stateless | 1.0.0 | 1.0.0 |
-| POST | /api/recommendation/shoes/stateless/full | 1.0.0 | 1.0.0 |
-| POST | /api/recommendation/shoes/{productId}/match | 1.0.0 | 1.0.0 |
-| GET | /api/recommendation/catalog/brands | 1.0.0 | 1.0.0 |
-| GET | /api/recommendation/catalog/shoes | 1.0.0 | 1.0.0 |
-| GET | /api/recommendation/catalog/shoes/{productId} | 1.0.0 | 1.0.0 |
+| Method | Path (`/api/recommendation` 이하) | 버전 | 인증 | 설명 |
+|---|---|---|---|---|
+| GET | [`/shoes`](#1-get-apirecommendationshoes) | **1.0.0, 1.0.1** | 공개 | `userId` (+선택 `recordId`) 로 프로필/측정 데이터를 조회해 개인화 추천 생성 |
+| POST | [`/shoes/stateless`](#2-post-apirecommendationshoesstateless) | 1.0.0 | 공개 | footprint-정렬 측정 payload 로부터 컴팩트 추천 리스트를 바로 반환 |
+| POST | [`/shoes/stateless/full`](#3-post-apirecommendationshoesstatelessfull) | 1.0.0 | 공개 | needs + 전체 신발 상세(`ShoeDetail`) 를 포함한 추천을 반환 |
+| POST | [`/shoes/{productId}/match`](#4-post-apirecommendationshoesproductidmatch) | 1.0.0 | 공개 | 카탈로그의 신발 1개를 측정 payload 로 채점 |
+| GET | [`/catalog/brands`](#5-get-apirecommendationcatalogbrands) | 1.0.0 | 공개 | 카탈로그의 브랜드명과 제품 수를 반환 |
+| GET | [`/catalog/shoes`](#6-get-apirecommendationcatalogshoes) | 1.0.0 | 공개 | 브랜드/카테고리/이름/가격 및 메트릭 필터로 카탈로그를 검색 |
+| GET | [`/catalog/shoes/{productId}`](#7-get-apirecommendationcatalogshoesproductid) | 1.0.0 | 공개 | 신발 1개의 전체 카탈로그 상세를 반환 |
 
 ---
 
@@ -59,11 +68,18 @@ Updated: 2026-07-09
 
 `userId` (+선택 `recordId`) 로 프로필/측정 데이터를 조회해 개인화 추천을 생성한다. `CncResponse` 가 아니라 raw map 을 반환한다. **버전에 따라 응답 shape 이 다르다** — `1.0.0` 은 컴팩트 추천 리스트만(`data`), `1.0.1` 은 여기에 상세 매칭 payload(`full`) 를 더한다.
 
+### 버전
+
+| 버전 | 차이 |
+|---|---|
+| `1.0.0` | 컴팩트 추천 리스트만 (`{ success, data }`) — `full` 필드 없음 |
+| `1.0.1` **(최신)** | `data` 에 더해 상세 매칭 payload `full` 추가 (`{ success, data, full }`) |
+
 ### Header
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
-| `api-version` | `1.0.0` \| `1.0.1` | yes |
+| `api-version` | `1.0.0` \| `1.0.1` (응답 shape 차이) | yes |
 
 ### Parameters (전 버전 공통)
 
@@ -72,6 +88,9 @@ Updated: 2026-07-09
 | query | `userId` | string | no | 프로필/측정 조회 키. 미전송 가능 |
 | query | `recordId` | string | no | 측정 record id. 미전송 시 최신 record 사용 |
 | query | `limit` | integer | no | 기본값 `5`, `@Min(1) @Max(50)` |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -105,6 +124,11 @@ Updated: 2026-07-09
   ]
 }
 ```
+
+</details>
+
+<details>
+<summary><b><code>1.0.1</code> — Request · Response</b></summary>
 
 ### `1.0.1` — Request
 
@@ -176,6 +200,8 @@ Updated: 2026-07-09
   "timestamp": "2026-04-27T08:00:00Z"
 }
 ```
+
+</details>
 
 </details>
 
@@ -252,6 +278,9 @@ Updated: 2026-07-09
 | `api-version` | `1.0.0` (단일 버전) | yes |
 | `Content-Type` | `application/json` | yes |
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
 `StatelessRecommendRequest` (`@Valid`). 모든 필드 선택. `limit` 만 `@Min(1) @Max(50)`.
@@ -314,6 +343,8 @@ Updated: 2026-07-09
 
 </details>
 
+</details>
+
 ### Request 필드 정의 — `StatelessRecommendRequest` (공통)
 
 | 필드 | 타입 | 필수 | 설명 |
@@ -365,6 +396,9 @@ Updated: 2026-07-09
 |---|---|---|
 | `api-version` | `1.0.0` (단일 버전) | yes |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -441,6 +475,8 @@ Updated: 2026-07-09
   "timestamp": "2026-04-27T08:00:00Z"
 }
 ```
+
+</details>
 
 </details>
 
@@ -551,6 +587,9 @@ Updated: 2026-07-09
 |---|---|---|---|---|
 | path | `productId` | string | yes | `shoes.json` 의 숫자 신발 id (숫자 파싱 실패 시 404) |
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
 `StatelessRecommendRequest` (`@Valid`) — §2 와 동일.
@@ -633,6 +672,8 @@ Updated: 2026-07-09
   "timestamp": "2026-04-27T08:00:00Z"
 }
 ```
+
+</details>
 
 </details>
 
@@ -736,6 +777,9 @@ Updated: 2026-07-09
 |---|---|---|
 | `api-version` | `1.0.0` (단일 버전) | yes |
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
 바디·파라미터 없음.
@@ -753,6 +797,8 @@ Updated: 2026-07-09
   ]
 }
 ```
+
+</details>
 
 ### Response 필드 정의 — `data[]` (`BrandDto`)
 
@@ -791,6 +837,9 @@ Updated: 2026-07-09
 ### 지원 메트릭 이름 (`metric` · `sortBy`)
 
 `weight_g`, `drop_lab_mm`, `heel_stack_lab_mm`, `forefoot_stack_lab_mm`, `midsole_softness_new`, `shock_absorption_raw`, `energy_return_raw`, `torsional_rigidity_raw`, `heel_counter_stiffness_raw`, `stiffness_n_new`, `breathability_raw`, `traction_raw`, `size_rating_raw`, `forefoot_width_mm`
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -848,6 +897,8 @@ Updated: 2026-07-09
 
 </details>
 
+</details>
+
 ### Response 필드 정의 — `data` (`PagedResponse<Shoe>`)
 
 | 필드 | 타입 | 필수 | 설명 |
@@ -888,6 +939,9 @@ Updated: 2026-07-09
 | In | Name | Type | 필수 | 설명 |
 |---|---|---|---|---|
 | path | `productId` | string | yes | `shoes.json` 의 숫자 신발 id (blank·숫자 파싱 실패 시 404) |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -955,6 +1009,8 @@ Updated: 2026-07-09
 ```
 
 컨트롤러가 `ResponseEntity.status(404)` 로 직접 반환. `code`·`timestamp` 없음.
+
+</details>
 
 </details>
 

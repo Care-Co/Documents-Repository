@@ -1,24 +1,39 @@
 # noti-service
 
-> 엔드포인트별 Header · Request · Response 정의 — 전 엔드포인트 `1.0.0` 단일 버전. 소스는 실제 컨트롤러/DTO.
-> 표기 — **굵은 필드 = 필수**.
+> 엔드포인트별 **Header · Request · Response** 정의 — 전 엔드포인트 `1.0.0` 단일 버전, 소스는 실제 컨트롤러/DTO. 표기 — **굵은 필드 = 필수**.
 
-Source: `/Users/jonghak/GitHub/Care&Co/noti-service`
-Updated: 2026-07-09
+| 항목 | 값 |
+|---|---|
+| Source | `/Users/jonghak/GitHub/Care&Co/noti-service` |
+| Updated | 2026-07-13 |
+| 배포 상태 | **내부 전용 (2026-07 기준)** — 게이트웨이가 noti 라우팅을 의도적으로 비활성 상태로 유지한다 (`/api/v1/devices/**` 가 device-service 경로와 충돌 + 외부 노출 설계 미결). 외부(app.carencoinc.com)에서 호출 불가, **k3s 클러스터 내부에서만** 호출 가능하다. |
+| Server | `http://noti.carenco.svc.cluster.local:8080` (클러스터 내부) |
+| Base path | 모든 엔드포인트 `/api/v1/...` 하위 |
 
-> **내부 전용 (2026-07 기준)** — 게이트웨이가 noti 라우팅을 의도적으로 비활성 상태로 유지한다 (`/api/v1/devices/**` 가 device-service 경로와 충돌 + 외부 노출 설계 미결). 외부(app.carencoinc.com)에서 호출 불가, **k3s 클러스터 내부에서만** 호출 가능하다.
+---
 
-**Servers**
-- `http://noti.carenco.svc.cluster.local:8080` (클러스터 내부)
+## 공통 규칙
 
-**Common headers**
+- **버전** — 전 엔드포인트 `1.0.0` 단일 버전. `api-version: 1.0.0` 헤더 필수.
+- **인증** — 별도 인증 헤더 없음 — 게이트웨이 미노출, k3s 클러스터 내부 호출 전제.
+- **바디** — 요청 바디가 있으면 `Content-Type: application/json`.
+- **응답 틀** — envelope 없음. `CncResponse` 를 쓰지 않고 DTO 를 최상위로 직접 반환한다. 검증 실패는 400.
 
-| Header | Value | Notes |
-|---|---|---|
-| `api-version` | `1.0.0` | 전 엔드포인트 단일 버전 |
-| `Content-Type` | `application/json` | 바디 있는 요청 |
+---
 
-**Response envelope** — 없음. `CncResponse` 를 쓰지 않고 DTO 를 최상위로 직접 반환한다. 검증 실패는 400.
+## 엔드포인트
+
+| Method | Path (`/api/v1` 이하) | 버전 | 인증 | 설명 |
+|---|---|---|---|---|
+| PUT | [`/devices`](#1-put-apiv1devices) | 1.0.0 | 내부 | FCM 디바이스 토큰 upsert — 같은 토큰이면 갱신, 없으면 등록 |
+| PATCH | [`/devices/deactivate`](#2-patch-apiv1devicesdeactivate) | 1.0.0 | 내부 | 푸시 비활성화 (토큰 기준) |
+| POST | [`/devices/cleanup`](#3-post-apiv1devicescleanup) | 1.0.0 | 내부 | 비활성/무효 디바이스 수동 정리 (admin — 자동 정리는 매일 03:00 cron) |
+| POST | [`/admin/topics`](#4-post-apiv1admintopics) | 1.0.0 | 내부 | 알림 토픽 생성 (admin) |
+| POST / DELETE | [`/users/{userId}/topics/{topicCode}`](#5-post-apiv1usersuseridtopicstopiccode--delete-동일-경로) | 1.0.0 | 내부 | 토픽 구독(POST) / 구독 해제(DELETE) |
+| DELETE | [`/admin/topics/{id}`](#6-delete-apiv1admintopicsid) | 1.0.0 | 내부 | 토픽 삭제 (admin) |
+| POST | [`/jobs`](#7-post-apiv1jobs) | 1.0.0 | 내부 | FCM 발송 잡 등록 (비동기 — 워커가 1초 폴링으로 처리) |
+| GET | [`/jobs/{jobId}`](#8-get-apiv1jobsjobid) | 1.0.0 | 내부 | 잡 상태 조회 |
+| GET | [`/histories/{historyId}` 외 이력 조회 4종](#9-get-apiv1historieshistoryid--usersuseridhistories--historiesstatusstatus--historiestargettargettype--histories) | 1.0.0 | 내부 | 발송 이력 조회 5종 — 단건 / 사용자별 / 상태별 / 대상타입별 / 전체 |
 
 ---
 
@@ -32,6 +47,9 @@ FCM 디바이스 토큰 upsert — 같은 토큰이면 갱신, 없으면 등록.
 |---|---|---|
 | `api-version` | `1.0.0` | yes |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -80,6 +98,8 @@ FCM 디바이스 토큰 upsert — 같은 토큰이면 갱신, 없으면 등록.
 
 </details>
 
+</details>
+
 ---
 
 ## 2. `PATCH` /api/v1/devices/deactivate
@@ -92,9 +112,12 @@ FCM 디바이스 토큰 upsert — 같은 토큰이면 갱신, 없으면 등록.
 |---|---|---|
 | `api-version` | `1.0.0` | yes |
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
-바디 없음. 쿼리 파라미터:
+바디 없음 — 쿼리 파라미터.
 
 | 파라미터 | 타입 | 필수 |
 |---|---|---|
@@ -104,11 +127,13 @@ FCM 디바이스 토큰 upsert — 같은 토큰이면 갱신, 없으면 등록.
 
 **200 OK** — 바디 없음.
 
+</details>
+
 ---
 
-## 3. `POST` /api/v1/users/{userId}/topics/{topicCode} · `DELETE` 동일 경로
+## 3. `POST` /api/v1/devices/cleanup
 
-토픽 구독(POST) / 구독 해제(DELETE).
+비활성/무효 디바이스 수동 정리 (admin — 자동 정리는 매일 03:00 cron).
 
 ### Header
 
@@ -116,124 +141,26 @@ FCM 디바이스 토큰 upsert — 같은 토큰이면 갱신, 없으면 등록.
 |---|---|---|
 | `api-version` | `1.0.0` | yes |
 
-### `1.0.0` — Request
-
-바디 없음 — path 의 `userId` (uuid), `topicCode` (string).
-
-### `1.0.0` — Response
-
-**200 OK** — 바디 없음.
-
----
-
-## 4. `POST` /api/v1/jobs
-
-FCM 발송 잡 등록 (비동기 — 워커가 1초 폴링으로 처리).
-
-### Header
-
-| 헤더 | 값 | 필수 |
-|---|---|---|
-| `api-version` | `1.0.0` | yes |
-| `Content-Type` | `application/json` | yes |
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
-```json
-{
-  "type": "SEND_USER",
-  "payload": { "userId": "3f2a...uuid", "title": "제목", "body": "내용", "imageUrl": null }
-}
-```
-
-| 필드 | 값 | 규칙 |
-|---|---|---|
-| **`type`** | `SEND_TOKEN` \| `SEND_USER` \| `SEND_TOPIC` | |
-| **`payload`** | object | type 별 요청 shape — SEND_TOKEN: `{tokens[], title, body, imageUrl}` / SEND_USER: `{userId, title, body, imageUrl}` / SEND_TOPIC: `{topic, title, body, imageUrl}` |
-
-### `1.0.0` — Response
-
-**202 Accepted** — 잡 ID 발급 (처리는 비동기)
-
-```json
-{ "jobId": "job-uuid" }
-```
-
----
-
-## 5. `GET` /api/v1/jobs/{jobId}
-
-잡 상태 조회.
-
-### Header
-
-| 헤더 | 값 | 필수 |
-|---|---|---|
-| `api-version` | `1.0.0` | yes |
-
-### `1.0.0` — Request
-
-바디 없음 — path 의 `jobId`.
+바디 없음.
 
 ### `1.0.0` — Response
 
 **200 OK**
 
 ```json
-{
-  "id": "job-uuid",
-  "jobType": "SEND_USER",
-  "status": "SUCCESS",
-  "successCount": 2,
-  "failureCount": 0,
-  "lastError": null,
-  "nextRunAt": null,
-  "deferredReason": null
-}
+{ "deletedCount": 12 }
 ```
 
-| 필드 | 값 |
-|---|---|
-| `status` | `PENDING` \| `DEFERRED` \| `PROCESSING` \| `SUCCESS` \| `PARTIAL_SUCCESS` \| `FAILED` |
-| `successCount` / `failureCount` | 대상 디바이스별 발송 결과 수 |
-| `deferredReason` `nextRunAt` | DEFERRED 시 사유·재시도 시각 |
+</details>
 
 ---
 
-## 6. `GET` /api/v1/histories/{historyId} · `/users/{userId}/histories` · `/histories/status/{status}` · `/histories/target/{targetType}` · `/histories`
-
-발송 이력 조회 5종 — 단건 / 사용자별 / 상태별(`SUCCESS`·`FAILED`) / 대상타입별(`TOKEN`·`TOPIC`) / 전체. 응답은 단건 또는 배열.
-
-### Header
-
-| 헤더 | 값 | 필수 |
-|---|---|---|
-| `api-version` | `1.0.0` | yes |
-
-### `1.0.0` — Request
-
-바디 없음 — path 파라미터만 (전체 조회는 파라미터 없음, 페이징 없음).
-
-### `1.0.0` — Response
-
-**200 OK** — `PushSendHistoryResponse` (배열 엔드포인트는 `[...]`)
-
-```json
-{
-  "id": "history-uuid",
-  "targetType": "TOKEN",
-  "targetValue": "fcm-token...",
-  "userId": "3f2a...uuid",
-  "devicePk": "device-pk",
-  "topicPk": null,
-  "title": "제목",
-  "body": "내용"
-}
-```
-
----
-
-## 7. `POST` /api/v1/admin/topics
+## 4. `POST` /api/v1/admin/topics
 
 알림 토픽 생성 (admin).
 
@@ -243,6 +170,9 @@ FCM 발송 잡 등록 (비동기 — 워커가 1초 폴링으로 처리).
 |---|---|---|
 | `api-version` | `1.0.0` | yes |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -283,9 +213,36 @@ FCM 발송 잡 등록 (비동기 — 워커가 1초 폴링으로 처리).
 }
 ```
 
+</details>
+
 ---
 
-## 8. `DELETE` /api/v1/admin/topics/{id}
+## 5. `POST` /api/v1/users/{userId}/topics/{topicCode} · `DELETE` 동일 경로
+
+토픽 구독(POST) / 구독 해제(DELETE).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
+### `1.0.0` — Request
+
+바디 없음 — path 의 `userId` (uuid), `topicCode` (string).
+
+### `1.0.0` — Response
+
+**200 OK** — 바디 없음.
+
+</details>
+
+---
+
+## 6. `DELETE` /api/v1/admin/topics/{id}
 
 토픽 삭제 (admin).
 
@@ -295,6 +252,9 @@ FCM 발송 잡 등록 (비동기 — 워커가 1초 폴링으로 처리).
 |---|---|---|
 | `api-version` | `1.0.0` | yes |
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
 바디 없음 — path 의 `id` (topic PK).
@@ -303,11 +263,53 @@ FCM 발송 잡 등록 (비동기 — 워커가 1초 폴링으로 처리).
 
 **200 OK** — 바디 없음.
 
+</details>
+
 ---
 
-## 9. `POST` /api/v1/devices/cleanup
+## 7. `POST` /api/v1/jobs
 
-비활성/무효 디바이스 수동 정리 (admin — 자동 정리는 매일 03:00 cron).
+FCM 발송 잡 등록 (비동기 — 워커가 1초 폴링으로 처리).
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` | yes |
+| `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
+### `1.0.0` — Request
+
+```json
+{
+  "type": "SEND_USER",
+  "payload": { "userId": "3f2a...uuid", "title": "제목", "body": "내용", "imageUrl": null }
+}
+```
+
+| 필드 | 값 | 규칙 |
+|---|---|---|
+| **`type`** | `SEND_TOKEN` \| `SEND_USER` \| `SEND_TOPIC` | |
+| **`payload`** | object | type 별 요청 shape — SEND_TOKEN: `{tokens[], title, body, imageUrl}` / SEND_USER: `{userId, title, body, imageUrl}` / SEND_TOPIC: `{topic, title, body, imageUrl}` |
+
+### `1.0.0` — Response
+
+**202 Accepted** — 잡 ID 발급 (처리는 비동기)
+
+```json
+{ "jobId": "job-uuid" }
+```
+
+</details>
+
+---
+
+## 8. `GET` /api/v1/jobs/{jobId}
+
+잡 상태 조회.
 
 ### Header
 
@@ -315,14 +317,72 @@ FCM 발송 잡 등록 (비동기 — 워커가 1초 폴링으로 처리).
 |---|---|---|
 | `api-version` | `1.0.0` | yes |
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
-바디 없음.
+바디 없음 — path 의 `jobId`.
 
 ### `1.0.0` — Response
 
 **200 OK**
 
 ```json
-{ "deletedCount": 12 }
+{
+  "id": "job-uuid",
+  "jobType": "SEND_USER",
+  "status": "SUCCESS",
+  "successCount": 2,
+  "failureCount": 0,
+  "lastError": null,
+  "nextRunAt": null,
+  "deferredReason": null
+}
 ```
+
+| 필드 | 값 |
+|---|---|
+| `status` | `PENDING` \| `DEFERRED` \| `PROCESSING` \| `SUCCESS` \| `PARTIAL_SUCCESS` \| `FAILED` |
+| `successCount` / `failureCount` | 대상 디바이스별 발송 결과 수 |
+| `deferredReason` `nextRunAt` | DEFERRED 시 사유·재시도 시각 |
+
+</details>
+
+---
+
+## 9. `GET` /api/v1/histories/{historyId} · `/users/{userId}/histories` · `/histories/status/{status}` · `/histories/target/{targetType}` · `/histories`
+
+발송 이력 조회 5종 — 단건 / 사용자별 / 상태별(`SUCCESS`·`FAILED`) / 대상타입별(`TOKEN`·`TOPIC`) / 전체. 응답은 단건 또는 배열.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
+### `1.0.0` — Request
+
+바디 없음 — path 파라미터만 (전체 조회는 파라미터 없음, 페이징 없음).
+
+### `1.0.0` — Response
+
+**200 OK** — `PushSendHistoryResponse` (배열 엔드포인트는 `[...]`)
+
+```json
+{
+  "id": "history-uuid",
+  "targetType": "TOKEN",
+  "targetValue": "fcm-token...",
+  "userId": "3f2a...uuid",
+  "devicePk": "device-pk",
+  "topicPk": null,
+  "title": "제목",
+  "body": "내용"
+}
+```
+
+</details>

@@ -1435,7 +1435,7 @@ self-check — path `b2bUserId` 가 principal id 와 불일치 시 `403 PERMISSI
 
 ### `1.0.0` — Request
 
-바디 없음. 쿼리 파라미터:
+바디 없음 — 쿼리 파라미터.
 
 | 파라미터 | 타입 | 기본값 | 비고 |
 |---|---|---|---|
@@ -1635,7 +1635,7 @@ self-check — path `b2bUserId` 가 principal id 와 불일치 시 `403 PERMISSI
 
 ### Response 필드 정의 — 버전 대조 / `stats`
 
-§POST /organizations 의 Response 필드 대조표와 동일. `stats` 세부:
+§POST /organizations 의 Response 필드 대조표와 동일. `stats` 세부.
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
@@ -1730,7 +1730,7 @@ self-check — path `b2bUserId` 가 principal id 와 불일치 시 `403 PERMISSI
 
 ### Request 필드 정의 (`UpdateOrganizationRequest`)
 
-모든 필드 `JsonNullable<T>`. clear(`null`) 가능 여부:
+모든 필드 `JsonNullable<T>`. clear(`null`) 가능 여부.
 
 | 필드 | 타입 | clear(`null`) | 규칙 |
 |---|---|---|---|
@@ -2019,7 +2019,7 @@ Carenco 사용자가 검색 결과 시설에 가입 신청 (pull 모델). organi
 
 ### `1.0.0` — Request
 
-바디 없음. 쿼리 파라미터:
+바디 없음 — 쿼리 파라미터.
 
 | 파라미터 | 타입 | 기본값 | 비고 |
 |---|---|---|---|
@@ -2137,7 +2137,7 @@ Carenco 사용자가 검색 결과 시설에 가입 신청 (pull 모델). organi
 
 ### `1.0.0` — Request
 
-바디 없음. 쿼리 파라미터:
+바디 없음 — 쿼리 파라미터.
 
 | 파라미터 | 타입 | 필수 | 기본값 | 규칙/설명 |
 |---|---|---|---|---|
@@ -2643,7 +2643,7 @@ organization 의 device 목록. 응답 item 이 버전별로 다르다 (`1.0.1` 
 
 ### `1.0.0` — Request
 
-바디 없음. 쿼리 파라미터:
+바디 없음 — 쿼리 파라미터.
 
 | 파라미터 | 타입 | 필수 | 규칙/설명 |
 |---|---|---|---|
@@ -4961,7 +4961,7 @@ membership 의 피드백 목록 (soft-delete 제외). 단일 버전 (`1.0.0`).
 
 ### `1.0.0` — Request
 
-바디 없음. 쿼리 파라미터:
+바디 없음 — 쿼리 파라미터.
 
 | 파라미터 | 타입 | 필수 | 기본값 | 규칙 |
 |---|---|---|---|---|

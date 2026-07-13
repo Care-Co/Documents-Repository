@@ -1,25 +1,35 @@
 # measure-service
 
-> 엔드포인트별 Header · Request · Response 정의 — **버전별 전량 전개**. 소스는 실제 컨트롤러/DTO.
-> 표기 — **굵은 필드 = 필수**, 규칙은 키워드만, 긴 설명은 각주(¹²³⁴⁵⁶). 버전 매칭은 정확 일치 (미등록 버전 → `400 Invalid API version`).
+> 엔드포인트별 **Header · Request · Response** 정의 — 버전별 전량 전개, 소스는 실제 컨트롤러/DTO. 표기 — **굵은 필드 = 필수**, 규칙은 키워드만, 긴 설명은 각주(¹²³⁴⁵⁶).
 
-Source: `/Users/jonghak/GitHub/Care&Co/measure-service`
-Updated: 2026-07-09
-
-**Servers**
-- `https://api.example.com`
-
-**Common headers**
-
-| Header | Value |
+| 항목 | 값 |
 |---|---|
-| `api-version` | `1.0.0` \| `1.0.1` — 엔드포인트별 Header 표 참조 |
-| `Authorization` | `Bearer <jwt>` (gateway-enforced) |
-| `Content-Type` | `application/json` 또는 `multipart/form-data` |
+| Source | `/Users/jonghak/GitHub/Care&Co/measure-service` |
+| Updated | 2026-07-13 |
+| Server | `https://api.example.com` |
+| Base path | 모든 엔드포인트 `/api/v2/users/{userId}/...` 하위 |
 
-**Security** &nbsp;메서드 시큐리티 애너테이션(`@PreAuthorize`/`@Secured`) 없음. 인증 컨텍스트는 컨트롤러 내부에서 `AuthService.userGetData(userId)` 로 imperative 하게 해석·검증한다.
+---
 
-**Common response envelope** (`Envelope`) — 모든 응답 샘플의 바깥 틀. 아래 필드는 모든 엔드포인트 공통이라 개별 섹션에서 반복하지 않는다.
+## 공통 규칙
+
+- **버전** — 모든 엔드포인트 versioned (unversioned 없음). 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning), **정확 일치만** (미등록 버전 → `400 Invalid API version`).
+- **인증** — 전 엔드포인트 `Authorization: Bearer <jwt>` (gateway-enforced). 메서드 시큐리티 애너테이션(`@PreAuthorize`/`@Secured`) 없음 — 인증 컨텍스트는 컨트롤러 내부에서 `AuthService.userGetData(userId)` 로 imperative 하게 해석·검증한다.
+- **바디** — 요청 바디가 있으면 `Content-Type: application/json` 또는 `multipart/form-data` (record 생성).
+- **응답 틀** — 모든 응답은 `Envelope` (아래 접기 참조) — 개별 섹션 샘플에서 반복하지 않음.
+- **DTO calendar 이력** — `2026-01-13` (record DTO, V9 부터 `deviceId` / `deviceSerial` / `source` / `appVersion` 포함), `2026-02-02` (activity DTO).
+
+**복수 버전 엔드포인트** — 나머지는 `1.0.0` 단일, 아래 4개만 복수. 버전 간 차이는 각 섹션 상단의 버전 표 참조.
+
+| 그룹 | 엔드포인트 | 최신 |
+|---|---|---|
+| records (측정 컨텍스트) | [`POST /records`](#2-post-apiv2usersuseridrecords) · [`GET /records`](#3-get-apiv2usersuseridrecords) · [`GET /records/{recordId}`](#4-get-apiv2usersuseridrecordsrecordid) | `1.0.1` |
+| activities (응답 wrapping) | [`DELETE /activities`](#8-delete-apiv2usersuseridactivities) | `1.0.1` |
+
+<details>
+<summary><b>응답 envelope</b> — 성공/에러 JSON · 필드 정의</summary>
+
+**성공** (`Envelope`) — 모든 응답 샘플의 바깥 틀. 아래 필드는 모든 엔드포인트 공통이라 개별 섹션에서 반복하지 않는다.
 
 ```json
 {
@@ -35,7 +45,7 @@ Updated: 2026-07-09
 | `data` | object | no | endpoint-specific |
 | `timestamp` | string (date-time, UTC) | yes | — |
 
-**Error envelope** (`ErrorResponse`)
+**에러** (`ErrorResponse`)
 
 ```json
 {
@@ -53,25 +63,23 @@ Updated: 2026-07-09
 | `message` | string | yes |
 | `timestamp` | string (date-time, UTC) | yes |
 
-DTO calendar 이력 — `2026-01-13` (record DTO, V9 부터 `deviceId` / `deviceSerial` / `source` / `appVersion` 포함), `2026-02-02` (activity DTO).
+</details>
 
 ---
 
-## API 버전 (endpoint별)
+## 엔드포인트
 
-> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning). 아래 "제공 버전" 중 하나를 보낸다. 모든 엔드포인트가 versioned (unversioned 없음).
-
-| Method | Path | 제공 버전 | 최신 |
-|---|---|---|---|
-| GET | /api/v2/users/{userId}/capture-settings | 1.0.0 | 1.0.0 |
-| PUT | /api/v2/users/{userId}/capture-settings | 1.0.0 | 1.0.0 |
-| POST | /api/v2/users/{userId}/records | 1.0.0, 1.0.1 | 1.0.1 |
-| GET | /api/v2/users/{userId}/records | 1.0.0, 1.0.1 | 1.0.1 |
-| GET | /api/v2/users/{userId}/records/{recordId} | 1.0.0, 1.0.1 | 1.0.1 |
-| DELETE | /api/v2/users/{userId}/records | 1.0.0 | 1.0.0 |
-| POST | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
-| GET | /api/v2/users/{userId}/activities | 1.0.0 | 1.0.0 |
-| DELETE | /api/v2/users/{userId}/activities | 1.0.0, 1.0.1 | 1.0.1 |
+| Method | Path (`/api/v2/users/{userId}` 이하) | 버전 | 인증 | 설명 |
+|---|---|---|---|---|
+| GET | [`/capture-settings`](#1-get--put-apiv2usersuseridcapture-settings) | 1.0.0 | Bearer | 측정 촬영 설정 조회 — 저장 행이 없어도 기본값으로 200 |
+| PUT | [`/capture-settings`](#1-get--put-apiv2usersuseridcapture-settings) | 1.0.0 | Bearer | 측정 촬영 설정 전체 upsert (기기 간 동기화) |
+| POST | [`/records`](#2-post-apiv2usersuseridrecords) | **1.0.0, 1.0.1** | Bearer | 측정 record 생성 (vision/footprint) |
+| GET | [`/records`](#3-get-apiv2usersuseridrecords) | **1.0.0, 1.0.1** | Bearer | record 페이지 검색 |
+| GET | [`/records/{recordId}`](#4-get-apiv2usersuseridrecordsrecordid) | **1.0.0, 1.0.1** | Bearer | 단건 record 조회 |
+| DELETE | [`/records`](#5-delete-apiv2usersuseridrecords) | 1.0.0 | Bearer | ids · 시간범위로 record bulk 삭제 |
+| POST | [`/activities`](#6-post-apiv2usersuseridactivities) | 1.0.0 | Bearer | 활동 로그 생성 |
+| GET | [`/activities`](#7-get-apiv2usersuseridactivities) | 1.0.0 | Bearer | 활동 페이지 검색 |
+| DELETE | [`/activities`](#8-delete-apiv2usersuseridactivities) | **1.0.0, 1.0.1** | Bearer | ids · 시간범위로 활동 bulk 삭제 |
 
 ---
 
@@ -86,6 +94,9 @@ DTO calendar 이력 — `2026-01-13` (record DTO, V9 부터 `deviceId` / `device
 | `api-version` | `1.0.0` (단일 버전) | yes |
 | `Authorization` | `Bearer <jwt>` | yes |
 | `Content-Type` | `application/json` (PUT) | PUT만 |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request (GET)
 
@@ -143,6 +154,8 @@ DTO calendar 이력 — `2026-01-13` (record DTO, V9 부터 `deviceId` / `device
 
 </details>
 
+</details>
+
 ### Request 필드 정의 (공통 — PUT `CaptureSettingsUpdateRequest`)
 
 응답(`CaptureSettingsResponse`)도 동일 4필드를 그대로 반환.
@@ -162,6 +175,13 @@ DTO calendar 이력 — `2026-01-13` (record DTO, V9 부터 `deviceId` / `device
 
 측정 record 생성 (vision/footprint). 요청 바디는 `multipart/form-data`. `api-version` 헤더로 요청·응답 DTO 가 분기된다 — `1.0.0` 은 B2C 모바일 앱 자가 측정 코호트(서버에서 `source=SELF` 강제 매핑), `1.0.1` 은 측정 컨텍스트 추적(`macAddress` / `source` / `appVersion` / `firmwareVersion`) 을 추가.
 
+### 버전
+
+| 버전 | 차이 |
+|---|---|
+| `1.0.0` | B2C 모바일 앱 자가 측정 코호트 — 서버에서 `source=SELF` 강제 매핑, 측정 컨텍스트 필드 미노출 |
+| `1.0.1` **(최신)** | 측정 컨텍스트 추적 — 요청 `macAddress`/`source`/`appVersion`/`firmwareVersion` 추가, 응답 `deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion` 노출 |
+
 ### Header
 
 | 헤더 | 값 | 필수 |
@@ -172,9 +192,12 @@ DTO calendar 이력 — `2026-01-13` (record DTO, V9 부터 `deviceId` / `device
 
 또한 쿼리 파라미터 `recordType` 필수 — `VISION` \| `FOOTPRINT` (`@ValidEnum(RecordType)`). path 의 `userId` 는 `@ValidUuid`.
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
-`multipart/form-data` parts (`CreateRecordRequestV1_0_0` — validation 애너테이션 없음):
+`multipart/form-data` parts (`CreateRecordRequestV1_0_0` — validation 애너테이션 없음).
 
 | Part | 타입 | 필수 |
 |---|---|---|
@@ -219,9 +242,14 @@ curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=VIS
 
 </details>
 
+</details>
+
+<details>
+<summary><b><code>1.0.1</code> — Request · Response</b></summary>
+
 ### `1.0.1` — Request (= 1.0.0 parts + `macAddress` · `source` · `appVersion` · `firmwareVersion`)
 
-`multipart/form-data` parts (`CreateRecordRequestV1_0_1`):
+`multipart/form-data` parts (`CreateRecordRequestV1_0_1`).
 
 | Part | 타입 | 필수 | 규칙 |
 |---|---|---|---|
@@ -281,6 +309,8 @@ curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=FOO
 <summary><b>4xx / 5xx</b> — device-service <code>DeviceLookup.LookupByMac</code> propagate (owner mismatch · device inactive 등)</summary>
 
 `macAddress` 전송 시 controller 가 device-service `DeviceLookup.LookupByMac` gRPC 를 호출한다. lookup 실패 시 device-service 의 `ErrorCode` 가 `CncResponse` 로 그대로 propagate 된다. owner / status 검증·풀 자동 추적은 device-service 가 처리한다.
+
+</details>
 
 </details>
 
@@ -354,6 +384,13 @@ curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=FOO
 
 record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.0` → `RecordResponseV1_0_0`, `1.0.1` → `RecordResponseV1_0_1`). `1.0.1` 은 device 필터 쿼리 파라미터(`deviceId`/`deviceSerial`/`kind`) 도 추가.
 
+### 버전
+
+| 버전 | 차이 |
+|---|---|
+| `1.0.0` | 응답 `RecordResponseV1_0_0` — device 필드 미노출 |
+| `1.0.1` **(최신)** | device 필터 쿼리(`deviceId`/`deviceSerial`/`kind`) 추가 + 응답 `RecordResponseV1_0_1` (device 필드 노출) |
+
 ### Header
 
 | 헤더 | 값 | 필수 |
@@ -361,9 +398,12 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 | `api-version` | `1.0.0` \| `1.0.1` | yes |
 | `Authorization` | `Bearer <jwt>` | yes |
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
-바디 없음. 쿼리 파라미터:
+바디 없음 — 쿼리 파라미터.
 
 | 파라미터 | 타입 | 기본값 |
 |---|---|---|
@@ -396,9 +436,14 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 }
 ```
 
+</details>
+
+<details>
+<summary><b><code>1.0.1</code> — Request · Response</b></summary>
+
 ### `1.0.1` — Request (= 1.0.0 쿼리 + `deviceId` · `deviceSerial` · `kind`)
 
-바디 없음. 쿼리 파라미터:
+바디 없음 — 쿼리 파라미터.
 
 | 파라미터 | 타입 | 기본값 |
 |---|---|---|
@@ -447,9 +492,11 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 </details>
 
+</details>
+
 ### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1`
 
-`data` 는 Spring Data `Page<T>` (`content[]` + `totalElements` `totalPages` `number` `size` `first` `last` `sort`). `content[]` 항목:
+`data` 는 Spring Data `Page<T>` (`content[]` + `totalElements` `totalPages` `number` `size` `first` `last` `sort`). `content[]` 항목.
 
 | 필드 | 타입 | 버전 | 설명 |
 |---|---|---|---|
@@ -472,12 +519,22 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 단건 record 조회. 미존재 시 404. `api-version` 헤더에 따라 응답 DTO 분기.
 
+### 버전
+
+| 버전 | 차이 |
+|---|---|
+| `1.0.0` | 응답 `RecordResponseV1_0_0` — device 필드 미노출 |
+| `1.0.1` **(최신)** | 응답 `RecordResponseV1_0_1` — `deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion` 추가 |
+
 ### Header
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
 | `api-version` | `1.0.0` \| `1.0.1` | yes |
 | `Authorization` | `Bearer <jwt>` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -514,6 +571,11 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 </details>
 
+</details>
+
+<details>
+<summary><b><code>1.0.1</code> — Request · Response</b></summary>
+
 ### `1.0.1` — Request
 
 바디 없음 — path 의 `userId` (uuid) · `recordId` (uuid) 만.
@@ -546,6 +608,8 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 ```json
 { "success": false, "code": "CMN-404-001", "message": "Record not found" }
 ```
+
+</details>
 
 </details>
 
@@ -582,6 +646,9 @@ ids · 시간범위로 bulk 삭제.
 | `Authorization` | `Bearer <jwt>` | yes |
 | `Content-Type` | `application/json` | yes |
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
 ```json
@@ -606,6 +673,8 @@ ids · 시간범위로 bulk 삭제.
   }
 }
 ```
+
+</details>
 
 ### Request 필드 정의 (공통 — `RecordDeleteRequestV1_0_0`)
 
@@ -638,6 +707,9 @@ ids · 시간범위로 bulk 삭제.
 | `api-version` | `1.0.0` (단일 버전) | yes |
 | `Authorization` | `Bearer <jwt>` | yes |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -686,6 +758,8 @@ ids · 시간범위로 bulk 삭제.
 
 </details>
 
+</details>
+
 ### Request 필드 정의 (공통 — `CreateActivityRequestV1_0_0`)
 
 | 필드 | 타입 | 필수 | 규칙 |
@@ -719,9 +793,12 @@ ids · 시간범위로 bulk 삭제.
 | `api-version` | `1.0.0` (단일 버전) | yes |
 | `Authorization` | `Bearer <jwt>` | yes |
 
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
 ### `1.0.0` — Request
 
-바디 없음. 쿼리 파라미터:
+바디 없음 — 쿼리 파라미터.
 
 | 파라미터 | 타입 | 기본값 |
 |---|---|---|
@@ -765,9 +842,11 @@ ids · 시간범위로 bulk 삭제.
 
 </details>
 
+</details>
+
 ### Response 필드 정의 — `Activity` (`ActivityResponseV1_0_0`)
 
-`data` 는 Spring Data `Page<T>` (`content[]` + `totalElements` `totalPages` `number` `size` …). `content[]` 항목:
+`data` 는 Spring Data `Page<T>` (`content[]` + `totalElements` `totalPages` `number` `size` …). `content[]` 항목.
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
@@ -784,6 +863,13 @@ ids · 시간범위로 bulk 삭제.
 
 ids · 시간범위로 bulk 삭제. `from`/`to` 는 UTC `Instant`. 요청 shape 는 두 버전 동일 — **응답 wrapping 만 다르다** (`1.0.0` 은 중첩 `{ result, total }`, `1.0.1` 은 flat `{ activityCount }`).
 
+### 버전
+
+| 버전 | 차이 |
+|---|---|
+| `1.0.0` | 응답 중첩 `{ result, total }` (`ActivityDeleteResponse`) |
+| `1.0.1` **(최신)** | 응답 flat `{ activityCount }` (`ActivityDeleteResult`) — 요청 shape 는 두 버전 동일 |
+
 ### Header
 
 | 헤더 | 값 | 필수 |
@@ -791,6 +877,9 @@ ids · 시간범위로 bulk 삭제. `from`/`to` 는 UTC `Instant`. 요청 shape 
 | `api-version` | `1.0.0` \| `1.0.1` | yes |
 | `Authorization` | `Bearer <jwt>` | yes |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -811,6 +900,11 @@ ids · 시간범위로 bulk 삭제. `from`/`to` 는 UTC `Instant`. 요청 shape 
   }
 }
 ```
+
+</details>
+
+<details>
+<summary><b><code>1.0.1</code> — Request · Response</b></summary>
 
 ### `1.0.1` — Request
 
@@ -837,6 +931,8 @@ ids · 시간범위로 bulk 삭제. `from`/`to` 는 UTC `Instant`. 요청 shape 
 ```json
 { "success": false, "code": "AUTH-401-001", "message": "..." }
 ```
+
+</details>
 
 </details>
 

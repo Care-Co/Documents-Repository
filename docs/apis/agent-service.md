@@ -1,30 +1,32 @@
 # agent-service
 
-> 엔드포인트별 Header · Request · Response 정의 — **버전별 전량 전개**. 소스는 실제 컨트롤러/DTO.
-> 표기 — **굵은 필드 = 필수**. 모든 엔드포인트가 `api-version: 1.0.0` 단일 버전 (`ChattingController` 클래스 레벨 `@RequestMapping(version="1.0.0")`).
+> 엔드포인트별 **Header · Request · Response** 정의 — 버전별 전량 전개, 소스는 실제 컨트롤러/DTO. 표기 — **굵은 필드 = 필수**, 규칙은 키워드만.
 
-Source: `/Users/jonghak/GitHub/Care&Co/agent-service`
-Updated: 2026-07-09
-
-> **주의** — 본 문서는 `develop-k3s` 브랜치 기준. prod 는 구버전 배포 상태(릴리즈 웨이브 대기)로, `/llm/usage` · `/llm/chat/records/{recordId}/overall-summary` 엔드포인트와 `diagnostics` 응답 필드는 아직 배포 전이다.
+| 항목 | 값 |
+|---|---|
+| Source | `/Users/jonghak/GitHub/Care&Co/agent-service` (`develop-k3s`) |
+| Updated | 2026-07-13 |
+| 배포 상태 | **prod 는 구버전 배포 (릴리즈 웨이브 대기)** — `GET /llm/usage` · `POST /llm/chat/records/{recordId}/overall-summary` 엔드포인트와 `diagnostics` 응답 필드는 아직 배포 전 |
+| Server | `https://api.example.com` |
+| Base path | 모든 엔드포인트 `/llm/...` 하위 |
 
 대화형 LLM 게이트웨이. OpenAI chat/responses tool loop 를 구동하고 `fisica-mcp` 툴을 agent-service 내부에서 직접 실행한다. 세션/메시지/토큰 사용량을 PostgreSQL 에 저장하고, 툴 호출 결과(예: `shoe_recommend`)는 응답의 `meta` 로 노출한다.
 
-채팅 요청은 사용자별로 rate-limit 된다 (**400 requests / day**, Asia/Seoul 캘린더 일 기준 — `UserDailyUsageService.DAILY_REQUEST_LIMIT`). 모든 엔드포인트는 처리 전에 호출자가 Física user 로 존재하는지 검증한다.
+---
 
-**Servers**
-- `https://api.example.com`
+## 공통 규칙
 
-**Common headers**
+- **버전** — 모든 엔드포인트 `api-version: 1.0.0` 단일 버전 (`ChattingController` 클래스 레벨 `@RequestMapping(version="1.0.0")`). 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning, `useRequestHeader("api-version")` + `addSupportedVersions("1.0.0")`).
+- **인증** — 서비스 자체 Spring Security 없음 (`permitAll`) — 메서드 시큐리티 애너테이션 없고 JWT 필터도 없다. 호출자 신원은 요청의 `user_id` (body 또는 query) 로 전달되며, 모든 엔드포인트는 처리 전에 호출자가 Física user 로 존재하는지 검증한다.
+- **CORS** — `*` origin / `GET POST PUT DELETE PATCH OPTIONS` (`WebMvcConfig`).
+- **바디** — 요청 바디가 있으면 `Content-Type: application/json`.
+- **Rate limit** — 채팅 요청은 사용자별로 rate-limit 된다 (**400 requests / day**, Asia/Seoul 캘린더 일 기준 — `UserDailyUsageService.DAILY_REQUEST_LIMIT`).
+- **응답 틀** — 모든 응답은 `CncResponse` envelope (아래 접기 참조) — 성공은 `success` + `data` 만 채워지고, 에러는 commoncore `GlobalExceptionHandler` 가 렌더링한다.
 
-| Header | Value |
-|---|---|
-| `api-version` | `1.0.0` (모든 엔드포인트 단일 버전) |
-| `Content-Type` | `application/json` (POST) |
+<details>
+<summary><b>응답 envelope</b> — 성공/에러 JSON · 필드 정의 · 핸들러별 매핑</summary>
 
-**Security** &nbsp;서비스 자체 Spring Security 없음 (`permitAll`) — 메서드 시큐리티 애너테이션 없고 JWT 필터도 없다. 호출자 신원은 요청의 `user_id` (body 또는 query) 로 전달된다. **CORS** &nbsp;`*` origin / `GET POST PUT DELETE PATCH OPTIONS` (`WebMvcConfig`).
-
-**Common response envelope** (`CncResponse`, commoncore) — 모든 성공 응답의 바깥 틀. 컨트롤러는 `success` + `data` 만 채운다. `CncResponse` 는 클래스 레벨 `@JsonInclude(NON_NULL)` 이므로 null 필드(`code`/`message`/`error`/`timestamp` 등)는 직렬화에서 생략된다.
+**성공** (`CncResponse`, commoncore) — 모든 성공 응답의 바깥 틀. 컨트롤러는 `success` + `data` 만 채운다. `CncResponse` 는 클래스 레벨 `@JsonInclude(NON_NULL)` 이므로 null 필드(`code`/`message`/`error`/`timestamp` 등)는 직렬화에서 생략된다.
 
 ```json
 {
@@ -38,7 +40,7 @@ Updated: 2026-07-09
 | `success` | boolean | yes | — |
 | `data` | object | no | endpoint-specific |
 
-**Error envelope** (`CncResponse`, 에러 필드만 채워짐) — agent-service 는 별도 `ProblemDetail` 을 쓰지 않는다. commoncore `GlobalExceptionHandler` 가 auto-config (`CommonExceptionAutoConfiguration`) 로 등록되어 모든 예외를 `CncResponse` 로 렌더링한다. content-type `application/json`.
+**에러** (`CncResponse`, 에러 필드만 채워짐) — agent-service 는 별도 `ProblemDetail` 을 쓰지 않는다. commoncore `GlobalExceptionHandler` 가 auto-config (`CommonExceptionAutoConfiguration`) 로 등록되어 모든 예외를 `CncResponse` 로 렌더링한다. content-type `application/json`.
 
 ```json
 {
@@ -69,110 +71,20 @@ Updated: 2026-07-09
 
 > ¹ `GlobalExceptionHandler.handleResponseStatusException` 는 body `code` 를 `CHECK_PARAMETER.getCode()`(=`E001`) 로 하드코딩한다. HTTP status 는 예외의 실제 status 를 그대로 쓰지만 body 의 `code` 만 `E001` 로 고정된다.
 
----
-
-## API 버전 (endpoint별)
-
-> 버전 협상은 요청 헤더 `api-version: x.y.z` (Spring API versioning, `useRequestHeader("api-version")` + `addSupportedVersions("1.0.0")`). 지원 버전은 `1.0.0` 하나뿐이다.
-
-| Method | Path | 제공 버전 | 최신 |
-|---|---|---|---|
-| GET | /llm/usage | 1.0.0 | 1.0.0 |
-| POST | /llm/chat | 1.0.0 | 1.0.0 |
-| POST | /llm/chat/greeting | 1.0.0 | 1.0.0 |
-| POST | /llm/chat/records/{recordId}/overall-summary | 1.0.0 | 1.0.0 |
+</details>
 
 ---
 
-## 1. `GET` /llm/usage
-
-사용자의 당일 채팅 요청 사용량을 조회한다. Asia/Seoul 캘린더 일 기준으로 `used` / `remaining` / `reset_at` 을 계산한다. `user_id` 쿼리 파라미터 필수. 조회 전에 Física user 검증을 수행한다.
-
-### Header
-
-| 헤더 | 값 | 필수 |
-|---|---|---|
-| `api-version` | `1.0.0` (단일 버전) | yes |
-
-### `1.0.0` — Request
-
-바디 없음. 쿼리 파라미터:
-
-| 파라미터 | 타입 | 필수 | 규칙 |
-|---|---|---|---|
-| **`user_id`** | string | yes | blank 이면 400 (`user_id is required`) |
-
-### `1.0.0` — Response
-
-**200 OK** — `DailyUsageResponse`
-
-```json
-{
-  "success": true,
-  "data": {
-    "user_id": "u1",
-    "usage_date": "2026-07-09",
-    "timezone": "Asia/Seoul",
-    "limit": 400,
-    "used": 12,
-    "remaining": 388,
-    "reset_at": "2026-07-10T00:00:00+09:00",
-    "retry_after_seconds": 57600
-  }
-}
-```
-
-<details>
-<summary><b>400 Bad Request</b> — <code>user_id</code> 누락/blank</summary>
-
-```json
-{ "success": false, "code": "E001", "message": "user_id is required", "error": "400 BAD_REQUEST" }
-```
-
-</details>
-
-<details>
-<summary><b>404 Not Found</b> — <code>user_id</code> 가 user-service 에 없음</summary>
-
-```json
-{ "success": false, "code": "E001", "message": "Fisica user not found", "error": "404 NOT_FOUND" }
-```
-
-</details>
-
-<details>
-<summary><b>502 Bad Gateway</b> — user-service 조회 실패 (NOT_FOUND 외 오류)</summary>
-
-```json
-{ "success": false, "code": "E001", "message": "Failed to validate user", "error": "502 BAD_GATEWAY" }
-```
-
-`UserApiClient.existsUser` 가 NOT_FOUND 외 응답/IO 오류 시 `ResponseStatusException(BAD_GATEWAY, "Failed to validate user")`.
-
-</details>
-
-### Request 필드 정의
-
-| 필드 | 타입 | 필수 | 위치 |
-|---|---|---|---|
-| **`user_id`** | string | yes | query param |
-
-### Response 필드 정의 — `DailyUsageResponse`
-
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| `user_id` | string | — |
-| `usage_date` | string (date, Asia/Seoul) | 당일 (`yyyy-MM-dd`) |
-| `timezone` | string | 항상 `Asia/Seoul` |
-| `limit` | integer | 일일 한도 (현재 `400`) |
-| `used` | integer | 당일 소비량 |
-| `remaining` | integer | `max(0, limit - used)` |
-| `reset_at` | string (date-time, offset) | 다음 날 00:00 Asia/Seoul (`+09:00`) |
-| `retry_after_seconds` | integer (long) | 리셋까지 남은 초 |
+| Method | Path (`/llm` 이하) | 버전 | 인증 | 설명 |
+|---|---|---|---|---|
+| POST | [`/chat`](#1-post-llmchat) | 1.0.0 | 공개 | 사용자 메시지를 보내고 agent 응답을 받는다 |
+| POST | [`/chat/greeting`](#2-post-llmchatgreeting) | 1.0.0 | 공개 | agent 인사말로 세션을 연다 |
+| POST | [`/chat/records/{recordId}/overall-summary`](#3-post-llmchatrecordsrecordidoverall-summary) | 1.0.0 | 공개 | 측정 record 에 대한 종합 요약을 생성한다 |
+| GET | [`/usage`](#4-get-llmusage) | 1.0.0 | 공개 | 사용자의 당일 채팅 요청 사용량을 조회한다 |
 
 ---
 
-## 2. `POST` /llm/chat
+## 1. `POST` /llm/chat
 
 사용자 메시지를 보내고 agent 응답을 받는다 (OpenAI chat tool loop 를 native MCP 툴 실행과 함께 동기 실행). Física user 검증 후 **일일 요청 한도(400/day, Asia/Seoul)를 원자적으로 소비**한다 — 초과 시 429. 툴 호출 결과(`shoe_recommend` 등)는 `meta` 로 노출된다.
 
@@ -182,6 +94,9 @@ Updated: 2026-07-09
 |---|---|---|
 | `api-version` | `1.0.0` (단일 버전) | yes |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -276,6 +191,8 @@ Feign 외부 호출 실패는 `CustomFeignErrorDecoder` → `CncException(EXTERN
 
 </details>
 
+</details>
+
 ### Request 필드 정의 — `AgentChatRequest`
 
 | 필드 | 타입 | 필수 | Validation | 설명 |
@@ -312,7 +229,7 @@ Feign 외부 호출 실패는 `CustomFeignErrorDecoder` → `CncException(EXTERN
 
 ---
 
-## 3. `POST` /llm/chat/greeting
+## 2. `POST` /llm/chat/greeting
 
 agent 인사말로 세션을 연다. 컨트롤러가 **`@Valid` 를 적용하지 않으므로** `user_msg` 가 비어도 통과한다 (`greeting` 서비스가 null 이면 `""` 로 대체). `directives` 는 무시된다. 일일 한도를 소비하지 않아 429 가 없다.
 
@@ -322,6 +239,9 @@ agent 인사말로 세션을 연다. 컨트롤러가 **`@Valid` 를 적용하지
 |---|---|---|
 | `api-version` | `1.0.0` (단일 버전) | yes |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -368,6 +288,8 @@ agent 인사말로 세션을 연다. 컨트롤러가 **`@Valid` 를 적용하지
 
 </details>
 
+</details>
+
 ### Request 필드 정의 — `AgentChatRequest` (greeting)
 
 | 필드 | 타입 | 필수 | 설명 |
@@ -379,7 +301,7 @@ agent 인사말로 세션을 연다. 컨트롤러가 **`@Valid` 를 적용하지
 
 ### Response 필드 정의 — `AgentJobResponse`
 
-§2 와 동일 스키마. greeting 은 `meta` = null, `client_actions` = null (생략), `diagnostics` = 서버 응답에 있으면 노출.
+§1 와 동일 스키마. greeting 은 `meta` = null, `client_actions` = null (생략), `diagnostics` = 서버 응답에 있으면 노출.
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
@@ -393,7 +315,7 @@ agent 인사말로 세션을 연다. 컨트롤러가 **`@Valid` 를 적용하지
 
 ---
 
-## 4. `POST` /llm/chat/records/{recordId}/overall-summary
+## 3. `POST` /llm/chat/records/{recordId}/overall-summary
 
 측정 record 에 대한 종합 요약을 생성한다. path 의 `recordId` 와 body 의 `user_id` 로 `fisicaAgentService.recordOverallSummary` 를 동기 호출한다. `recordId` blank → 400, Física user 검증 후 처리. 일일 한도를 소비하지 않는다.
 
@@ -403,6 +325,9 @@ agent 인사말로 세션을 연다. 컨트롤러가 **`@Valid` 를 적용하지
 |---|---|---|
 | `api-version` | `1.0.0` (단일 버전) | yes |
 | `Content-Type` | `application/json` | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
 
 ### `1.0.0` — Request
 
@@ -458,6 +383,8 @@ path `recordId` (string) + `application/json` — `RecordReportRequest` (`@Valid
 
 </details>
 
+</details>
+
 ### Request 필드 정의 — `RecordReportRequest` (+ path)
 
 | 필드 | 타입 | 필수 | Validation | 위치 |
@@ -467,7 +394,7 @@ path `recordId` (string) + `application/json` — `RecordReportRequest` (`@Valid
 
 ### Response 필드 정의 — `AgentJobResponse`
 
-§2 와 동일 스키마. `session_id` 는 서버(`fisicaAgentService`) 응답값, `created_at` 은 agent-service 수신 시각(`OffsetDateTime.now()`), `meta` 는 항상 생략.
+§1 와 동일 스키마. `session_id` 는 서버(`fisicaAgentService`) 응답값, `created_at` 은 agent-service 수신 시각(`OffsetDateTime.now()`), `meta` 는 항상 생략.
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
@@ -479,3 +406,96 @@ path `recordId` (string) + `application/json` — `RecordReportRequest` (`@Valid
 | `processing_time` | number (double) \| null | 초 |
 | `client_actions` | array\<object\> \| null | UI 액션 |
 | `diagnostics` | object \| null | 진단 정보 |
+
+---
+
+## 4. `GET` /llm/usage
+
+사용자의 당일 채팅 요청 사용량을 조회한다. Asia/Seoul 캘린더 일 기준으로 `used` / `remaining` / `reset_at` 을 계산한다. `user_id` 쿼리 파라미터 필수. 조회 전에 Física user 검증을 수행한다.
+
+### Header
+
+| 헤더 | 값 | 필수 |
+|---|---|---|
+| `api-version` | `1.0.0` (단일 버전) | yes |
+
+<details>
+<summary><b><code>1.0.0</code> — Request · Response</b></summary>
+
+### `1.0.0` — Request
+
+바디 없음. 쿼리 파라미터 —
+
+| 파라미터 | 타입 | 필수 | 규칙 |
+|---|---|---|---|
+| **`user_id`** | string | yes | blank 이면 400 (`user_id is required`) |
+
+### `1.0.0` — Response
+
+**200 OK** — `DailyUsageResponse`
+
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "u1",
+    "usage_date": "2026-07-09",
+    "timezone": "Asia/Seoul",
+    "limit": 400,
+    "used": 12,
+    "remaining": 388,
+    "reset_at": "2026-07-10T00:00:00+09:00",
+    "retry_after_seconds": 57600
+  }
+}
+```
+
+<details>
+<summary><b>400 Bad Request</b> — <code>user_id</code> 누락/blank</summary>
+
+```json
+{ "success": false, "code": "E001", "message": "user_id is required", "error": "400 BAD_REQUEST" }
+```
+
+</details>
+
+<details>
+<summary><b>404 Not Found</b> — <code>user_id</code> 가 user-service 에 없음</summary>
+
+```json
+{ "success": false, "code": "E001", "message": "Fisica user not found", "error": "404 NOT_FOUND" }
+```
+
+</details>
+
+<details>
+<summary><b>502 Bad Gateway</b> — user-service 조회 실패 (NOT_FOUND 외 오류)</summary>
+
+```json
+{ "success": false, "code": "E001", "message": "Failed to validate user", "error": "502 BAD_GATEWAY" }
+```
+
+`UserApiClient.existsUser` 가 NOT_FOUND 외 응답/IO 오류 시 `ResponseStatusException(BAD_GATEWAY, "Failed to validate user")`.
+
+</details>
+
+</details>
+
+### Request 필드 정의
+
+| 필드 | 타입 | 필수 | 위치 |
+|---|---|---|---|
+| **`user_id`** | string | yes | query param |
+
+### Response 필드 정의 — `DailyUsageResponse`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `user_id` | string | — |
+| `usage_date` | string (date, Asia/Seoul) | 당일 (`yyyy-MM-dd`) |
+| `timezone` | string | 항상 `Asia/Seoul` |
+| `limit` | integer | 일일 한도 (현재 `400`) |
+| `used` | integer | 당일 소비량 |
+| `remaining` | integer | `max(0, limit - used)` |
+| `reset_at` | string (date-time, offset) | 다음 날 00:00 Asia/Seoul (`+09:00`) |
+| `retry_after_seconds` | integer (long) | 리셋까지 남은 초 |
