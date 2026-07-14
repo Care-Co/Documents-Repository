@@ -5,7 +5,7 @@
 | 항목 | 값 |
 |---|---|
 | Source | `/Users/jonghak/GitHub/Care&Co/measure-service` |
-| Updated | 2026-07-13 |
+| Updated | 2026-07-14 |
 | Server | `https://api.example.com` |
 | Base path | 모든 엔드포인트 `/api/v2/users/{userId}/...` 하위 |
 
@@ -23,7 +23,7 @@
 
 | 그룹 | 엔드포인트 | 최신 |
 |---|---|---|
-| records (측정 컨텍스트) | [`POST /records`](#2-post-apiv2usersuseridrecords) · [`GET /records`](#3-get-apiv2usersuseridrecords) · [`GET /records/{recordId}`](#4-get-apiv2usersuseridrecordsrecordid) | `1.0.1` |
+| records (측정 컨텍스트 · gender/bmi) | [`POST /records`](#2-post-apiv2usersuseridrecords) · [`GET /records`](#3-get-apiv2usersuseridrecords) · [`GET /records/{recordId}`](#4-get-apiv2usersuseridrecordsrecordid) | `1.0.2` |
 | activities (응답 wrapping) | [`DELETE /activities`](#8-delete-apiv2usersuseridactivities) | `1.0.1` |
 
 <details>
@@ -73,9 +73,9 @@
 |---|---|---|---|---|
 | GET | [`/capture-settings`](#1-get--put-apiv2usersuseridcapture-settings) | 1.0.0 | Bearer | 측정 촬영 설정 조회 — 저장 행이 없어도 기본값으로 200 |
 | PUT | [`/capture-settings`](#1-get--put-apiv2usersuseridcapture-settings) | 1.0.0 | Bearer | 측정 촬영 설정 전체 upsert (기기 간 동기화) |
-| POST | [`/records`](#2-post-apiv2usersuseridrecords) | **1.0.0, 1.0.1** | Bearer | 측정 record 생성 (vision/footprint) |
-| GET | [`/records`](#3-get-apiv2usersuseridrecords) | **1.0.0, 1.0.1** | Bearer | record 페이지 검색 |
-| GET | [`/records/{recordId}`](#4-get-apiv2usersuseridrecordsrecordid) | **1.0.0, 1.0.1** | Bearer | 단건 record 조회 |
+| POST | [`/records`](#2-post-apiv2usersuseridrecords) | **1.0.0, 1.0.1, 1.0.2** | Bearer | 측정 record 생성 (vision/footprint) |
+| GET | [`/records`](#3-get-apiv2usersuseridrecords) | **1.0.0, 1.0.1, 1.0.2** | Bearer | record 페이지 검색 |
+| GET | [`/records/{recordId}`](#4-get-apiv2usersuseridrecordsrecordid) | **1.0.0, 1.0.1, 1.0.2** | Bearer | 단건 record 조회 |
 | DELETE | [`/records`](#5-delete-apiv2usersuseridrecords) | 1.0.0 | Bearer | ids · 시간범위로 record bulk 삭제 |
 | POST | [`/activities`](#6-post-apiv2usersuseridactivities) | 1.0.0 | Bearer | 활동 로그 생성 |
 | GET | [`/activities`](#7-get-apiv2usersuseridactivities) | 1.0.0 | Bearer | 활동 페이지 검색 |
@@ -180,13 +180,14 @@
 | 버전 | 차이 |
 |---|---|
 | `1.0.0` | B2C 모바일 앱 자가 측정 코호트 — 서버에서 `source=SELF` 강제 매핑, 측정 컨텍스트 필드 미노출 |
-| `1.0.1` **(최신)** | 측정 컨텍스트 추적 — 요청 `macAddress`/`source`/`appVersion`/`firmwareVersion` 추가, 응답 `deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion` 노출 |
+| `1.0.1` | 측정 컨텍스트 추적 — 요청 `macAddress`/`source`/`appVersion`/`firmwareVersion` 추가, 응답 `deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion` 노출 |
+| `1.0.2` **(최신)** | 응답 footprint 에 측정 당시 `gender` · `bmi` 스냅샷 추가 (bmi = weight(kg)/(height(cm)/100)², 과거 record 는 gender null · bmi 는 backfill) |
 
 ### Header
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
-| `api-version` | `1.0.0` \| `1.0.1` | yes |
+| `api-version` | `1.0.0` \| `1.0.1` \| `1.0.2` | yes |
 | `Authorization` | `Bearer <jwt>` | yes |
 | `Content-Type` | `multipart/form-data` | yes |
 
@@ -314,7 +315,88 @@ curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=FOO
 
 </details>
 
-### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1`
+<details>
+<summary><b><code>1.0.2</code> — Request · Response</b></summary>
+
+### `1.0.2` — Request
+
+요청 shape 는 `1.0.1` 과 완전 동일 (parts · 쿼리 파라미터 포함) — `api-version: 1.0.2` 만 다르다.
+
+### `1.0.2` — Response
+
+**200 OK** — `1.0.1` 과 동일 shape 에 `footprint.gender` · `footprint.bmi` 추가
+
+```json
+{
+  "data": {
+    "id": "3f2a...record-uuid",
+    "userId": "9b1c...user-uuid",
+    "measuredDateTime": "2026-07-14T01:29:03.610Z",
+    "timezone": "Asia/Seoul",
+    "footprint": {
+      "id": "77aa...footprint-uuid",
+      "firstClass": {
+        "type": 0.0,
+        "accuracy": 74.65
+      },
+      "secondaryClass": {
+        "type": 2.0,
+        "accuracy": 21.7
+      },
+      "thirdClass": {
+        "type": 3.0,
+        "accuracy": 1.65
+      },
+      "leftFootDimension": {
+        "length": 26.0,
+        "width": 9.486232837923312
+      },
+      "rightFootDimension": {
+        "length": 26.0,
+        "width": 9.140577333953576
+      },
+      "imageUrl": "https://cdn.example.com/footprint.png",
+      "centerOfGravity": {
+        "x": 0.47,
+        "y": 0.54
+      },
+      "leftPressure": {
+        "top": 23.26,
+        "middle": 29.93,
+        "bottom": 46.67,
+        "total": 49.62
+      },
+      "rightPressure": {
+        "top": 25.12,
+        "middle": 33.93,
+        "bottom": 40.93,
+        "total": 50.37
+      },
+      "weight": 71.9,
+      "height": 175.5,
+      "age": 36,
+      "gender": "MALE",
+      "bmi": 23.343966363909388
+    },
+    "front": null,
+    "side": null,
+    "score": null,
+    "deviceId": null,
+    "deviceSerial": null,
+    "deviceType": null,
+    "source": "UNSPECIFIED",
+    "appVersion": null
+  },
+  "success": true,
+  "timestamp": "2026-07-14T01:29:09.946351743Z"
+}
+```
+
+에러 응답은 `1.0.1` 과 동일.
+
+</details>
+
+### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1` / `RecordResponseV1_0_2`
 
 `1.0.0` 은 아래 상단 8개 필드, `1.0.1` 은 + `deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion` ⁵. nested 타입(`Footprint`/`Vision`/`Score`)은 버전별로 독립 정의되지만 필드 동일.
 
@@ -344,6 +426,7 @@ curl -X POST "https://api.example.com/api/v2/users/<uuid>/records?recordType=FOO
 | `centerOfGravity` | `{ x: number, y: number }` |
 | `leftPressure` / `rightPressure` | `{ top: number, middle: number, bottom: number, total: number }` |
 | `weight` / `height` / `age` | number / number / integer |
+| `gender` / `bmi` | string / number — **`1.0.2`만** · 측정 당시 스냅샷, 과거 record 는 gender null |
 
 **`Vision`** (`front` / `side`)
 
@@ -389,13 +472,14 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 | 버전 | 차이 |
 |---|---|
 | `1.0.0` | 응답 `RecordResponseV1_0_0` — device 필드 미노출 |
-| `1.0.1` **(최신)** | device 필터 쿼리(`deviceId`/`deviceSerial`/`kind`) 추가 + 응답 `RecordResponseV1_0_1` (device 필드 노출) |
+| `1.0.1` | device 필터 쿼리(`deviceId`/`deviceSerial`/`kind`) 추가 + 응답 `RecordResponseV1_0_1` (device 필드 노출) |
+| `1.0.2` **(최신)** | 응답 footprint 에 측정 당시 `gender` · `bmi` 스냅샷 추가 (bmi = weight(kg)/(height(cm)/100)², 과거 record 는 gender null · bmi 는 backfill) |
 
 ### Header
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
-| `api-version` | `1.0.0` \| `1.0.1` | yes |
+| `api-version` | `1.0.0` \| `1.0.1` \| `1.0.2` | yes |
 | `Authorization` | `Bearer <jwt>` | yes |
 
 <details>
@@ -494,7 +578,88 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 </details>
 
-### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1`
+<details>
+<summary><b><code>1.0.2</code> — Request · Response</b></summary>
+
+### `1.0.2` — Request
+
+요청 shape 는 `1.0.1` 과 완전 동일 (parts · 쿼리 파라미터 포함) — `api-version: 1.0.2` 만 다르다.
+
+### `1.0.2` — Response
+
+**200 OK** — `1.0.1` 과 동일 shape 에 `footprint.gender` · `footprint.bmi` 추가
+
+```json
+{
+  "data": {
+    "id": "3f2a...record-uuid",
+    "userId": "9b1c...user-uuid",
+    "measuredDateTime": "2026-07-14T01:29:03.610Z",
+    "timezone": "Asia/Seoul",
+    "footprint": {
+      "id": "77aa...footprint-uuid",
+      "firstClass": {
+        "type": 0.0,
+        "accuracy": 74.65
+      },
+      "secondaryClass": {
+        "type": 2.0,
+        "accuracy": 21.7
+      },
+      "thirdClass": {
+        "type": 3.0,
+        "accuracy": 1.65
+      },
+      "leftFootDimension": {
+        "length": 26.0,
+        "width": 9.486232837923312
+      },
+      "rightFootDimension": {
+        "length": 26.0,
+        "width": 9.140577333953576
+      },
+      "imageUrl": "https://cdn.example.com/footprint.png",
+      "centerOfGravity": {
+        "x": 0.47,
+        "y": 0.54
+      },
+      "leftPressure": {
+        "top": 23.26,
+        "middle": 29.93,
+        "bottom": 46.67,
+        "total": 49.62
+      },
+      "rightPressure": {
+        "top": 25.12,
+        "middle": 33.93,
+        "bottom": 40.93,
+        "total": 50.37
+      },
+      "weight": 71.9,
+      "height": 175.5,
+      "age": 36,
+      "gender": "MALE",
+      "bmi": 23.343966363909388
+    },
+    "front": null,
+    "side": null,
+    "score": null,
+    "deviceId": null,
+    "deviceSerial": null,
+    "deviceType": null,
+    "source": "UNSPECIFIED",
+    "appVersion": null
+  },
+  "success": true,
+  "timestamp": "2026-07-14T01:29:09.946351743Z"
+}
+```
+
+에러 응답은 `1.0.1` 과 동일.
+
+</details>
+
+### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1` / `RecordResponseV1_0_2`
 
 `data` 는 Spring Data `Page<T>` (`content[]` + `totalElements` `totalPages` `number` `size` `first` `last` `sort`). `content[]` 항목.
 
@@ -524,13 +689,14 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 | 버전 | 차이 |
 |---|---|
 | `1.0.0` | 응답 `RecordResponseV1_0_0` — device 필드 미노출 |
-| `1.0.1` **(최신)** | 응답 `RecordResponseV1_0_1` — `deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion` 추가 |
+| `1.0.1` | 응답 `RecordResponseV1_0_1` — `deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion` 추가 |
+| `1.0.2` **(최신)** | 응답 footprint 에 측정 당시 `gender` · `bmi` 스냅샷 추가 (bmi = weight(kg)/(height(cm)/100)², 과거 record 는 gender null · bmi 는 backfill) |
 
 ### Header
 
 | 헤더 | 값 | 필수 |
 |---|---|---|
-| `api-version` | `1.0.0` \| `1.0.1` | yes |
+| `api-version` | `1.0.0` \| `1.0.1` \| `1.0.2` | yes |
 | `Authorization` | `Bearer <jwt>` | yes |
 
 <details>
@@ -613,7 +779,88 @@ record 페이지 검색. `api-version` 헤더에 따라 응답 DTO 분기 (`1.0.
 
 </details>
 
-### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1`
+<details>
+<summary><b><code>1.0.2</code> — Request · Response</b></summary>
+
+### `1.0.2` — Request
+
+요청 shape 는 `1.0.1` 과 완전 동일 (parts · 쿼리 파라미터 포함) — `api-version: 1.0.2` 만 다르다.
+
+### `1.0.2` — Response
+
+**200 OK** — `1.0.1` 과 동일 shape 에 `footprint.gender` · `footprint.bmi` 추가
+
+```json
+{
+  "data": {
+    "id": "3f2a...record-uuid",
+    "userId": "9b1c...user-uuid",
+    "measuredDateTime": "2026-07-14T01:29:03.610Z",
+    "timezone": "Asia/Seoul",
+    "footprint": {
+      "id": "77aa...footprint-uuid",
+      "firstClass": {
+        "type": 0.0,
+        "accuracy": 74.65
+      },
+      "secondaryClass": {
+        "type": 2.0,
+        "accuracy": 21.7
+      },
+      "thirdClass": {
+        "type": 3.0,
+        "accuracy": 1.65
+      },
+      "leftFootDimension": {
+        "length": 26.0,
+        "width": 9.486232837923312
+      },
+      "rightFootDimension": {
+        "length": 26.0,
+        "width": 9.140577333953576
+      },
+      "imageUrl": "https://cdn.example.com/footprint.png",
+      "centerOfGravity": {
+        "x": 0.47,
+        "y": 0.54
+      },
+      "leftPressure": {
+        "top": 23.26,
+        "middle": 29.93,
+        "bottom": 46.67,
+        "total": 49.62
+      },
+      "rightPressure": {
+        "top": 25.12,
+        "middle": 33.93,
+        "bottom": 40.93,
+        "total": 50.37
+      },
+      "weight": 71.9,
+      "height": 175.5,
+      "age": 36,
+      "gender": "MALE",
+      "bmi": 23.343966363909388
+    },
+    "front": null,
+    "side": null,
+    "score": null,
+    "deviceId": null,
+    "deviceSerial": null,
+    "deviceType": null,
+    "source": "UNSPECIFIED",
+    "appVersion": null
+  },
+  "success": true,
+  "timestamp": "2026-07-14T01:29:09.946351743Z"
+}
+```
+
+에러 응답은 `1.0.1` 과 동일.
+
+</details>
+
+### Response 필드 정의 — `RecordResponseV1_0_0` / `RecordResponseV1_0_1` / `RecordResponseV1_0_2`
 
 `1.0.0` 은 상단 8개 필드, `1.0.1` 은 + 5개 (`deviceId`/`deviceSerial`/`deviceType`/`source`/`appVersion`) ⁵. nested 타입 상세는 POST §2 참조.
 

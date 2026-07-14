@@ -1,6 +1,6 @@
 # Care&Co Workspace API Index
 
-Updated: 2026-07-13
+Updated: 2026-07-14
 Style: **예시-우선 양식 B** — 엔드포인트별 Header · Request · Response, 버전별 전량 전개
 
 ## Documentation Standard (양식 B)
@@ -22,7 +22,7 @@ Style: **예시-우선 양식 B** — 엔드포인트별 Header · Request · Re
 |---|---|---|---|
 | [user-service](./user-service.md) | 34 endpoints (auth + user + b2b-center + admin + public + audit) | header `api-version` — `1.0.0` / `1.0.2` / `1.1.0` / `1.1.1` (weightUnit·capture-settings 는 `1.1.x`) | OAuth2 controller deprecated. b2b-center license-detail 는 b2b gRPC 합성 (0.0.78) |
 | [b2b-service](./b2b-service.md) | 57 endpoints (auth + user + organization + membership + invite + device + measurement + feedback + license + billing + B2C/availability) | **전부 versioned, 정확 일치만** — users `1.0.0`/`1.0.1` (country alpha-3), organizations `1.0.0`~`1.0.2`, devices `1.0.0`/`1.0.1`, 나머지 `1.0.0` 단일 | 별도 user pool (b2b_users). country alpha-3 + `UNKNOWN` sentinel (V19). memberNumber `M260608-001` (V16). B2cMemberQuery gRPC (0.0.78) |
-| [measure-service](./measure-service.md) | 8 endpoints (record + activity + internal sync) | `api-version: 1.0.0` / `1.0.1` (POST records) | record DTO `2026-01-13` (V9: `deviceId` / `deviceSerial` / `source` / `appVersion` 노출), activity DTO `2026-02-02` |
+| [measure-service](./measure-service.md) | 8 endpoints (record + activity + internal sync) | `api-version: 1.0.0` / `1.0.1` / `1.0.2` (records — gender·bmi) | record DTO `2026-01-13` (V9: `deviceId` / `deviceSerial` / `source` / `appVersion` 노출), activity DTO `2026-02-02` |
 | [noti-service](./noti-service.md) | 9 endpoints (FCM + device + topic + history) | `api-version: 1.0.0` | async job pattern |
 | [storage-service](./storage-service.md) | 9 endpoints (v1 deprecated + v2 current) | `api-version: 1.0.0` | v1 sunset 2026-12-31 |
 | [admin-service](./admin-service.md) **(deprecated)** | 2 endpoints (Spring Boot Admin instance view) | `api-version` `1.0.0`, `2025-06-24`, `0.0.1` | **미사용 서비스** — wraps SBA |
